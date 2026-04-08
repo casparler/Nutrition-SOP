@@ -2,427 +2,331 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeoNutri - Neonatal Nutrition Calculator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NeoSOP Assistant</title>
     <style>
-        @media print {
-            .no-print { display: none; }
-        }
-        input:invalid { border-color: #ef4444; }
-        .critical-warning { background-color: #fee2e2; border: 2px solid #ef4444; color: #991b1b; }
+        /* Modernes, klinisches Design */
+        :root { --primary: #0056b3; --secondary: #6c757d; --danger: #dc3545; --success: #28a745; --warning: #ffc107; --bg: #f8f9fa; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .section { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .disclaimer { background: #fff3f3; color: #7a0000; border: 1px solid #ffdddd; border-radius: 12px; padding: 12px 14px; margin: 0 auto 12px auto; max-width: 500px; white-space: pre-line; font-size: 0.85rem; line-height: 1.35; }
+        h2 { font-size: 0.9rem; color: var(--secondary); text-transform: uppercase; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        label { display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; }
+        input, select { width: 100%; border: 1px solid #ddd; padding: 10px; border-radius: 8px; font-size: 1rem; box-sizing: border-box; margin-bottom: 10px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        /* Situations-Buttons */
+        .chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .chip { padding: 8px 12px; border: 1px solid #ddd; border-radius: 20px; font-size: 0.8rem; cursor: pointer; background: white; transition: 0.2s; }
+        .chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        /* Ergebniskarten */
+        .med-card { border-left: 5px solid var(--primary); padding: 12px; margin-bottom: 10px; background: #fff; position: relative; }
+        .med-name { font-weight: bold; font-size: 1.1rem; }
+        .med-dose { color: var(--primary); font-weight: 800; font-size: 1.2rem; float: right; }
+        .med-note { font-size: 0.75rem; color: #666; margin-top: 5px; }
+        .alert { padding: 10px; border-radius: 8px; font-size: 0.8rem; margin-top: 10px; line-height: 1.4; }
+        .alert-info { background: #e7f3ff; color: #004085; border: 1px solid #b8daff; }
+        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans min-h-screen">
+<body>
 
-    <header class="bg-blue-800 text-white p-4 shadow-md no-print">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span class="text-sm font-normal opacity-75">v1.0 | ESPGHAN 2018</span></h1>
-            <div class="text-right">
-                <p id="current-date" class="text-xs uppercase"></p>
-            </div>
-        </div>
+<div class="disclaimer">
+WICHTIG: Indikation prüfen (Wehen, Blasensprung, Blutung, mütterl. Fieber). Bei fehlender Infektionsanamnese keine primäre antibiotische Therapie im Kreißsaal. Immer BB, CRP und IL-6 bestimmen.
+</div>
+
+<div class="container">
+    <header style="text-align: center; margin-bottom: 20px;">
+        <h1 style="margin:0; color: var(--primary); font-size: 1.6rem;">Neo-Sepsis SOP</h1>
+        <span style="font-size: 0.7rem; color: #999;">Stand 05/2021 | Köln</span>
     </header>
 
-    <main class="container mx-auto p-4 md:p-6 lg:p-8 max-w-6xl">
-        
-        <!-- Patient Info Section -->
-        <section class="bg-white rounded-lg shadow-sm p-4 mb-6 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 border-l-4 border-blue-500">
+    <!-- Zone 1: Patientendaten -->
+    <div class="section">
+        <h2>1. Patientendaten</h2>
+        <label>Gewicht (g)</label>
+        <input type="number" id="weight" value="1500" oninput="ui_update()">
+        <div class="grid">
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase">Patienten-ID / Name</label>
-                <input type="text" id="patient-id" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. Station A, Bett 4">
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase">Geburtsgewicht (g)</label>
-                <input type="number" id="birth-weight" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. 1250">
+                <label>SSW</label>
+                <input type="number" id="ssw_w" value="28" oninput="ui_update()">
             </div>
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase">Aktuelles Gewicht (g)</label>
-                <input type="number" id="current-weight" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. 1180">
+                <label>Tage</label>
+                <input type="number" id="ssw_d" value="0" oninput="ui_update()">
             </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase">SSW</label>
-                <select id="input-ssw" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1 bg-white">
-                    <option value="23">23</option>
-                    <option value="24">24</option>
-                    <option value="25">25</option>
-                    <option value="26">26</option>
-                    <option value="27">27</option>
-                    <option value="28" selected>28</option>
-                    <option value="29">29</option>
-                    <option value="30">30</option>
-                    <option value="31">31</option>
-                    <option value="32">32</option>
-                    <option value="33">33</option>
-                    <option value="34">34</option>
-                    <option value="35">35</option>
-                    <option value="36">36</option>
-                    <option value="37">37</option>
-                    <option value="38">38</option>
-                    <option value="39">39</option>
-                    <option value="40">40</option>
-                    <option value="41">41</option>
-                    <option value="42">42</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase">Tag (Postnatal)</label>
-                <input type="number" id="input-day" min="1" step="1" value="1" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. 1">
-            </div>
-            <div class="flex items-end">
-                <label class="inline-flex items-center gap-2 text-xs font-bold text-gray-500 uppercase cursor-pointer select-none pb-1">
-                    <input type="checkbox" id="input-invasive-ventilation" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    <span>Invasive Beatmung</span>
-                </label>
-            </div>
-        </section>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            <!-- Input Panel -->
-            <section class="space-y-6 no-print">
-                <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                    <div class="bg-gray-800 text-white px-4 py-2 font-semibold">Ernährungsziele & Volumen</div>
-                    <div class="p-4 space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Gesamtflüssigkeit (TFI) <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
-                            <input type="number" id="input-tfi" step="1" value="80" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Enterale Ernährung <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
-                                <input type="number" id="input-enteral" step="1" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">FM85 (%)</label>
-                                <select id="input-fm85" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-                                    <option value="0">0%</option>
-                                    <option value="1">1%</option>
-                                    <option value="2">2%</option>
-                                    <option value="3">3%</option>
-                                    <option value="4">4%</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Medikamenten-Trägerlösungen <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
-                            <input type="number" id="input-carrier" step="1" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                    <div class="bg-gray-800 text-white px-4 py-2 font-semibold">Parenterale Makronährstoffe</div>
-                    <div class="p-4 space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Glukose-Infusionsrate (GIR) <span class="text-gray-400 font-normal">(mg/kg/min)</span></label>
-                            <input type="number" id="input-gir" step="0.1" value="6.0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Aminosäuren <span class="text-gray-400 font-normal">(g/kg/d)</span></label>
-                                <input type="number" id="input-protein" step="0.1" value="2.0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Lipide <span class="text-gray-400 font-normal">(g/kg/d)</span></label>
-                                <input type="number" id="input-lipids" step="0.1" value="1.0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Results Panel -->
-            <section class="space-y-6">
-                <!-- Main Calculation Card -->
-                <div id="result-card" class="bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
-                    <div class="bg-blue-600 text-white px-4 py-3 flex justify-between items-center">
-                        <span class="font-bold text-lg">Ergebnis-Zusammenfassung</span>
-                        <span id="safety-badge" class="bg-green-500 text-white text-xs px-2 py-1 rounded-full uppercase font-bold">Sicher</span>
-                    </div>
-                    <div id="warning-container" class="hidden p-3 text-sm font-bold bg-red-100 text-red-800 border-b border-red-200"></div>
-                    <div id="fortification-info" class="hidden p-3 rounded-md text-sm font-bold bg-blue-50 text-blue-800 border-b border-blue-200"></div>
-                    
-                    <div class="p-0">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="bg-gray-50 text-gray-500 text-xs uppercase">
-                                    <th class="p-3 border-b">Parameter</th>
-                                    <th class="p-3 border-b text-right">Pro Tag</th>
-                                    <th class="p-3 border-b text-right">Laufrate</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                <tr>
-                                    <td class="p-3 font-medium">Gesamtflüssigkeit</td>
-                                    <td id="res-tfi-daily" class="p-3 text-right">-</td>
-                                    <td id="res-tfi-rate" class="p-3 text-right">-</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3" id="rec-tfi" class="px-3 pb-3 text-xs text-gray-500">Empfehlung: -</td>
-                                </tr>
-                                <tr class="bg-blue-50/30">
-                                    <td class="p-3 font-medium">PN-Volumen (Netto)</td>
-                                    <td id="res-pn-daily" class="p-3 text-right">-</td>
-                                    <td id="res-pn-rate" class="p-3 text-right">-</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3 font-medium">Enteral</td>
-                                    <td id="res-enteral-daily" class="p-3 text-right">-</td>
-                                    <td id="res-enteral-rate" class="p-3 text-right">-</td>
-                                </tr>
-                                <tr class="bg-gray-50">
-                                    <td colspan="3" class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Nährstoff-Details</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3">Glukose-Konz. (PN)</td>
-                                    <td id="res-glucose-conc" class="p-3 text-right font-bold text-blue-700">-</td>
-                                    <td class="p-3 text-right text-gray-400 text-sm">%</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3">Glukose Gesamt</td>
-                                    <td id="res-glucose-gkg" class="p-3 text-right">-</td>
-                                    <td class="p-3 text-right text-gray-400 text-sm">g/kg/d</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3">Aminosäuren Gesamt</td>
-                                    <td id="res-protein-total-gkg" class="p-3 text-right font-bold text-blue-800">-</td>
-                                    <td class="p-3 text-right text-gray-400 text-sm">g/kg/d</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3" id="rec-protein" class="px-3 pb-3 text-xs text-gray-500">Empfehlung: -</td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3">Lipide</td>
-                                    <td id="res-lipids-g" class="p-3 text-right">-</td>
-                                    <td class="p-3 text-right text-gray-400 text-sm">g/d</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3" id="rec-lipids" class="px-3 pb-3 text-xs text-gray-500">Empfehlung: -</td>
-                                </tr>
-                                <tr class="bg-orange-50 font-bold">
-                                    <td class="p-3">Energie-Zufuhr</td>
-                                    <td id="res-kcal-kg" class="p-3 text-right text-orange-700">-</td>
-                                    <td id="res-kcal-target" class="p-3 text-right text-gray-400 text-xs font-normal">Ziel: -</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3" id="rec-energy" class="px-3 pb-3 text-xs text-gray-500">Empfehlung: -</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex gap-4 no-print">
-                    <button id="btn-export" class="flex-1 bg-gray-800 hover:bg-black text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        PDF Export
-                    </button>
-                    <button id="btn-reset" class="bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-600 font-bold py-3 px-6 rounded-lg transition">
-                        Reset
-                    </button>
-                </div>
-            </section>
         </div>
+        <label>Lebensalter (Tage)</label>
+        <input type="number" id="pna" value="1" oninput="ui_update()">
+    </div>
 
-        <footer class="mt-12 text-center text-gray-400 text-sm no-print border-t pt-6">
-            <p>&copy; 2026 Clinical Decision Support System - Nur für autorisiertes medizinisches Personal.</p>
-            <p class="mt-2 text-xs">Berechnungen basieren auf ESPGHAN 2018 Leitlinien. Trotz höchster Sorgfalt wird keine Haftung für die Richtigkeit übernommen.</p>
-        </footer>
-    </main>
+    <!-- Zone 3: Output -->
+    <div id="output"></div>
+    
+    <!-- Zone 2: Situation -->
+    <div class="section">
+        <h2>2. Indikation & Situation</h2>
+        <div class="chip-group">
+            <div class="chip" id="chip_eos" onclick="toggleChip('eos')">EOS Primärtherapie</div>
+            <div class="chip" id="chip_vanco" onclick="toggleChip('vanco')">Verdacht KNS / Katheter</div>
+            <div class="chip" id="chip_meningitis" onclick="toggleChip('meningitis')">V.a. Meningitis</div>
+            <div class="chip" id="chip_steril" onclick="toggleChip('steril')">Blutkultur steril</div>
+            <div class="chip" id="chip_targeted" onclick="toggleChip('targeted')">Gezielte Therapie</div>
+            <div class="chip" id="chip_ureaplasma" onclick="toggleChip('ureaplasma')">V.a. Ureaplasmen / PCR positiv</div>
+            <div class="chip" id="chip_nvk_esk" onclick="toggleChip('nvk_esk')">NVK / ESK einliegend</div>
+        </div>
+    </div>
+    
+    <!-- Zone 4: Infobox Prävention -->
+    <div id="infobox" class="section" style="background: #fffdf0;"></div>
 
-    <!-- App Logic -->
-    <script src="calculator.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const calculator = new NutritionCalculator();
-            const inputs = [
-                'birth-weight', 'current-weight', 'input-tfi', 
-                'input-enteral', 'input-fm85', 'input-carrier', 'input-gir', 
-                'input-protein', 'input-lipids', 'input-ssw', 'input-day', 'input-invasive-ventilation'
-            ];
+    <footer style="font-size: 0.6rem; color: #aaa; text-align: center; padding: 20px;">
+        NUR FÜR ÄRZTLICHES PERSONAL. KEINE GEWÄHR FÜR RICHTIGKEIT.
+    </footer>
+</div>
 
-            // Set current date
-            document.getElementById('current-date').innerText = new Date().toLocaleDateString('de-DE', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-            });
+<script>
+    // Zustand der App
+    let state = { eos: true, vanco: false, meningitis: false, steril: false, targeted: false, ureaplasma: false, nvk_esk: false };
 
-            // Auto-load from localStorage
-            inputs.forEach(id => {
-                const val = localStorage.getItem(id);
-                if (val !== null) {
-                    if (id === 'input-invasive-ventilation') {
-                        document.getElementById(id).checked = val === 'true';
-                    } else {
-                        document.getElementById(id).value = val;
-                    }
-                }
-                
-                // Add change listener
-                const eventName = (id === 'input-invasive-ventilation' || id === 'input-ssw' || id === 'input-fm85') ? 'change' : 'input';
-                document.getElementById(id).addEventListener(eventName, () => {
-                    const el = document.getElementById(id);
-                    const storedValue = id === 'input-invasive-ventilation' ? el.checked : el.value;
-                    localStorage.setItem(id, storedValue);
-                    updateCalculations();
-                });
-            });
+    function toggleChip(id) {
+        state[id] = !state[id];
+        document.getElementById('chip_' + id).classList.toggle('active', state[id]);
+        ui_update();
+    }
 
-            function updateCalculations() {
-                const data = {
-                    currentWeight: document.getElementById('current-weight').value || 1000,
-                    tfi: document.getElementById('input-tfi').value || 0,
-                    enteralVolume: document.getElementById('input-enteral').value || 0,
-                    fm85Percent: document.getElementById('input-fm85').value || 0,
-                    carrierVolume: document.getElementById('input-carrier').value || 0,
-                    gir: document.getElementById('input-gir').value || 0,
-                    protein: document.getElementById('input-protein').value || 0,
-                    lipids: document.getElementById('input-lipids').value || 0,
-                    birthWeight: document.getElementById('birth-weight').value || 1000,
-                    ssw: document.getElementById('input-ssw').value || 28,
-                    postnatalAge: document.getElementById('input-day').value || 1,
-                    ventilationStatus: document.getElementById('input-invasive-ventilation').checked ? 'invasive' : 'spontaneous'
-                };
+    function ui_update() {
+        // Hier binden wir deine logic.js ein (SOP_LOGIC Objekt)
+        const weight = parseFloat(document.getElementById('weight').value) / 1000;
+        const ssw_w = parseInt(document.getElementById('ssw_w').value);
+        const ssw_d = parseInt(document.getElementById('ssw_d').value);
+        const pna = parseInt(document.getElementById('pna').value);
+        
+        const pma = SOP_LOGIC.calculatePMA(ssw_w, ssw_d, pna);
+        const ssw_dec = ssw_w + (ssw_d / 7);
+        const therapyDays = ssw_dec < 28.0 ? 5 : 3;
 
-                const res = calculator.calculate(data);
-                displayResults(res);
+        let html = `<div class="pma-badge" style="text-align:center; font-weight:bold; margin-bottom:10px; font-size:0.9rem;">
+                    PMA: ${pma.weeks}+${pma.days} SSW</div>`;
+        const therapyNote = `<div class="alert alert-info" style="margin-bottom:10px;"><b>Therapiedauer:</b> ${therapyDays} Tage (Nur bei CRP&lt;10 mg/l und stabilem Zustand beenden).</div>`;
+        html += therapyNote;
+
+        const swapToVanco = state.targeted || state.vanco;
+
+        // Blutkultur-Steril-Logik (Global): Hinweis immer anzeigen, wenn Chip aktiv.
+        if (state.steril) {
+            html += `<div class="alert alert-success">Blutkultur steril: Cefotaxim & Caspofungin beenden</div>`;
+        }
+
+        // Ampicillin bleibt Basis in beiden SOP-Fällen
+        const ampi = SOP_LOGIC.getAmpiCefo(pma, pna, weight, state.meningitis);
+        html += renderMedCard('Ampicillin', ampi.dose, ampi.interval, 'mg');
+
+        // FALL A: Primärtherapie/EOS (keine gezielte Therapie/KNS-Verdacht)
+        // - Cefotaxim außer steril
+        // - Tobramycin außer Swap zu Vanco
+        if (!swapToVanco) {
+            if (!state.steril) {
+                html += renderMedCard('Cefotaxim', ampi.dose, ampi.interval, 'mg');
             }
+            const tobra = SOP_LOGIC.getTobramycin(pma, pna, weight);
+            html += renderMedCard('Tobramycin', tobra.dose, tobra.interval, 'mg', 'Talspiegel-Ziel: < 2 mg/l (vor 3. Gabe)');
+        } else {
+            // FALL B: Gezielte Therapie / KNS-Verdacht
+            // - Ampicillin + Vancomycin
+            // - Cefotaxim & Tobramycin ausgeblendet, außer bei V.a. Meningitis (Cefotaxim bleibt sichtbar)
+            const vanco = SOP_LOGIC.getVancomycin(pma, pna, weight, state.meningitis);
+            html += renderMedCard('Vancomycin', vanco.dose, vanco.interval, 'mg', `Talspiegel-Ziel: ${state.meningitis ? '15-20' : '5-10'} mg/l`);
 
-            function displayResults(res) {
-                const r = res.results;
-                
-                // Volumes & Rates
-                document.getElementById('res-tfi-daily').innerText = `${r.totalDailyFluid} ml`;
-                document.getElementById('res-tfi-rate').innerText = `${r.rates.total} ml/h`;
-                document.getElementById('res-pn-daily').innerText = `${r.pnDaily} ml`;
-                document.getElementById('res-pn-rate').innerText = `${r.rates.pn} ml/h`;
-                document.getElementById('res-enteral-daily').innerText = `${r.enteralDaily} ml`;
-                document.getElementById('res-enteral-rate').innerText = `${r.rates.enteral} ml/h`;
-
-                // Details
-                document.getElementById('res-glucose-conc').innerText = `${r.glucoseConc}`;
-                document.getElementById('res-glucose-gkg').innerText = `${r.glucoseGPerKg}`;
-                document.getElementById('res-protein-total-gkg').innerText = `${r.proteinTotalGPerKg}`;
-                document.getElementById('res-lipids-g').innerText = `${r.lipidsTotalG}`;
-                document.getElementById('res-kcal-kg').innerText = `${r.kcalPerKg}`;
-                document.getElementById('res-kcal-target').innerText = `Ziel: ${res.targets.energyTarget.min}-${res.targets.energyTarget.max} kcal/kg/d`;
-
-                updateRecommendationLine('rec-tfi', res.recommendations.tfi, res.comparisons.tfi.status);
-                updateRecommendationLine('rec-protein', res.recommendations.protein, res.comparisons.protein.status);
-                updateRecommendationLine('rec-lipids', res.recommendations.lipids, res.comparisons.lipids.status);
-                updateRecommendationLine('rec-energy', res.recommendations.energy, res.comparisons.energy.status);
-
-                // Safety
-                const warningCont = document.getElementById('warning-container');
-                const safetyBadge = document.getElementById('safety-badge');
-                
-                warningCont.innerHTML = '';
-                if (res.warnings.length > 0) {
-                    warningCont.classList.remove('hidden');
-                    res.warnings.forEach(w => {
-                        const div = document.createElement('div');
-                        div.className = `p-2 ${w.startsWith('CRITICAL') || w.includes('Restriktives Ziel') ? 'text-red-800' : 'text-yellow-800'}`;
-                        div.innerText = w;
-                        warningCont.appendChild(div);
-                    });
-                } else {
-                    warningCont.classList.add('hidden');
-                }
-
-                const fortificationInfo = document.getElementById('fortification-info');
-                if (res.recommendations.fortification) {
-                    fortificationInfo.classList.remove('hidden');
-                    fortificationInfo.innerText = res.recommendations.fortification;
-                } else {
-                    fortificationInfo.classList.add('hidden');
-                }
-
-                if (res.isSafe) {
-                    safetyBadge.innerText = 'Sicher';
-                    safetyBadge.className = 'bg-green-500 text-white text-xs px-2 py-1 rounded-full uppercase font-bold';
-                } else {
-                    safetyBadge.innerText = 'Kritisch';
-                    safetyBadge.className = 'bg-red-600 text-white text-xs px-2 py-1 rounded-full uppercase font-bold';
-                }
+            if (state.meningitis) {
+                html += renderMedCard('Cefotaxim', ampi.dose, ampi.interval, 'mg');
             }
+        }
 
-            function updateRecommendationLine(targetId, text, status) {
-                const el = document.getElementById(targetId);
-                const colorMap = {
-                    green: 'text-green-700 bg-green-50',
-                    yellow: 'text-yellow-800 bg-yellow-50',
-                    red: 'text-red-700 bg-red-50'
-                };
-                el.className = `px-3 pb-3 pt-2 text-xs rounded-sm ${colorMap[status] || 'text-gray-500 bg-gray-50'}`;
-                el.innerText = text;
-            }
+        // Caspofungin-Sperre: Wenn steril aktiv, nie anzeigen.
+        if (!state.steril && state.eos && ssw_dec < 28.0) {
+            html += renderMedCard('Caspofungin', (weight * 25).toFixed(1), 24, 'mg', 'Loading Dose 25mg/kg, dann 25mg/kg 1x tgl.');
+        }
 
-            // PDF Export
-            document.getElementById('btn-export').addEventListener('click', () => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                const pId = document.getElementById('patient-id').value || 'Unbekannt';
-                
-                doc.setFontSize(20);
-                doc.text("Ernährungsplan Frühgeborene", 14, 22);
-                doc.setFontSize(10);
-                doc.text(`Patient: ${pId}`, 14, 32);
-                doc.text(`Datum: ${new Date().toLocaleString('de-DE')}`, 14, 37);
-                doc.text(`Aktuelles Gewicht: ${document.getElementById('current-weight').value} g`, 14, 42);
-                doc.text(`SSW: ${document.getElementById('input-ssw').value}`, 14, 47);
-                doc.text(`Postnataler Tag: ${document.getElementById('input-day').value}`, 14, 52);
-                doc.text(`Invasive Beatmung: ${document.getElementById('input-invasive-ventilation').checked ? 'Ja' : 'Nein'}`, 14, 57);
+        // Ureaplasma-Feature -> Clarithromycin
+        if (state.ureaplasma) {
+            const extraNote = (ssw_dec > 32.0) ? ' PCR nur im Sonderfall.' : '';
+            html += `<div class="alert alert-warning"><b>Spezialmedikation:</b> Clarithromycin (Oberarzt-Indikation).${extraNote}</div>`;
+        }
 
-                // Add Table
-                doc.autoTable({
-                    startY: 65,
-                    head: [['Parameter', 'Wert pro Tag', 'Laufrate / Einheit']],
-                    body: [
-                        ['Gesamtflüssigkeit (TFI)', document.getElementById('res-tfi-daily').innerText, document.getElementById('res-tfi-rate').innerText],
-                        ['PN-Volumen (Netto)', document.getElementById('res-pn-daily').innerText, document.getElementById('res-pn-rate').innerText],
-                        ['Enterale Ernährung', document.getElementById('res-enteral-daily').innerText, document.getElementById('res-enteral-rate').innerText],
-                        ['Glukose Konzentration', document.getElementById('res-glucose-conc').innerText + ' %', '-'],
-                        ['Aminosäuren Gesamt', document.getElementById('res-protein-total-gkg').innerText + ' g/kg/d', '-'],
-                        ['Lipide', document.getElementById('res-lipids-g').innerText + ' g', '-'],
-                        ['Energie Gesamt', document.getElementById('res-kcal-kg').innerText + ' kcal/kg/d', '-']
-                    ],
-                    theme: 'striped',
-                    headStyles: { fillColor: [30, 64, 175] }
-                });
+        // Diagnostik-Erinnerung
+        if (state.targeted) {
+            html += `<div class="alert alert-warning" style="margin-top:10px;"><b>Diagnostik-Erinnerung:</b> LP erwägen, bei gramnegativer Sepsis obligat!</div>`;
+        }
 
-                // Add Warnings if any
-                const warnings = Array.from(document.querySelectorAll('#warning-container div')).map(d => d.innerText);
-                if (warnings.length > 0) {
-                    let y = doc.lastAutoTable.finalY + 15;
-                    doc.setTextColor(200, 0, 0);
-                    doc.setFontSize(12);
-                    doc.text("SICHERHEITSHINWEISE:", 14, y);
-                    doc.setFontSize(10);
-                    warnings.forEach(w => {
-                        y += 7;
-                        doc.text(`• ${w}`, 14, y);
-                    });
-                }
+        document.getElementById('output').innerHTML = html;
 
-                doc.save(`Nutrition_${pId.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
-            });
+        // 3. Infobox Prävention
+        const info = SOP_LOGIC.getInfobox(ssw_dec, weight, pna, state.nvk_esk);
+        document.getElementById('infobox').innerHTML = `
+            <h2>Prävention Katheter-Infektion</h2>
+            <div class="med-note"><b>Desinfektion:</b> ${info.desinfektion}</div>
+            <div class="med-note"><b>Fluconazol:</b> ${info.fluconazol}</div>
+            ${ssw_dec < 28.0 ? `<div class="med-note"><b>Antimykotika:</b> ${info.ampho}</div>` : ``}
+        `;
 
-            // Reset
-            document.getElementById('btn-reset').addEventListener('click', () => {
-                if (confirm('Alle Eingaben löschen?')) {
-                    localStorage.clear();
-                    location.reload();
-                }
-            });
+        // Fluconazol-Prophylaxe prominent anzeigen (nur bei NVK/ESK einliegend + Kriterien)
+        if (state.nvk_esk && (weight < 1.0 || ssw_dec < 28.0)) {
+            document.getElementById('output').innerHTML += `
+                <div class="alert alert-warning" style="margin-top:10px; font-weight:700;">
+                    <b>Fluconazol-Prophylaxe</b>: Kriterien erfüllt (NVK/ESK einliegend + Gewicht &/oder SSW).
+                </div>
+            `;
+        }
+    }
 
-            // Initial calculation
-            updateCalculations();
-        });
-    </script>
+    function renderMedCard(name, dose, interval, unit, note = "") {
+        return `
+            <div class="med-card">
+                <span class="med-dose">${dose} ${unit}</span>
+                <div class="med-name">${name}</div>
+                <div class="med-int">Alle ${interval} Stunden</div>
+                ${note ? `<div class="med-note">${note}</div>` : ''}
+            </div>
+        `;
+    }
+
+</script>
+
+<script>
+/**
+ * Neonatologische SOP Logik-Engine (Stand 05/2021)
+ *
+ * Ergänzt mit Hinweisen für Kombinationslogik in ui_update():
+ *
+ * if (state.eos || state.vanco) {
+ *   // Ampicillin bleibt immer die Basis (außer bei explizitem Absetzen)
+ *   const ampi = SOP_LOGIC.getAmpiCefo(pma, pna, weight, state.meningitis);
+ *   html += renderMedCard('Ampicillin', ampi.dose, ampi.interval, 'mg');
+ *
+ *   if (state.vanco) {
+ *     // SWAP: Vancomycin statt Tobramycin bei KNS/gezielter Therapie
+ *     const vanco = SOP_LOGIC.getVancomycin(pma, pna, weight, state.meningitis);
+ *     html += renderMedCard('Vancomycin', vanco.dose, vanco.interval, 'mg',
+ *         `Ziel-Talspiegel: ${state.meningitis ? '15-20' : '5-10'} mg/l`); // [cite: 1]
+ *   } else {
+ *     // Standard EOS: Tobramycin anzeigen
+ *     const tobra = SOP_LOGIC.getTobramycin(pma, pna, weight);
+ *     html += renderMedCard('Tobramycin', tobra.dose, tobra.interval, 'mg',
+ *         'Ziel-Talspiegel: < 2 mg/l (vor 3. Gabe)'); // [cite: 1]
+ *   }
+ * }
+ */
+const SOP_LOGIC = {
+    // Hilfsfunktion zur Berechnung des dezimalen PMA
+    calculatePMA: function(ssw_w, ssw_d, pna_d) {
+        const totalDays = (ssw_w * 7) + ssw_d + pna_d;
+        return {
+            weeks: Math.floor(totalDays / 7),
+            days: totalDays % 7,
+            decimal: totalDays / 7
+        };
+    },
+
+    // Dosierung Ampicillin & Cefotaxim (50 mg/kg ED)
+    getAmpiCefo: function(pma, pna, weight, isMeningitis) {
+        // Bei Meningitis: 200 mg/kg/Tag, verteilt auf 3 ED => 66.6 mg/kg pro ED, Intervall 8h
+        if (isMeningitis) {
+            return {
+                dose: Math.round(weight * 66.6),
+                interval: 8,
+                unit: "mg"
+            };
+        }
+
+        const dosePerKg = 50;
+        let interval = 12;
+
+        if (pma.decimal <= 28.85) { // <= 28+6 SSW
+            interval = (pna <= 28) ? 12 : 8;
+        } else if (pma.decimal <= 35.85) { // 29+0 - 35+6 SSW
+            interval = (pna <= 14) ? 12 : 8;
+        } else if (pma.decimal <= 43.85) { // 36+0 - 43+6 SSW
+            interval = (pna <= 7) ? 12 : 8;
+        } else { // >= 44+0 SSW
+            interval = 6;
+        }
+
+        return {
+            dose: Math.round(weight * dosePerKg),
+            interval: interval,
+            unit: "mg"
+        };
+    },
+
+    // Dosierung Tobramycin (4-5 mg/kg ED)
+    getTobramycin: function(pma, pna, weight) {
+        let dosePerKg = 4;
+        let interval = 24;
+
+        if (pma.decimal <= 28.85) { // <= 28+6 SSW
+            dosePerKg = (pna <= 7) ? 5 : 4;
+            interval = (pna <= 7) ? 48 : (pna <= 28 ? 36 : 24);
+        } else if (pma.decimal <= 33.85) { // 29+0 - 33+6 SSW
+            dosePerKg = (pna <= 7) ? 4.5 : 4;
+            interval = (pna <= 7) ? 36 : 24;
+        } else { // >= 34+0 SSW
+            dosePerKg = 4;
+            interval = 24;
+        }
+
+        return {
+            dose: (weight * dosePerKg).toFixed(1),
+            interval: interval,
+            unit: "mg"
+        };
+    },
+
+    // Dosierung Vancomycin (10-15 mg/kg ED)
+    getVancomycin: function(pma, pna, weight, isMeningitis) {
+        const dosePerKg = isMeningitis ? 15 : 10;
+        let interval = 12;
+
+        if (pma.decimal <= 28.85) {
+            interval = (pna <= 14) ? 18 : 12;
+        } else if (pma.decimal <= 35.85) {
+            interval = (pna <= 14) ? 12 : 8;
+        } else if (pma.decimal <= 43.85) {
+            interval = (pna <= 7) ? 12 : 8;
+        } else {
+            interval = 6;
+        }
+
+        return {
+            dose: Math.round(weight * dosePerKg),
+            interval: interval,
+            unit: "mg"
+        };
+    },
+
+    // Infobox & Prophylaxen
+    getInfobox: function(ssw_dec, weight, pna, hasNvkEsk = false) {
+        hasNvkEsk = !!hasNvkEsk;
+        let desinfektion = "Kodan (Spray)";
+        if (ssw_dec < 26.0) desinfektion = "Betaisadona 1:10 (9ml Aqua + 1ml Betaisadona). Kontrolle TSH/fT3/fT4 nach 7 Tagen!";
+        else if (ssw_dec < 32.0) desinfektion = "Octenidin 0,1%";
+
+        const fluconazol = hasNvkEsk
+            ? ((ssw_dec < 28.0 || weight < 1.0) ? "Fluconazol-Prophylaxe indiziert (Kriterien erfüllt)" : "Fluconazol-Prophylaxe nicht standardmäßig indiziert (Kriterien nicht erfüllt)")
+            : "Fluconazol-Prophylaxe nicht indiziert (NVK/ESK nicht einliegend)";
+        const ampho = (ssw_dec < 28.0) ? "Amphomoronal po 2x0,3ml bis 48h nach Ende Antibiotika" : "Nicht indiziert";
+        return { desinfektion, fluconazol, ampho };
+    }
+};
+</script>
+
+<script>
+    // Initialer Aufruf (erst nach SOP_LOGIC-Definition)
+    document.getElementById('chip_eos').classList.add('active');
+    ui_update();
+</script>
+
 </body>
 </html>
