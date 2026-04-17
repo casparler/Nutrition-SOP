@@ -212,11 +212,13 @@ class NutritionCalculator {
         // = lipids_g_kg * weightKg * 100 / fatPer100ml
         const lipidVolDaily = lipidsPNKg.times(weightKg).times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
 
+        const microVolKg = D(parseFloat(input.microVolume) || 0);
         const totalDailyFluid = weightKg.times(tfi).toDecimalPlaces(1);
         const enteralDaily = weightKg.times(enteralVolKg).toDecimalPlaces(1);
         const carrierDaily = weightKg.times(carrierVolKg).toDecimalPlaces(1);
+        const microDaily = weightKg.times(microVolKg).toDecimalPlaces(1);
         // R-07: Secondary infusion subtracts from available PN capacity
-        const pnDailyGrossRaw = totalDailyFluid.minus(enteralDaily).minus(carrierDaily).minus(secondaryDaily);
+        const pnDailyGrossRaw = totalDailyFluid.minus(enteralDaily).minus(carrierDaily).minus(secondaryDaily).minus(microDaily);
         const pnVolumeOverflow = pnDailyGrossRaw.lt(0);
         const pnDailyGross = Decimal.max(0, pnDailyGrossRaw).toDecimalPlaces(1);
         // R-04: PN-Netto = Gross PN minus lipid volume
@@ -317,22 +319,28 @@ class NutritionCalculator {
         }
 
         if (selectedEnteralProduct === 'ebm' && enteralVolKg.gt(0) && fm85Percent > 0) {
-            // FM85 fortification: protein = base 1.13 + fm85% * 0.4675 per 100ml
+            // FM85 fortification — full nutrient model
             const fortifiedProtein = D('1.13').plus(D(fm85Percent).times('0.4675'));
             enteralProteinGKg = enteralVolKg.times(fortifiedProtein).div(100).toDecimalPlaces(3);
             const fortifiedKcal = D(71).plus(D(fm85Percent).times('3.5'));
             enteralKcalKg = enteralVolKg.times(fortifiedKcal).div(100).toDecimalPlaces(2);
+            const fortifiedFat = D('4.03').plus(D(fm85Percent).times('0.05'));
+            enteralFatGKg = enteralVolKg.times(fortifiedFat).div(100).toDecimalPlaces(3);
+            const fortifiedCarbs = D('7.0').plus(D(fm85Percent).times('0.6'));
+            enteralCarbsGKg = enteralVolKg.times(fortifiedCarbs).div(100).toDecimalPlaces(3);
+            const fortifiedNaMg = D(7).plus(D(fm85Percent).times(3));
+            enteralNaMmolKg = enteralVolKg.times(fortifiedNaMg).div(100).div(23).toDecimalPlaces(3);
         } else {
             enteralProteinGKg = enteralVolKg.times(baseProteinPer100).div(100).toDecimalPlaces(3);
             enteralKcalKg = enteralVolKg.times(baseKcalPer100).div(100).toDecimalPlaces(2);
-        }
 
-        if (typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.enteralProducts) {
-            const ep2 = window.NeoProducts.enteralProducts.find(p => p.id === selectedEnteralProduct);
-            if (ep2 && ep2.per100ml) {
-                enteralFatGKg = enteralVolKg.times(D(ep2.per100ml.fat || 0)).div(100).toDecimalPlaces(3);
-                enteralCarbsGKg = enteralVolKg.times(D(ep2.per100ml.carbs || 0)).div(100).toDecimalPlaces(3);
-                enteralNaMmolKg = enteralVolKg.times(D(ep2.per100ml.sodium_mg || 0)).div(100).div(23).toDecimalPlaces(3); // Na mg -> mmol: /23
+            if (typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.enteralProducts) {
+                const ep2 = window.NeoProducts.enteralProducts.find(p => p.id === selectedEnteralProduct);
+                if (ep2 && ep2.per100ml) {
+                    enteralFatGKg = enteralVolKg.times(D(ep2.per100ml.fat || 0)).div(100).toDecimalPlaces(3);
+                    enteralCarbsGKg = enteralVolKg.times(D(ep2.per100ml.carbs || 0)).div(100).toDecimalPlaces(3);
+                    enteralNaMmolKg = enteralVolKg.times(D(ep2.per100ml.sodium_mg || 0)).div(100).div(23).toDecimalPlaces(3);
+                }
             }
         }
 
@@ -342,9 +350,14 @@ class NutritionCalculator {
         if (typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.enteralProducts) {
             const ep = window.NeoProducts.enteralProducts.find(p => p.id === selectedEnteralProduct);
             if (ep && ep.per100ml) {
-                enteralPMgKg = enteralVolKg.times(D(ep.per100ml.phosphorus_mg || 0)).div(100).toDecimalPlaces(2);
-                const caMgPer100 = ep.per100ml.calcium_mg || (selectedEnteralProduct === 'ebm' ? 28 : 0);
-                enteralCaMgKg = enteralVolKg.times(D(caMgPer100)).div(100).toDecimalPlaces(2);
+                let basePMg = D(ep.per100ml.phosphorus_mg || 0);
+                let baseCaMg = D(ep.per100ml.calcium_mg || (selectedEnteralProduct === 'ebm' ? 28 : 0));
+                if (selectedEnteralProduct === 'ebm' && fm85Percent > 0) {
+                    baseCaMg = baseCaMg.plus(D(fm85Percent).times(40));
+                    basePMg = basePMg.plus(D(fm85Percent).times(22));
+                }
+                enteralPMgKg = enteralVolKg.times(basePMg).div(100).toDecimalPlaces(2);
+                enteralCaMgKg = enteralVolKg.times(baseCaMg).div(100).toDecimalPlaces(2);
             }
         }
 
@@ -384,12 +397,30 @@ class NutritionCalculator {
         }
 
         // Energy from total glucose (PN + secondary)
-        const kcalParenteralKg = totalGlucoseGKg.times(this.CALORIES.GLUCOSE)
-            .plus(lipidsPNKg.times(kcalPerGFat))
-            .plus(effectiveAS.times(this.CALORIES.PROTEIN))
-            .toDecimalPlaces(1);
+        const kcalGlucose = totalGlucoseGKg.times(this.CALORIES.GLUCOSE).toDecimalPlaces(1);
+        const kcalLipid = lipidsPNKg.times(kcalPerGFat).toDecimalPlaces(1);
+        const kcalProteinPN = effectiveAS.times(this.CALORIES.PROTEIN).toDecimalPlaces(1);
+        const kcalParenteralKg = kcalGlucose.plus(kcalLipid).plus(kcalProteinPN).toDecimalPlaces(1);
         const kcalEnteralKg = enteralKcalKg.toDecimalPlaces(1);
         const kcalPerKg = kcalParenteralKg.plus(kcalEnteralKg).toDecimalPlaces(1);
+
+        // --- NPC Ratio (Non-Protein Calories) ---
+        const npcTotal = kcalGlucose.plus(kcalLipid).toDecimalPlaces(1);
+        let npcLipidPercent = D(0);
+        let npcGlucosePercent = D(0);
+        if (npcTotal.gt(0)) {
+            npcLipidPercent = kcalLipid.div(npcTotal).times(100).toDecimalPlaces(1);
+            npcGlucosePercent = kcalGlucose.div(npcTotal).times(100).toDecimalPlaces(1);
+        }
+
+        // --- NPC/P Ratio (Energy Efficiency) ---
+        const enteralProteinKcal = enteralProteinGKg.times(this.CALORIES.PROTEIN);
+        const enteralNonProteinKcal = kcalEnteralKg.gt(0) ? Decimal.max(0, kcalEnteralKg.minus(enteralProteinKcal)) : D(0);
+        const npcTotalAll = npcTotal.plus(enteralNonProteinKcal).toDecimalPlaces(1);
+        let npcPerProtein = D(0);
+        if (proteinTotalGKg.gt(0)) {
+            npcPerProtein = npcTotalAll.div(proteinTotalGKg).toDecimalPlaces(1);
+        }
 
         // --- Step 9: Ca:P Ratio (molar) — TOTAL (PN + Enteral) ---
         let caPRatio = D(0);
@@ -458,7 +489,15 @@ class NutritionCalculator {
             totalPMgKg: totalPMgKg.toNumber(),
             totalGIRIncEnteral: totalGIRIncEnteral.toNumber(),
             totalLipidsGKg: totalLipidsGKg.toDecimalPlaces(2).toNumber(),
-            paaRatio: paaRatio.toNumber()
+            paaRatio: paaRatio.toNumber(),
+            npcTotal: npcTotal.toNumber(),
+            npcLipidPercent: npcLipidPercent.toNumber(),
+            npcGlucosePercent: npcGlucosePercent.toNumber(),
+            kcalGlucose: kcalGlucose.toNumber(),
+            kcalLipid: kcalLipid.toNumber(),
+            microVolDaily: microDaily.toNumber(),
+            npcTotalAll: npcTotalAll.toNumber(),
+            npcPerProtein: npcPerProtein.toNumber()
         };
 
         const reminders = [];
@@ -518,7 +557,7 @@ class NutritionCalculator {
             warnings.push('CRITICAL: TFI überschritten! Sekundärinfusionen reduzieren.');
         }
         if (triglycerides !== null && triglycerides > 250) {
-            warnings.push('CRITICAL: Triglyzeride > 250 mg/dl – Lipide stoppen/reduzieren.');
+            warnings.push('CRITICAL: Triglyzeride > 250 mg/dl – Hypertriglyceridämie! Lipidzufuhr auf 0,5–1,0 g/kg/d reduzieren (ESPGHAN).');
         }
 
         // C-01: Glucose concentration > 12.5% at peripheral access
@@ -568,9 +607,50 @@ class NutritionCalculator {
             warnings.push(`Hinweis: Energie ${n.kcalPerKg} kcal/kg/d unter Zielbereich (${targets.energy.min}–${targets.energy.max}) – Zufuhr steigern.`);
         }
 
+        // Energy excess above target
+        if (postnatalAge >= 4 && n.kcalPerKg > targets.energy.max) {
+            warnings.push(`Hinweis: Energie ${n.kcalPerKg} kcal/kg/d über Zielbereich (${targets.energy.min}–${targets.energy.max}) – Überernährung prüfen.`);
+        }
+
         // Warnung (yellow)
         if (n.caPRatio > 0 && (n.caPRatio < 1.5 || n.caPRatio > 2.0)) {
             warnings.push(`Warnung: Ca:P Verhältnis (${n.caPRatio}:1) außerhalb Zielbereich (1.5–2.0:1) – Zufuhr von Phosphat (z.B. Glycophos) oder Calcium anpassen.`);
+        }
+
+        // CRYSTAL GUARD: Ca-P solubility check in PN solution
+        // Reference: Simplified solubility curve for Level-1 NICU
+        if (pnDaily.gt(0) && (effectiveCa_mmol.gt(0) || effectiveP_mmol.gt(0))) {
+            const pnLitersForCrystal = pnDaily.div(1000);
+            const caConcMmolL = effectiveCa_mmol.times(weightKg).div(pnLitersForCrystal).toDecimalPlaces(1);
+            const pConcMmolL = effectiveP_mmol.times(weightKg).div(pnLitersForCrystal).toDecimalPlaces(1);
+            const caPSumMmolL = caConcMmolL.plus(pConcMmolL).toDecimalPlaces(1);
+            
+            // Threshold depends on volume density (simplified logic)
+            const threshold = 72; 
+            if (caPSumMmolL.gt(threshold)) {
+                warnings.push(`CRITICAL: Ausfällungsrisiko! Calcium/Phosphat-Konzentration (${caPSumMmolL.toNumber()} mmol/l) zu hoch für dieses Volumen (Limit ${threshold} mmol/l).`);
+            } else if (caPSumMmolL.gt(55)) {
+                warnings.push(`Warnung: Ca+P Konzentration ${caPSumMmolL.toNumber()} mmol/l nähert sich der Löslichkeitsgrenze.`);
+            }
+        }
+
+        // NPC-Ratio Guard: Lipid should be 25–50% of non-protein calories (ESPGHAN)
+        if (n.npcTotal > 0 && hasPNVolume) {
+            if (n.npcLipidPercent < 25) {
+                warnings.push(`Warnung: Lipid-Anteil an NPC nur ${n.npcLipidPercent}% (Ziel 25–50%) – metabolische Imbalance, Lipide steigern.`);
+            } else if (n.npcLipidPercent > 50) {
+                warnings.push(`Warnung: Lipid-Anteil an NPC ${n.npcLipidPercent}% > 50% – metabolische Imbalance, Glucose-Anteil erhöhen.`);
+            }
+        }
+
+        // ENERGY EFFICIENCY: NPC/P Ratio (ESPGHAN 2018)
+        // Zielbereich: 20–30 kcal pro 1g Protein
+        if (n.npcPerProtein > 0 && n.proteinTotalGKg > 0.5) {
+            if (n.npcPerProtein < 20) {
+                warnings.push(`Warnung: Energie-Ungleichgewicht: Protein wird energetisch verwertet (NPC/P ${n.npcPerProtein} < 20 kcal/g).`);
+            } else if (n.npcPerProtein > 40) {
+                warnings.push(`Warnung: Verfettungsrisiko (NPC/P ${n.npcPerProtein} > 40 kcal/g).`);
+            }
         }
 
         // P:AA Rule (ESPGHAN): ≥ 1 mmol P per 1 g Protein
@@ -612,7 +692,7 @@ class NutritionCalculator {
         if (postnatalAge >= 28 && weightVelocity !== 'Initial' && weightVelocity < 15 && n.enteralVolKg >= 100) {
             warnings.push(`Hinweis: Growth Velocity ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation. Fortifizierung prüfen.`);
         }
-        if (postnatalAge >= 28 && urea !== null && urea < 3 && n.enteralVolKg >= 100 && fm85Percent >= 4) {
+        if (postnatalAge >= 28 && urea !== null && urea < 3 && n.enteralVolKg >= 100 && fm85Percent >= 4 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             warnings.push('Hinweis: BUN < 3 mmol/l trotz FM85 4% in Phase C — Aptamil Eiweiß+ Supplementierung prüfen.');
         }
 
@@ -674,7 +754,7 @@ class NutritionCalculator {
 
         // --- Step 15: Recommendations ---
         let lipidEscalation = null;
-        if (n.lipidsPNKg < dayLipidTarget.min) {
+        if (n.lipidsPNKg < dayLipidTarget.min && hasPNVolume) {
             lipidEscalation = `Steigerung auf ${dayLipidTarget.min}–${dayLipidTarget.max} g/kg/d empfohlen (Tag ${lipidDayKey})`;
         }
 
@@ -687,10 +767,43 @@ class NutritionCalculator {
             fortification: (n.enteralVolKg >= 100 && fm85Percent < 4 && selectedEnteralProduct === 'ebm')
                 ? 'FM85 Titrationsplan: Steigerung auf 4% empfohlen'
                 : null,
-            supplement: (urea !== null && urea < 3 && fm85Percent >= 4)
+            supplement: (urea !== null && urea < 3 && fm85Percent >= 4 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max)
                 ? '+0.5 g/kg/d Protein (Aptamil Eiweiß+)'
                 : null
         };
+
+        // --- Step 16: Klinisches Fazit (Top 3 Optimizations) ---
+        const fazit = [];
+        if (n.proteinTotalGKg > this.LIMITS.PROTEIN.max) {
+            fazit.push(`Protein um ${this._round(n.proteinTotalGKg - this.LIMITS.PROTEIN.max, 1)} g/kg reduzieren (aktuell ${n.proteinTotalGKg}, Max ${this.LIMITS.PROTEIN.max} g/kg/d).`);
+        }
+        if (pnVolumeOverflow) {
+            fazit.push('Gesamtvolumen übersteigt TFI – Sekundärinfusionen oder enterales Volumen reduzieren.');
+        }
+        if (fazit.length < 3 && n.caPRatio > 0 && (n.caPRatio < 1.5 || n.caPRatio > 2.0)) {
+            const action = n.caPRatio < 1.5
+                ? `Phosphat reduzieren oder Calcium um ~${this._round((1.7 * totalPMmolKg.toNumber() - totalCaMmolKg.toNumber()) * this.MOLAR_MASS.CALCIUM, 0)} mg/kg erhöhen`
+                : `Phosphat (z.B. Glycophos) um ~${this._round((totalCaMmolKg.toNumber() / 1.7 - totalPMmolKg.toNumber()) * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen`;
+            fazit.push(`Ca:P Ratio ${n.caPRatio}:1 optimieren – ${action}.`);
+        }
+        if (fazit.length < 3 && postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
+            fazit.push(`Energiezufuhr um ${this._round(targets.energy.min - n.kcalPerKg, 0)} kcal/kg/d steigern (Ziel ${targets.energy.min}–${targets.energy.max}).`);
+        }
+        if (fazit.length < 3 && postnatalAge >= 4 && n.proteinTotalGKg < targets.protein.min && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
+            fazit.push(`Proteinzufuhr um ${this._round(targets.protein.min - n.proteinTotalGKg, 1)} g/kg/d steigern (Ziel ${targets.protein.min}–${targets.protein.max}).`);
+        }
+        if (fazit.length < 3 && n.npcPerProtein > 0 && n.npcPerProtein < 20) {
+            fazit.push(`NPC/Protein-Ratio zu niedrig (${n.npcPerProtein}) – Glukose- oder Lipidzufuhr steigern für optimale Proteinverwertung.`);
+        }
+        if (fazit.length < 3 && n.paaRatio > 0 && n.paaRatio < 1.0 && n.proteinTotalGKg > 0) {
+            fazit.push(`Phosphat um ~${this._round((1.0 - n.paaRatio) * n.proteinTotalGKg * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen (P:AA Ratio ${n.paaRatio} → Ziel ≥ 1.0).`);
+        }
+        if (fazit.length < 3 && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+            fazit.push('FM85-Fortifizierung starten – enterales Volumen ≥ 100 ml/kg/d erreicht.');
+        }
+        if (fazit.length === 0) {
+            fazit.push('Ernährungsplan im ESPGHAN-Zielbereich – keine Korrekturen erforderlich.');
+        }
 
         // --- Return ---
         return {
@@ -746,14 +859,23 @@ class NutritionCalculator {
                 totalGIR: n.totalGIRIncEnteral,
                 totalLipidsGKg: n.totalLipidsGKg,
                 paaRatio: n.paaRatio,
-                totalPMmolKg: totalPMmolKg.toDecimalPlaces(2).toNumber()
+                totalPMmolKg: totalPMmolKg.toDecimalPlaces(2).toNumber(),
+                npcTotal: n.npcTotal,
+                npcLipidPercent: n.npcLipidPercent,
+                npcGlucosePercent: n.npcGlucosePercent,
+                kcalGlucose: n.kcalGlucose,
+                kcalLipid: n.kcalLipid,
+                microVolDaily: n.microVolDaily,
+                npcTotalAll: n.npcTotalAll,
+                npcPerProtein: n.npcPerProtein
             },
             comparisons,
             warnings,
             reminders,
             safetyChecks,
             isSafe,
-            plausibilityFlags
+            plausibilityFlags,
+            fazit
         };
     }
 }

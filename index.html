@@ -295,6 +295,26 @@
                         </div>
                     </div>
 
+                    <!-- MIKRONÄHRSTOFFE - ACCORDION -->
+                    <div class="pt-2 border-t border-gray-100">
+                        <div class="accordion-header flex justify-between items-center py-2 hover:bg-gray-50 rounded cursor-pointer" onclick="toggleAccordionSection('micro-content')">
+                            <h4 class="text-xs font-bold text-purple-600 uppercase tracking-wider">💊 Mikronährstoffe (Vitamine & Spurenelemente)</h4>
+                            <svg id="micro-icon" class="h-4 w-4 text-purple-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                        <div id="micro-content" class="accordion-content" style="display: none;">
+                            <div class="space-y-3 pt-2 pb-2">
+                                <p class="text-[10px] text-purple-700">Zusätzliches Volumen wird vom PN-Restvolumen abgezogen.</p>
+                                <div id="micro-products-list" class="space-y-2"></div>
+                                <div class="bg-purple-50 rounded p-3 text-sm">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div class="font-medium text-purple-800">Gesamt Mikro-Volumen:</div>
+                                        <div id="res-micro-vol" class="text-right font-bold text-purple-800">0 ml/kg/d</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Harnstoff <span class="text-gray-400 font-normal">(mmol/l)</span> <span id="tip-urea" class="text-gray-400 cursor-help" data-tippy-content="BUN < 3.0 bei Vollernährung (≥ 100 ml/kg/d) → Eiweiß-Supplementierung prüfen">ⓘ</span></label>
                             <input type="number" id="input-urea" step="0.1" value="" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="z.B. 4.2">
@@ -553,6 +573,27 @@
                                     <td id="res-paa-ratio" class="p-3 text-right font-bold text-teal-700">-</td>
                                     <td class="p-3 text-right text-gray-400 text-sm">mmol/g</td>
                                 </tr>
+                                <tr class="bg-gray-50"><td colspan="3" class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Energieverteilung (NPC)</td></tr>
+                                <tr>
+                                    <td class="p-3 pl-6">NPC Gesamt</td>
+                                    <td id="res-npc-total" class="p-3 text-right font-bold text-violet-700">-</td>
+                                    <td class="p-3 text-right text-gray-400 text-sm">kcal/kg/d</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 pl-6">↳ Glucose-Anteil</td>
+                                    <td id="res-npc-glucose" class="p-3 text-right font-bold text-violet-600">-</td>
+                                    <td class="p-3 text-right text-gray-400 text-sm">%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 pl-6">↳ Lipid-Anteil <span id="tip-npc" class="text-gray-400 cursor-help ml-1">ⓘ</span></td>
+                                    <td id="res-npc-lipid" class="p-3 text-right font-bold text-violet-600">-</td>
+                                    <td class="p-3 text-right text-gray-400 text-sm">%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 pl-6">NPC / Protein <span id="tip-npc-p" class="text-gray-400 cursor-help ml-1">ⓘ</span></td>
+                                    <td id="res-npc-per-protein" class="p-3 text-right font-bold text-violet-700">-</td>
+                                    <td class="p-3 text-right text-gray-400 text-sm">kcal/g</td>
+                                </tr>
                                 <!-- ACCORDION: DETAILS MINERALIEN -->
                                 <tr class="bg-gray-50">
                                     <td colspan="3" class="p-2">
@@ -687,6 +728,17 @@
                     <div id="validation-kpis" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"></div>
                 </div>
 
+                <!-- Klinisches Fazit -->
+                <div id="clinical-fazit" class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg border-2 border-emerald-200 overflow-hidden">
+                    <div class="bg-emerald-700 text-white px-4 py-3 flex justify-between items-center">
+                        <span class="font-bold text-sm uppercase tracking-wider">📋 Klinisches Fazit</span>
+                        <span class="text-[10px] opacity-75">Optimierungsvorschläge</span>
+                    </div>
+                    <div id="fazit-content" class="p-4 space-y-2 text-sm text-emerald-900">
+                        <p class="text-gray-400 italic">Berechnung ausstehend…</p>
+                    </div>
+                </div>
+
                 <!-- Action Buttons -->
                 <div class="flex gap-4 no-print">
                     <button id="btn-export" class="flex-1 bg-gray-800 hover:bg-black text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
@@ -705,6 +757,8 @@
             <p class="mt-2 text-xs">Berechnungen basieren auf ESPGHAN 2018 & NICU Master Protocol 2026. V11 Master Logic.</p>
         </footer>
     </main>
+
+    <input type="hidden" id="input-micro-vol-hidden" value="0">
 
     <!-- App Logic -->
     <script src="products.js"></script>
@@ -938,6 +992,13 @@
                     unit: ':1',
                     min: 1.0,
                     max: 1.4
+                },
+                {
+                    name: 'NPC Lipid-Anteil',
+                    value: r.npcLipidPercent,
+                    unit: '%',
+                    min: 25,
+                    max: 50
                 }
             ];
 
@@ -958,7 +1019,7 @@
 
             // Tippy tooltips
             const tipInstances = {};
-            const tipIds = ['tip-tfi', 'tip-glucose', 'tip-protein', 'tip-lipids', 'tip-osm', 'tip-cap', 'tip-energy', 'tip-urea'];
+            const tipIds = ['tip-tfi', 'tip-glucose', 'tip-protein', 'tip-lipids', 'tip-osm', 'tip-cap', 'tip-energy', 'tip-urea', 'tip-npc', 'tip-npc-p'];
             tipIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el && typeof tippy !== 'undefined') {
@@ -976,6 +1037,8 @@
                 set('tip-glucose', '<strong>Glukose-Konz. (PN)</strong><br>Aus GIR und PN-Volumen; peripher typ. &lt; 12,5&nbsp;%.');
                 set('tip-osm', '<strong>Osmolarität</strong><br>Peripher &lt; 900 mOsm/l.');
                 set('tip-cap', '<strong>Ca:P (molar)</strong><br>Ziel: 1,5:1 bis 1,7:1');
+                set('tip-npc', '<strong>NPC Lipid-Anteil</strong><br>ESPGHAN: 25–50% der Nicht-Protein-Kalorien aus Lipiden');
+                set('tip-npc-p', '<strong>NPC/Protein Ratio</strong><br>Ziel: 20–30 kcal NPC pro g Protein.<br>&lt; 20: Protein wird zur Energiegewinnung verbrannt.<br>&gt; 40: Verfettungsrisiko.');
             }
 
             const inputs = [
@@ -1038,6 +1101,41 @@
                     updateCalculations();
                 });
             });
+
+            // Micronutrient product checkboxes
+            (function initMicroProducts() {
+                const container = document.getElementById('micro-products-list');
+                if (!container || !window.NeoProducts || !window.NeoProducts.micronutrientProducts) return;
+                window.NeoProducts.micronutrientProducts.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-start gap-2 p-2 bg-purple-50 rounded';
+                    div.innerHTML = `
+                        <input type="checkbox" id="micro-${p.id}" class="mt-1 rounded border-gray-300 text-purple-600 focus:ring-purple-500 micro-checkbox" data-vol="${p.mlPerKgPerDay}">
+                        <div class="text-xs">
+                            <label for="micro-${p.id}" class="font-bold text-purple-800 cursor-pointer">${p.name}</label>
+                            <p class="text-purple-600">${p.mlPerKgPerDay} ml/kg/d — ${p.contents}</p>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+                // Bind change events
+                document.querySelectorAll('.micro-checkbox').forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        updateMicroVolume();
+                        if (typeof updateCalculations === 'function') updateCalculations();
+                    });
+                });
+            })();
+
+            function updateMicroVolume() {
+                let total = 0;
+                document.querySelectorAll('.micro-checkbox:checked').forEach(cb => {
+                    total += parseFloat(cb.dataset.vol) || 0;
+                });
+                document.getElementById('input-micro-vol-hidden').value = total;
+                const resEl = document.getElementById('res-micro-vol');
+                if (resEl) resEl.innerText = `${total} ml/kg/d`;
+            }
 
             // Solution accordion logic
             window.updateSolutionUI = function updateSolutionUI() {
@@ -1151,7 +1249,8 @@
                     kclMl: document.getElementById('input-kcl').value || 0,
                     secondarySolution: document.getElementById('input-secondary-solution').value || 'none',
                     secondaryRateKg: secRateKgD,
-                    hiddenSodiumMmolKg: document.getElementById('input-hidden-sodium').value || 0
+                    hiddenSodiumMmolKg: document.getElementById('input-hidden-sodium').value || 0,
+                    microVolume: document.getElementById('input-micro-vol-hidden').value || 0
                 };
 
                 const res = calculator.calculate(data);
@@ -1206,6 +1305,19 @@
                         r.paaRatio > 0 && r.paaRatio < 1.0 ? 'text-red-700' : 'text-teal-700'
                     );
                 }
+
+                // NPC Ratio
+                document.getElementById('res-npc-total').innerText = `${r.npcTotal}`;
+                const npcLipidEl = document.getElementById('res-npc-lipid');
+                npcLipidEl.innerText = `${r.npcLipidPercent}`;
+                npcLipidEl.className = 'p-3 text-right font-bold tabular-nums ' + (
+                    r.npcTotal > 0 && (r.npcLipidPercent < 25 || r.npcLipidPercent > 50) ? 'text-red-700' : 'text-violet-600'
+                );
+                document.getElementById('res-npc-glucose').innerText = `${r.npcGlucosePercent}`;
+
+                // Micro volume
+                const microVolEl = document.getElementById('res-micro-vol');
+                if (microVolEl) microVolEl.innerText = `${r.microVolDaily} ml`;
 
                 // Enteral nutrients accordion
                 if (r.enteralProteinGKg !== undefined) {
@@ -1380,6 +1492,30 @@
                     const warningCont = document.getElementById('warning-container');
                     warningCont.classList.remove('hidden');
                     warningCont.prepend(warnDiv);
+                }
+
+                // Klinisches Fazit
+                const fazitEl = document.getElementById('fazit-content');
+                if (fazitEl) {
+                    if (res.fazit && res.fazit.length > 0) {
+                        fazitEl.innerHTML = res.fazit.map((f, i) => 
+                            `<div class="flex gap-2 items-start p-2 rounded ${i === 0 ? 'bg-emerald-100 font-bold' : 'bg-white/50 shadow-sm'} border border-emerald-100/50">
+                                <span class="text-emerald-600 font-bold">${i + 1}.</span>
+                                <span>${f}</span>
+                            </div>`
+                        ).join('');
+                    } else {
+                        fazitEl.innerHTML = '<p class="text-emerald-600 font-medium italic">✓ Ernährungsplan im ESPGHAN-Zielbereich – keine Korrekturen erforderlich.</p>';
+                    }
+                }
+
+                // NPC/Protein Ratio
+                const npcPEl = document.getElementById('res-npc-per-protein');
+                if (npcPEl) {
+                    npcPEl.innerText = `${r.npcPerProtein}`;
+                    npcPEl.className = 'p-3 text-right font-bold tabular-nums ' + (
+                        r.npcPerProtein > 0 && (r.npcPerProtein < 20 || r.npcPerProtein > 40) ? 'text-red-700' : 'text-violet-700'
+                    );
                 }
 
                 // Validation Box (Simulation Mode)
