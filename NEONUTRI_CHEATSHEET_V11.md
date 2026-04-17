@@ -236,7 +236,6 @@ TFI (Gesamt) = 120 ml/kg
 
 ## 📞 SUPPORT & ESKALATION
 
-- **Technische Fragen:** IT-Support (NICU-Hotline)
 - **Klinische Fragen:** Oberarzt / Neonatologe konsultieren
 - **Bei kritischen Alarmen:** Sofortige ärztliche Rücksprache
 
