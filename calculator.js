@@ -4,6 +4,19 @@
  * ALL arithmetic via Decimal.js — no IEEE 754 floats in clinical paths.
  */
 
+/**
+ * Dedizierte Exception-Klasse für Eingabe-Validierungsfehler.
+ * Wird vor der Berechnung geworfen, wenn physikalisch/klinisch
+ * unmögliche Werte erkannt werden (Safety-First-Prinzip).
+ */
+class ValidationError extends Error {
+    constructor(message, field) {
+        super(message);
+        this.name = 'ValidationError';
+        this.field = field;
+    }
+}
+
 class NutritionCalculator {
     constructor() {
         this.LIMITS = {
@@ -40,15 +53,17 @@ class NutritionCalculator {
         const effectiveDay = Math.min(age, 14);
 
         // --- TFI targets by weight class ---
+        // Master-Protokoll: ELBW-Klassengrenze inklusiv bei 1000g (bw <= 1000)
         let tfiMin, tfiMax;
-        if (bw < 1000) {
+        if (bw <= 1000) {
             if (effectiveDay === 1) { tfiMin = 80; tfiMax = 100; }
             else if (effectiveDay === 2) { tfiMin = 100; tfiMax = 120; }
             else { tfiMin = 120 + (effectiveDay - 3) * 20; tfiMax = 140 + (effectiveDay - 3) * 20; }
         } else if (bw <= 1500) {
-            if (effectiveDay === 1) { tfiMin = 70; tfiMax = 90; }
-            else if (effectiveDay === 2) { tfiMin = 90; tfiMax = 110; }
-            else { tfiMin = 110 + (effectiveDay - 3) * 20; tfiMax = 130 + (effectiveDay - 3) * 20; }
+            // VLBW (1000–1500g): Master-Protokoll konforme TFI-Ziele
+            if (effectiveDay === 1) { tfiMin = 80; tfiMax = 100; }
+            else if (effectiveDay === 2) { tfiMin = 100; tfiMax = 120; }
+            else { tfiMin = 120 + (effectiveDay - 3) * 20; tfiMax = 140 + (effectiveDay - 3) * 20; }
         } else {
             if (effectiveDay === 1) { tfiMin = 60; tfiMax = 80; }
             else if (effectiveDay === 2) { tfiMin = 80; tfiMax = 100; }
@@ -103,6 +118,37 @@ class NutritionCalculator {
 
     calculate(input) {
         const D = (v) => this._d(v);
+
+        // --- Step 0: Hard Input Validation (Safety-First, vor jeder Berechnung) ---
+        // Klinisch/physikalisch unmögliche Werte führen zum sofortigen Abbruch.
+        const rawBirthWeight = parseFloat(input.birthWeight);
+        const rawCurrentWeight = parseFloat(input.currentWeight);
+        const rawTfi = parseFloat(input.tfi);
+
+        if (!isNaN(rawBirthWeight) && rawBirthWeight <= 200) {
+            throw new ValidationError(
+                `Geburtsgewicht ${rawBirthWeight}g ist klinisch unmöglich (muss > 200g sein).`,
+                'birthWeight'
+            );
+        }
+        if (!isNaN(rawCurrentWeight) && rawCurrentWeight < 0) {
+            throw new ValidationError(
+                `Aktuelles Gewicht ${rawCurrentWeight}g darf nicht negativ sein.`,
+                'currentWeight'
+            );
+        }
+        if (!isNaN(rawTfi) && rawTfi > 200) {
+            throw new ValidationError(
+                `TFI ${rawTfi} ml/kg/d überschreitet das klinische Maximum (200 ml/kg/d).`,
+                'tfi'
+            );
+        }
+        if (!isNaN(rawTfi) && rawTfi < 0) {
+            throw new ValidationError(
+                `TFI ${rawTfi} ml/kg/d darf nicht negativ sein.`,
+                'tfi'
+            );
+        }
 
         // --- Parse all inputs as Decimal ---
         const birthWeightG = D(parseFloat(input.birthWeight) || 1000);
