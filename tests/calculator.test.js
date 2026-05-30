@@ -123,6 +123,62 @@ describe('A) Extreme Edge Cases — vom User explizit gefordert', () => {
         expect(() => calc.calculate(baseInput({ birthWeight: -100, currentWeight: -100 })))
             .toThrow();
     });
+
+    /* --- A4: Extended Validation Layer (Ticket R-01, v2.0) ---
+     * Erweiterte Fat-Finger- und Sanity-Checks. Alle MUSS hart abbrechen. */
+
+    it('A4a: Geburtsgewicht > 8000g → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ birthWeight: 9999 }))).toThrow(/Geburtsgewicht/);
+    });
+
+    it('A4b: SSW < 22 → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ ssw: 20 }))).toThrow(/SSW/);
+    });
+
+    it('A4c: SSW > 44 → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ ssw: 50 }))).toThrow(/SSW/);
+    });
+
+    it('A4d: GIR > 25 mg/kg/min → ValidationError (Tippfehler)', () => {
+        expect(() => calc.calculate(baseInput({ gir: 30 }))).toThrow(/GIR/);
+    });
+
+    it('A4e: Protein > 6 g/kg/d → ValidationError (Tippfehler)', () => {
+        expect(() => calc.calculate(baseInput({ protein: 7 }))).toThrow(/Protein/);
+    });
+
+    it('A4f: Lipide > 6 g/kg/d → ValidationError (Tippfehler)', () => {
+        expect(() => calc.calculate(baseInput({ lipids: 7 }))).toThrow(/Lipide/);
+    });
+
+    it('A4g: Calcium > 200 mg/kg/d → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ calcium: 250 }))).toThrow(/Calcium/);
+    });
+
+    it('A4h: Phosphat > 150 mg/kg/d → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ phosphate: 200 }))).toThrow(/Phosphat/);
+    });
+
+    it('A4i: FM85 > 6% → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ fm85Percent: 8 }))).toThrow(/FM85/);
+    });
+
+    it('A4j: Non-numerischer String ("abc") → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ protein: 'abc' }))).toThrow(/gültige Zahl/);
+    });
+
+    it('A4k: Mahlzeiten-Frequenz 0 → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ mealFrequency: 0 }))).toThrow(/Mahlzeiten/);
+    });
+
+    it('A4l: Postnatales Alter > 365 Tage → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ postnatalAge: 500 }))).toThrow(/Alter/);
+    });
+
+    it('A4m: Sanity-Check — gültige Mittelwerte werfen KEINEN Fehler', () => {
+        // Regression: Standard-Eingaben dürfen nach Validation-Hardening NICHT mehr werfen.
+        expect(() => calc.calculate(baseInput())).not.toThrow();
+    });
 });
 
 /* ────────────────────────────────────────────────────────────────

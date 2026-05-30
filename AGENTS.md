@@ -77,3 +77,94 @@ Wenn eine User-Anfrage eine der drei sakrosankten Invarianten verletzen würde:
 2. Den User explizit auf den Konflikt hinweisen und die klinische Begründung nennen.
 3. Eine sichere Alternative vorschlagen.
 4. Nur nach expliziter, informierter Bestätigung weitermachen.
+
+---
+
+## 🚀 Deployment & Git-Workflow (WICHTIG für zukünftige Sessions)
+
+### Repository-Setup — Besonderheit dieses Projekts
+
+⚠️ **Der Obsidian-Arbeitsordner ist KEIN Git-Repository.**
+
+- **Working Directory (lokal, kein `.git`):**
+  `/Users/caspar/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/_PARA/1_Projects/AI_Local_LLM/SOP Apps/Ernährung App/`
+  → Hier arbeitet der User in Obsidian. Hier liegen alle Dateien, Specs, Backups, `node_modules/`.
+  → `git status` schlägt hier FEHL — das ist erwartet.
+
+- **GitHub Remote:**
+  - HTTPS: `https://github.com/casparler/Nutrition-SOP.git`
+  - Live-Site (GitHub Pages): `https://casparler.github.io/Nutrition-SOP/`
+  - Default-Branch: `main`
+  - Auth: macOS Keychain (Git Credential Manager) — Push funktioniert ohne Prompt.
+
+### Standard-Workflow für neue Versionen → GitHub
+
+```bash
+# 1. Vor jeder Änderung: lokale Backups im Obsidian-Ordner
+cp index.html      backup_index_v{X.Y}.html
+cp calculator.js   backup_calculator_v{X.Y}.js
+cp AGENTS.md       backup_AGENTS_v{X.Y}.md
+
+# 2. Tests müssen 31/31 grün sein
+npm test    # im Obsidian-Ordner
+
+# 3. Repo frisch in /tmp klonen (wenn nicht schon vorhanden)
+git clone https://github.com/casparler/Nutrition-SOP.git /tmp/Nutrition-SOP
+cd /tmp/Nutrition-SOP
+
+# 4. Feature-Branch erstellen (NIE direkt auf main!)
+git checkout main
+git pull
+git checkout -b feature/{kurze-beschreibung}-v{X.Y}
+
+# 5. Geänderte Dateien vom Obsidian-Ordner ins Clone kopieren
+SRC="/Users/caspar/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian/_PARA/1_Projects/AI_Local_LLM/SOP Apps/Ernährung App"
+cp "$SRC/calculator.js"        /tmp/Nutrition-SOP/calculator.js
+cp "$SRC/index.html"           /tmp/Nutrition-SOP/index.html
+cp "$SRC/AGENTS.md"            /tmp/Nutrition-SOP/AGENTS.md
+cp "$SRC/package.json"         /tmp/Nutrition-SOP/package.json
+cp "$SRC/package-lock.json"    /tmp/Nutrition-SOP/package-lock.json
+cp "$SRC/vitest.config.js"     /tmp/Nutrition-SOP/vitest.config.js
+cp -r "$SRC/tests"             /tmp/Nutrition-SOP/
+
+# 6. Tests im Clone erneut grün?
+cd /tmp/Nutrition-SOP && npm install --silent && npm test
+
+# 7. Commit + Push
+git add -A
+git commit -m "feat(vX.Y): <Beschreibung>"
+git push -u origin feature/{name}-v{X.Y}
+# → GitHub gibt PR-URL zurück
+```
+
+### Bisherige Versionen (Changelog)
+
+| Version | Branch | Wichtigste Änderungen | Status |
+|---------|--------|----------------------|--------|
+| v1.0    | `main` | Ausgangsstand (calculator.js, index.html, logic.js, products.js) | live |
+| v1.1    | `feature/nicu-optimization-v1.1` | ValidationError-Layer, UI try-catch + Error-Banner, ELBW-Boundary `bw<=1000`, 31 Vitest-Tests, AGENTS.md | PR offen |
+
+### Git-Konfiguration im Clone
+```
+user.email = caspar@local
+user.name  = Caspar
+```
+
+### Nicht in Git versioniert (bewusst)
+Diese Dateien existieren nur lokal im Obsidian-Ordner und werden nicht gepusht (außer User wünscht es explizit):
+- `NEO_NUTRITION_SPEC_V*.md`, `NEO_NUTRITION_MASTER_LOGIC_V*.md` (Versions-Specs)
+- `KANBAN.md`, `AUDIT_LOG.md`, `SYSTEM_REVIEW.md`, `VALIDATION.md`
+- `Expert_knowledge.md`, `skills.md`, `USER_MANUAL_V11.md`
+- `backup_*_v*.*` (lokale Datei-Backups)
+- `node_modules/`, `.DS_Store` (via `.gitignore`)
+
+### Falls Push fehlschlägt
+- **403/Auth-Fehler:** User um GitHub Personal Access Token bitten ODER SSH-Setup vorschlagen.
+- **Conflict / non-fast-forward:** `git pull --rebase origin <branch>` im Clone, Konflikte lösen, neu pushen.
+- **Branch existiert schon:** Versionsnummer erhöhen (`v1.2`, `v1.3`, …) oder mit User klären.
+
+### User-Profil
+- Der User ist **klinisch versiert**, aber **Git-Anfänger** ("ich kenne mich damit nicht aus").
+- Bei Git-Operationen: kurz und nicht-technisch erklären, was passiert ist und was die nächsten Schritte sind (PR-Link, Live-URL).
+- Niemals `git push --force`, `git reset --hard origin/main` oder andere zerstörerische Befehle ohne explizite Rückfrage.
+- Niemals direkt auf `main` committen — immer Feature-Branch.

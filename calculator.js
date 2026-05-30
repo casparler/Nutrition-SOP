@@ -121,34 +121,92 @@ class NutritionCalculator {
 
         // --- Step 0: Hard Input Validation (Safety-First, vor jeder Berechnung) ---
         // Klinisch/physikalisch unmögliche Werte führen zum sofortigen Abbruch.
-        const rawBirthWeight = parseFloat(input.birthWeight);
-        const rawCurrentWeight = parseFloat(input.currentWeight);
-        const rawTfi = parseFloat(input.tfi);
+        // SIEHE AGENTS.md — dieser Layer ist SAKROSANKT und darf nie entfernt werden.
+        const validate = (raw, field, { min, max, minMsg, maxMsg, allowEmpty = true }) => {
+            // Leere Strings/null/undefined als "nicht gesetzt" tolerieren (Default-Werte greifen unten)
+            if (allowEmpty && (raw === '' || raw === null || raw === undefined)) return;
+            const v = parseFloat(raw);
+            // Non-numeric (z.B. "abc") → hart abbrechen
+            if (raw !== '' && raw !== null && raw !== undefined && isNaN(v)) {
+                throw new ValidationError(
+                    `${field}: "${raw}" ist keine gültige Zahl.`,
+                    field
+                );
+            }
+            if (!isNaN(v) && min !== undefined && v < min) {
+                throw new ValidationError(minMsg || `${field} ${v} unterschreitet das Minimum (${min}).`, field);
+            }
+            if (!isNaN(v) && max !== undefined && v > max) {
+                throw new ValidationError(maxMsg || `${field} ${v} überschreitet das Maximum (${max}).`, field);
+            }
+        };
 
-        if (!isNaN(rawBirthWeight) && rawBirthWeight <= 200) {
-            throw new ValidationError(
-                `Geburtsgewicht ${rawBirthWeight}g ist klinisch unmöglich (muss > 200g sein).`,
-                'birthWeight'
-            );
-        }
-        if (!isNaN(rawCurrentWeight) && rawCurrentWeight < 0) {
-            throw new ValidationError(
-                `Aktuelles Gewicht ${rawCurrentWeight}g darf nicht negativ sein.`,
-                'currentWeight'
-            );
-        }
-        if (!isNaN(rawTfi) && rawTfi > 200) {
-            throw new ValidationError(
-                `TFI ${rawTfi} ml/kg/d überschreitet das klinische Maximum (200 ml/kg/d).`,
-                'tfi'
-            );
-        }
-        if (!isNaN(rawTfi) && rawTfi < 0) {
-            throw new ValidationError(
-                `TFI ${rawTfi} ml/kg/d darf nicht negativ sein.`,
-                'tfi'
-            );
-        }
+        // Gewicht & Alter
+        validate(input.birthWeight, 'birthWeight', {
+            min: 200.0001, max: 8000,
+            minMsg: `Geburtsgewicht ${input.birthWeight}g ist klinisch unmöglich (muss > 200g sein).`,
+            maxMsg: `Geburtsgewicht ${input.birthWeight}g überschreitet realistisches Maximum (8000g).`
+        });
+        validate(input.currentWeight, 'currentWeight', {
+            min: 0, max: 10000,
+            maxMsg: `Aktuelles Gewicht ${input.currentWeight}g überschreitet realistisches Maximum (10000g).`
+        });
+        validate(input.postnatalAge, 'postnatalAge', {
+            min: 0, max: 365,
+            maxMsg: `Postnatales Alter ${input.postnatalAge} Tage überschreitet 1 Jahr — Tool nicht validiert.`
+        });
+        validate(input.ssw, 'ssw', {
+            min: 22, max: 44,
+            minMsg: `SSW ${input.ssw} < 22 — außerhalb klinisch validierter Grenze.`,
+            maxMsg: `SSW ${input.ssw} > 44 — unplausibel.`
+        });
+
+        // Flüssigkeit & Glucose
+        validate(input.tfi, 'tfi', {
+            min: 0, max: 200,
+            maxMsg: `TFI ${input.tfi} ml/kg/d überschreitet das klinische Maximum (200 ml/kg/d).`
+        });
+        validate(input.gir, 'gir', {
+            min: 0, max: 25,
+            maxMsg: `GIR ${input.gir} mg/kg/min überschreitet realistisches Maximum (25).`
+        });
+
+        // Makronährstoffe — Hard-Limit deutlich über klinischem Max für Fat-Finger-Schutz
+        validate(input.protein, 'protein', {
+            min: 0, max: 6,
+            maxMsg: `Protein ${input.protein} g/kg/d überschreitet jedes klinische Maximum (Tippfehler?).`
+        });
+        validate(input.lipids, 'lipids', {
+            min: 0, max: 6,
+            maxMsg: `Lipide ${input.lipids} g/kg/d überschreiten jedes klinische Maximum (Tippfehler?).`
+        });
+
+        // Mineralien
+        validate(input.calcium, 'calcium', {
+            min: 0, max: 200,
+            maxMsg: `Calcium ${input.calcium} mg/kg/d überschreitet realistisches Maximum (200).`
+        });
+        validate(input.phosphate, 'phosphate', {
+            min: 0, max: 150,
+            maxMsg: `Phosphat ${input.phosphate} mg/kg/d überschreitet realistisches Maximum (150).`
+        });
+        validate(input.sodium, 'sodium', { min: 0, max: 15 });
+        validate(input.potassium, 'potassium', { min: 0, max: 10 });
+
+        // Enterale Konfiguration
+        validate(input.enteralVolume, 'enteralVolume', { min: 0, max: 250 });
+        validate(input.fm85Percent, 'fm85Percent', {
+            min: 0, max: 6,
+            maxMsg: `FM85 ${input.fm85Percent}% überschreitet maximale Dosierung (6%).`
+        });
+        validate(input.mealFrequency, 'mealFrequency', {
+            min: 1, max: 24,
+            minMsg: `Mahlzeiten-Frequenz muss ≥ 1 sein.`
+        });
+
+        // Labor
+        validate(input.triglycerides, 'triglycerides', { min: 0, max: 2000 });
+        validate(input.urea, 'urea', { min: 0, max: 100 });
 
         // --- Parse all inputs as Decimal ---
         const birthWeightG = D(parseFloat(input.birthWeight) || 1000);
