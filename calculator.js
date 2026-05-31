@@ -45,6 +45,39 @@ class NutritionCalculator {
         return this._d(num).toDecimalPlaces(decimals).toNumber();
     }
 
+    /**
+     * Type-safe numeric parser (Ticket R-02).
+     * Vereinheitlicht parse + validate: leere/null/undefined → defaultValue,
+     * non-numerische Strings → ValidationError, Bereichsüberschreitung → ValidationError.
+     * Garantiert, dass nie "NaN" oder undefined in die klinischen Berechnungen fließt.
+     *
+     * @param {*} raw          Rohwert aus input (string|number|null|undefined|'')
+     * @param {string} field   Feldname für Fehlermeldung
+     * @param {object} opts    { min?:number, max?:number, defaultValue?:number,
+     *                           integer?:boolean, minMsg?:string, maxMsg?:string }
+     * @returns {number}       Geparster Wert (Number, garantiert finit)
+     * @throws  {ValidationError}
+     */
+    _safeParseNum(raw, field, opts = {}) {
+        const { min, max, defaultValue = 0, integer = false, minMsg, maxMsg } = opts;
+        // Leerwerte → default (keine Validierung — sichere Annahme)
+        if (raw === '' || raw === null || raw === undefined) return defaultValue;
+        const v = integer ? parseInt(raw, 10) : parseFloat(raw);
+        if (isNaN(v) || !isFinite(v)) {
+            throw new ValidationError(
+                `${field}: "${raw}" ist keine gültige Zahl.`,
+                field
+            );
+        }
+        if (min !== undefined && v < min) {
+            throw new ValidationError(minMsg || `${field} ${v} unterschreitet das Minimum (${min}).`, field);
+        }
+        if (max !== undefined && v > max) {
+            throw new ValidationError(maxMsg || `${field} ${v} überschreitet das Maximum (${max}).`, field);
+        }
+        return v;
+    }
+
     getTargets(input) {
         const bw = parseFloat(input.birthWeight) || 1000;
         const age = Math.max(1, parseInt(input.postnatalAge) || 1);
@@ -208,35 +241,80 @@ class NutritionCalculator {
         validate(input.triglycerides, 'triglycerides', { min: 0, max: 2000 });
         validate(input.urea, 'urea', { min: 0, max: 100 });
 
-        // --- Parse all inputs as Decimal ---
-        const birthWeightG = D(parseFloat(input.birthWeight) || 1000);
-        const currentWeightG = D(parseFloat(input.currentWeight) || birthWeightG.toNumber());
-        const postnatalAge = Math.max(1, parseInt(input.postnatalAge) || 1);
-        const ssw = parseInt(input.ssw) || 28;
-        const tfi = D(parseFloat(input.tfi) || 0);
-        const enteralVolKg = D(parseFloat(input.enteralVolume) || 0);
-        const fm85Percent = parseInt(input.fm85Percent) || 0;
-        const carrierVolKg = D(parseFloat(input.carrierVolume) || 0);
-        const urea = input.urea !== null && input.urea !== undefined && input.urea !== '' ? parseFloat(input.urea) : null;
-        const triglycerides = input.triglycerides !== null && input.triglycerides !== undefined && input.triglycerides !== '' ? parseFloat(input.triglycerides) : null;
-        const gir = D(parseFloat(input.gir) || 0);
-        const proteinPNKg = D(parseFloat(input.protein) || 0);
-        const lipidsPNKg = D(parseFloat(input.lipids) || 0);
-        const calciumMgKg = D(parseFloat(input.calcium) || 0);
-        const phosphateMgKg = D(parseFloat(input.phosphate) || 0);
-        const sodiumMmolKg = D(parseFloat(input.sodium) || 0);
-        const potassiumMmolKg = D(parseFloat(input.potassium) || 0);
+        // --- R-02: Hard-Limits für bisher ungeprüfte Volumen-/Elektrolyt-Felder ---
+        // Schutz vor Tippfehlern (z.B. "20" statt "2.0" ml NaCl).
+        validate(input.carrierVolume, 'carrierVolume', {
+            min: 0, max: 100,
+            maxMsg: `Trägerlösung-Volumen ${input.carrierVolume} ml/kg/d überschreitet realistisches Maximum (100).`
+        });
+        validate(input.microVolume, 'microVolume', {
+            min: 0, max: 50,
+            maxMsg: `Mikronährstoff-Volumen ${input.microVolume} ml/d überschreitet realistisches Maximum (50).`
+        });
+        validate(input.naclMl, 'naclMl', {
+            min: 0, max: 50,
+            maxMsg: `NaCl-Zusatz ${input.naclMl} mmol/kg/d überschreitet realistisches Maximum (50) — Tippfehler?`
+        });
+        validate(input.kclMl, 'kclMl', {
+            min: 0, max: 20,
+            maxMsg: `KCl-Zusatz ${input.kclMl} mmol/kg/d überschreitet realistisches Maximum (20) — Tippfehler?`
+        });
+        validate(input.secondaryRateKg, 'secondaryRateKg', {
+            min: 0, max: 200,
+            maxMsg: `Sekundärinfusion ${input.secondaryRateKg} ml/kg/d überschreitet realistisches Maximum (200).`
+        });
+        validate(input.hiddenSodiumMmolKg, 'hiddenSodiumMmolKg', {
+            min: 0, max: 20,
+            maxMsg: `Hidden Sodium ${input.hiddenSodiumMmolKg} mmol/kg/d überschreitet realistisches Maximum (20).`
+        });
+        validate(input.length, 'length', {
+            min: 0, max: 100,
+            maxMsg: `Körperlänge ${input.length} cm überschreitet realistisches Maximum (100).`
+        });
+        validate(input.head, 'head', {
+            min: 0, max: 60,
+            maxMsg: `Kopfumfang ${input.head} cm überschreitet realistisches Maximum (60).`
+        });
+        validate(input.previousWeight, 'previousWeight', {
+            min: 0, max: 10000,
+            maxMsg: `Vortags-Gewicht ${input.previousWeight}g überschreitet realistisches Maximum (10000g).`
+        });
+
+        // --- Parse all inputs as Decimal (R-02: über _safeParseNum, garantiert finite numbers) ---
+        const sp = (raw, field, opts) => this._safeParseNum(raw, field, opts);
+
+        const birthWeightG = D(sp(input.birthWeight, 'birthWeight', { defaultValue: 1000 }));
+        const currentWeightG = D(sp(input.currentWeight, 'currentWeight', { defaultValue: birthWeightG.toNumber() }));
+        const postnatalAge = Math.max(1, sp(input.postnatalAge, 'postnatalAge', { defaultValue: 1, integer: true }));
+        const ssw = sp(input.ssw, 'ssw', { defaultValue: 28, integer: true });
+        const tfi = D(sp(input.tfi, 'tfi', { defaultValue: 0 }));
+        const enteralVolKg = D(sp(input.enteralVolume, 'enteralVolume', { defaultValue: 0 }));
+        const fm85Percent = sp(input.fm85Percent, 'fm85Percent', { defaultValue: 0, integer: true });
+        const carrierVolKg = D(sp(input.carrierVolume, 'carrierVolume', { defaultValue: 0 }));
+        const urea = input.urea !== null && input.urea !== undefined && input.urea !== ''
+            ? sp(input.urea, 'urea', { defaultValue: null })
+            : null;
+        const triglycerides = input.triglycerides !== null && input.triglycerides !== undefined && input.triglycerides !== ''
+            ? sp(input.triglycerides, 'triglycerides', { defaultValue: null })
+            : null;
+        const gir = D(sp(input.gir, 'gir', { defaultValue: 0 }));
+        const proteinPNKg = D(sp(input.protein, 'protein', { defaultValue: 0 }));
+        const lipidsPNKg = D(sp(input.lipids, 'lipids', { defaultValue: 0 }));
+        const calciumMgKg = D(sp(input.calcium, 'calcium', { defaultValue: 0 }));
+        const phosphateMgKg = D(sp(input.phosphate, 'phosphate', { defaultValue: 0 }));
+        const sodiumMmolKg = D(sp(input.sodium, 'sodium', { defaultValue: 0 }));
+        const potassiumMmolKg = D(sp(input.potassium, 'potassium', { defaultValue: 0 }));
         const access = input.access || 'peripheral';
         const ventilationStatus = input.ventilationStatus || 'spontaneous';
         const selectedSolution = input.selectedSolution || 'none';
         const selectedEnteralProduct = input.selectedEnteralProduct || 'ebm';
         const selectedLipidProduct = input.selectedLipidProduct || 'standardLipid';
-        const mealFrequency = parseInt(input.mealFrequency) || 8;
-        const naclMl = D(parseFloat(input.naclMl) || 0);
-        const kclMl = D(parseFloat(input.kclMl) || 0);
+        const mealFrequency = sp(input.mealFrequency, 'mealFrequency', { defaultValue: 8, integer: true });
+        const naclMl = D(sp(input.naclMl, 'naclMl', { defaultValue: 0 }));
+        const kclMl = D(sp(input.kclMl, 'kclMl', { defaultValue: 0 }));
         const secondarySolution = input.secondarySolution || 'none';
-        const secondaryRateKg = D(parseFloat(input.secondaryRateKg) || 0);
-        const hiddenSodiumMmolKg = D(parseFloat(input.hiddenSodiumMmolKg) || 0);
+        const secondaryRateKg = D(sp(input.secondaryRateKg, 'secondaryRateKg', { defaultValue: 0 }));
+        const hiddenSodiumMmolKg = D(sp(input.hiddenSodiumMmolKg, 'hiddenSodiumMmolKg', { defaultValue: 0 }));
 
         // --- Step 0: Growth Percentile ---
         let weightPercentile = 'N/A';

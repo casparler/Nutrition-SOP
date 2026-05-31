@@ -7,10 +7,11 @@
 
 ## 🔴 SAKROSANKTE INVARIANTEN — NIEMALS BRECHEN
 
-### 1. Test-Suite (Vitest) — 31 Tests müssen IMMER zu 100 % grün sein
+### 1. Test-Suite (Vitest) — ALLE Tests müssen IMMER zu 100 % grün sein
 
-- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **31 klinische Tests** (Sektionen A–G), die das gesamte Sicherheitsverhalten des Calculators absichern.
-- **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — alle 31 Tests müssen bestanden sein.**
+- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 44 klinische Tests** (Sektionen A–G; ursprünglich 31, in v1.2 um 13 Validierungs-Tests A4a–A4m erweitert), die das gesamte Sicherheitsverhalten des Calculators absichern.
+- Die Anzahl darf wachsen, aber **nie schrumpfen**. Neue Tests gerne — alte nur mit klinischer Begründung anpassen.
+- **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — ALLE Tests müssen bestanden sein.**
 - **Nach JEDER Änderung an `calculator.js` muss `npm test` erneut grün sein, bevor die Aufgabe als abgeschlossen gilt.**
 - Tests dürfen **niemals** angepasst werden, um Produktivcode-Änderungen "passend zu machen". Wenn ein Test rot wird, ist standardmäßig der Produktivcode falsch — nicht der Test.
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
@@ -143,6 +144,7 @@ git push -u origin feature/{name}-v{X.Y}
 |---------|--------|----------------------|--------|
 | v1.0    | `main` | Ausgangsstand (calculator.js, index.html, logic.js, products.js) | live |
 | v1.1    | `feature/nicu-optimization-v1.1` | ValidationError-Layer, UI try-catch + Error-Banner, ELBW-Boundary `bw<=1000`, 31 Vitest-Tests, AGENTS.md | PR offen |
+| v1.2    | `feature/super-tool-v2-evolution` | EPIC 1 R-01/R-04: Erweiterter ValidationError-Layer (Gewicht/SSW/GIR/Protein/Lipide/Ca/P/FM85/Frequenz/PostnatalAge + non-numerische Strings) → 13 neue Tests A4a–A4m, **44 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```

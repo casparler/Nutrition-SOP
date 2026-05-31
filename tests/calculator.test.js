@@ -179,6 +179,50 @@ describe('A) Extreme Edge Cases — vom User explizit gefordert', () => {
         // Regression: Standard-Eingaben dürfen nach Validation-Hardening NICHT mehr werfen.
         expect(() => calc.calculate(baseInput())).not.toThrow();
     });
+
+    // ── R-02: Type-safe Parser — bisher ungeprüfte Felder, Tippfehler-Schutz ──
+    it('A5a: NaCl-Zusatz "20" mmol/kg (statt 2.0) → ValidationError (Tippfehler)', () => {
+        // Realer Fat-Finger-Fall: User vergisst Dezimalpunkt → 20 statt 2.0
+        expect(() => calc.calculate(baseInput({ naclMl: 75 }))).toThrow(/NaCl/);
+    });
+
+    it('A5b: KCl-Zusatz "50" mmol/kg → ValidationError (Tippfehler)', () => {
+        expect(() => calc.calculate(baseInput({ kclMl: 50 }))).toThrow(/KCl/);
+    });
+
+    it('A5c: Carrier-Volumen > 100 ml/kg/d → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ carrierVolume: 150 }))).toThrow(/Trägerlösung/);
+    });
+
+    it('A5d: Non-numerischer String in naclMl ("abc") → ValidationError', () => {
+        // R-02: Auch bisher ungeprüfte Felder müssen NaN abfangen.
+        expect(() => calc.calculate(baseInput({ naclMl: 'abc' }))).toThrow(/gültige Zahl/);
+    });
+
+    it('A5e: Sekundärinfusion > 200 ml/kg/d → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ secondaryRateKg: 300 }))).toThrow(/Sekundärinfusion/);
+    });
+
+    it('A5f: Hidden Sodium > 20 mmol/kg/d → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ hiddenSodiumMmolKg: 25 }))).toThrow(/Hidden Sodium/);
+    });
+
+    it('A5g: Körperlänge > 100 cm → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ length: 150 }))).toThrow(/Körperlänge/);
+    });
+
+    it('A5h: Kopfumfang > 60 cm → ValidationError', () => {
+        expect(() => calc.calculate(baseInput({ head: 99 }))).toThrow(/Kopfumfang/);
+    });
+
+    it('A5i: Sanity — leere Strings & null in optionalen Feldern → KEIN Fehler', () => {
+        // R-02 Regress: Optionalfelder dürfen mit '' oder null defaults greifen lassen.
+        expect(() => calc.calculate(baseInput({
+            naclMl: '', kclMl: null, carrierVolume: '',
+            microVolume: undefined, hiddenSodiumMmolKg: '',
+            length: '', head: '', secondaryRateKg: ''
+        }))).not.toThrow();
+    });
 });
 
 /* ────────────────────────────────────────────────────────────────

@@ -34,10 +34,10 @@ Transformation des bestehenden klinischen Rechners in ein **stress-resilientes, 
 
 | # | Ticket | Beschreibung | Status |
 |---|--------|--------------|--------|
-| R-01 | **Extended ValidationError-Layer** | Hard-Limits für: Gewicht > 8000g, postnatalAge > 365, ssw < 22 oder > 44, GIR > 25, Protein > 6, Lipide > 6, Calcium > 200 mg/kg, Phosphat > 150 mg/kg, FM85 > 6%. | ☐ |
-| R-02 | **Type-Safe Input Parser** | Helper `safeParse(input, name, {min, max, required})` → wirft `ValidationError` bei NaN/non-numeric strings. | ☐ |
+| R-01 | **Extended ValidationError-Layer** | Hard-Limits für: Gewicht > 8000g, postnatalAge > 365, ssw < 22 oder > 44, GIR > 25, Protein > 6, Lipide > 6, Calcium > 200 mg/kg, Phosphat > 150 mg/kg, FM85 > 6%. | ✅ v1.2 |
+| R-02 | **Type-Safe Input Parser** | Helper `_safeParseNum(raw, name, {min, max, default})` → wirft `ValidationError` bei NaN/non-numeric strings. Validiert auch bisher ungeprüfte Felder (naclMl, kclMl, carrierVolume, microVolume, secondaryRateKg, hiddenSodiumMmolKg, length, head). | ⏳ in Arbeit |
 | R-03 | **Defensive Display** | Alle `displayResults`-Setter mit `?? '–'`-Fallback, damit `undefined` keine NaN-Anzeige produziert. | ☐ |
-| R-04 | **Unit Tests** | A4a–A4j: Tests für jeden neuen ValidationError-Fall. | ☐ |
+| R-04 | **Unit Tests** | A4a–A4m: 13 Tests für jeden ValidationError-Fall. Geplant A5a–A5e für R-02. | ✅ A4a–A4m / ⏳ A5* |
 
 ### EPIC 2 — Clinical Intelligence (mittel, sehr hoher Wert)
 *Risiko: mittel. Erfordert klinische Validierung — User-Freigabe vor Merge.*
@@ -100,9 +100,22 @@ Transformation des bestehenden klinischen Rechners in ein **stress-resilientes, 
 
 ---
 
-## 📌 Erste Iteration (jetzt umgesetzt)
+## 📌 Iterations-Verlauf (Gedächtnis-Anker für Session-Unterbrechungen)
 
-→ **Ticket R-01 + R-04**: Erweiterter ValidationError-Layer + Tests.
+### Iteration 1 — v1.2 (commit `898a54a`) ✅
+**Ticket R-01 + R-04**: Erweiterter ValidationError-Layer + 13 Tests A4a–A4m.
 Begründung: Sofortiger Patientensicherheits-Gewinn, geringes Risiko, vollständig durch Tests abgesichert.
+**Stand: 44 Tests grün.**
 
-Nach dieser Iteration: Checkpoint-Commit, Push, Status-Bericht an User. Dann gemeinsam über EPIC 2/3-Priorität entscheiden.
+### Iteration 2 — v1.3 (in Arbeit) ⏳
+**Ticket R-02 + R-03**: Type-safe Parser für bisher ungeprüfte Felder + Defensive Display-Fallbacks.
+- R-02: `_safeParseNum()`-Helper in calculator.js; ergänzende Validierung für `naclMl`, `kclMl`, `carrierVolume`, `microVolume`, `secondaryRateKg`, `hiddenSodiumMmolKg`, `length`, `head`.
+- R-03: `displayResults()` in index.html mit `fmt(v)`-Wrapper, der `null/undefined/NaN → '–'` ersetzt.
+- Neue Tests A5a–A5e geplant für R-02.
+- Bei Unterbrechung: hier weitermachen. Branch: `feature/super-tool-v2-evolution`.
+
+### Iteration 3 — Vorschlag für User-Freigabe (noch nicht gestartet)
+Nach v1.3-Commit warte ich auf Freigabe für eine der folgenden Stoßrichtungen:
+- **B (UI/Visualisierung):** U-02 Sparklines + U-03 Sticky Safety-Banner.
+- **C (Clinical Intelligence):** C-01 Osmolarity Breakdown (rein deskriptiv, keine neue Dosierung).
+- **C-04 "Smart Ca/P ml-Vorschlag" bleibt OHNE explizite Freigabe TABU** (User-Konstitution: "keine Dosierungen erfinden").
