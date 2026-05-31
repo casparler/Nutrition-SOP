@@ -35,9 +35,9 @@ Transformation des bestehenden klinischen Rechners in ein **stress-resilientes, 
 | # | Ticket | Beschreibung | Status |
 |---|--------|--------------|--------|
 | R-01 | **Extended ValidationError-Layer** | Hard-Limits für: Gewicht > 8000g, postnatalAge > 365, ssw < 22 oder > 44, GIR > 25, Protein > 6, Lipide > 6, Calcium > 200 mg/kg, Phosphat > 150 mg/kg, FM85 > 6%. | ✅ v1.2 |
-| R-02 | **Type-Safe Input Parser** | Helper `_safeParseNum(raw, name, {min, max, default})` → wirft `ValidationError` bei NaN/non-numeric strings. Validiert auch bisher ungeprüfte Felder (naclMl, kclMl, carrierVolume, microVolume, secondaryRateKg, hiddenSodiumMmolKg, length, head). | ⏳ in Arbeit |
-| R-03 | **Defensive Display** | Alle `displayResults`-Setter mit `?? '–'`-Fallback, damit `undefined` keine NaN-Anzeige produziert. | ☐ |
-| R-04 | **Unit Tests** | A4a–A4m: 13 Tests für jeden ValidationError-Fall. Geplant A5a–A5e für R-02. | ✅ A4a–A4m / ⏳ A5* |
+| R-02 | **Type-Safe Input Parser** | Helper `_safeParseNum(raw, name, {min, max, default})` → wirft `ValidationError` bei NaN/non-numeric strings. Validiert auch bisher ungeprüfte Felder (naclMl, kclMl, carrierVolume, microVolume, secondaryRateKg, hiddenSodiumMmolKg, length, head, previousWeight). | ✅ v1.3 |
+| R-03 | **Defensive Display** | `displayResults()` in index.html mit `fmt(v)` + `setText(id, val, suffix)`-Helpern: `null/undefined/NaN → '–'`, fehlende DOM-Elemente werden tolerant übersprungen. | ✅ v1.3 |
+| R-04 | **Unit Tests** | A4a–A4m + A5a–A5i: insgesamt 22 neue Validierungs-Tests. | ✅ 53/53 |
 
 ### EPIC 2 — Clinical Intelligence (mittel, sehr hoher Wert)
 *Risiko: mittel. Erfordert klinische Validierung — User-Freigabe vor Merge.*
@@ -107,12 +107,11 @@ Transformation des bestehenden klinischen Rechners in ein **stress-resilientes, 
 Begründung: Sofortiger Patientensicherheits-Gewinn, geringes Risiko, vollständig durch Tests abgesichert.
 **Stand: 44 Tests grün.**
 
-### Iteration 2 — v1.3 (in Arbeit) ⏳
-**Ticket R-02 + R-03**: Type-safe Parser für bisher ungeprüfte Felder + Defensive Display-Fallbacks.
-- R-02: `_safeParseNum()`-Helper in calculator.js; ergänzende Validierung für `naclMl`, `kclMl`, `carrierVolume`, `microVolume`, `secondaryRateKg`, `hiddenSodiumMmolKg`, `length`, `head`.
-- R-03: `displayResults()` in index.html mit `fmt(v)`-Wrapper, der `null/undefined/NaN → '–'` ersetzt.
-- Neue Tests A5a–A5e geplant für R-02.
-- Bei Unterbrechung: hier weitermachen. Branch: `feature/super-tool-v2-evolution`.
+### Iteration 2 — v1.3 ✅ (commits `f3174af` R-02 + folgender R-03)
+**Ticket R-02 + R-03 + R-04 erweitert**: Type-safe Parser + Defensive Display + 9 neue Tests.
+- R-02: `_safeParseNum()` in calculator.js, alle `parseFloat(input.X) || 0`-Sites in `calculate()` ersetzt; ergänzende Hard-Validierung für `naclMl`, `kclMl`, `carrierVolume`, `microVolume`, `secondaryRateKg`, `hiddenSodiumMmolKg`, `length`, `head`, `previousWeight`.
+- R-03: `displayResults()` in index.html mit `fmt(v)` + `setText(id, val, suffix)` — schützt vor "undefined"/"NaN" und vor fehlenden DOM-IDs.
+- R-04: 9 neue Tests A5a–A5i — `npm test` zeigt **53/53 grün**.
 
 ### Iteration 3 — Vorschlag für User-Freigabe (noch nicht gestartet)
 Nach v1.3-Commit warte ich auf Freigabe für eine der folgenden Stoßrichtungen:

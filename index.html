@@ -1307,43 +1307,57 @@
             function displayResults(res, data) {
                 const r = res.results;
 
+                // --- R-03 Defensive Display ---
+                // fmt() schützt vor 'undefined'/'NaN'-Anzeige in der UI.
+                // Liefert '–' für null/undefined/NaN, sonst den Wert.
+                // setText(id, value, suffix) setzt den Text robust und nur, wenn das Element existiert.
+                const fmt = (v) => (v === null || v === undefined || (typeof v === 'number' && !isFinite(v))) ? '–' : v;
+                const setText = (id, value, suffix = '') => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const shown = fmt(value);
+                    el.innerText = shown === '–' ? '–' : `${shown}${suffix}`;
+                };
+
                 // Volumes
-                document.getElementById('res-tfi-daily').innerText = `${r.totalDailyFluid} ml`;
-                document.getElementById('res-tfi-rate').innerText = `${r.rates.total} ml/h`;
-                document.getElementById('res-pn-daily').innerText = `${r.pnDaily} ml`;
-                document.getElementById('res-pn-rate').innerText = `${r.rates.pn} ml/h`;
-                document.getElementById('res-enteral-daily').innerText = `${r.enteralDaily} ml`;
-                document.getElementById('res-enteral-rate').innerText = `${r.rates.enteral} ml/h`;
+                setText('res-tfi-daily', r.totalDailyFluid, ' ml');
+                setText('res-tfi-rate', r.rates && r.rates.total, ' ml/h');
+                setText('res-pn-daily', r.pnDaily, ' ml');
+                setText('res-pn-rate', r.rates && r.rates.pn, ' ml/h');
+                setText('res-enteral-daily', r.enteralDaily, ' ml');
+                setText('res-enteral-rate', r.rates && r.rates.enteral, ' ml/h');
 
                 // Details
-                document.getElementById('res-glucose-conc').innerText = `${r.glucoseConc}`;
-                document.getElementById('res-gir').innerText = `${r.effectiveGIR}`;
-                document.getElementById('res-osmolarity').innerText = `${r.osmolarity}`;
-                document.getElementById('res-cap-ratio').innerText = `${r.caPRatio}:1`;
-                document.getElementById('res-weight-percentile').innerText = `${r.weightPercentile}`;
+                setText('res-glucose-conc', r.glucoseConc);
+                setText('res-gir', r.effectiveGIR);
+                setText('res-osmolarity', r.osmolarity);
+                setText('res-cap-ratio', r.caPRatio, ':1');
+                setText('res-weight-percentile', r.weightPercentile);
                 const protEl = document.getElementById('res-protein-total-gkg');
-                protEl.innerText = `${r.proteinTotalGPerKg}`;
-                protEl.className = 'p-3 text-right font-bold tabular-nums ' + (
-                    r.proteinTotalGPerKg > 4.5 ? 'text-red-700' : 'text-blue-800'
-                );
-                document.getElementById('res-lipids-g').innerText = `${r.lipidsPNKg}`;
-                document.getElementById('res-lipid-vol').innerText = `${r.lipidVolDaily}`;
-                document.getElementById('res-calcium-mg').innerText = `${r.calciumMgKg}`;
-                document.getElementById('res-calcium-mmol').innerText = `${r.calciumMmolKg}`;
-                document.getElementById('res-phosphate-mg').innerText = `${r.phosphateMgKg}`;
-                document.getElementById('res-phosphate-mmol').innerText = `${r.phosphateMmolKg}`;
-                document.getElementById('res-sodium').innerText = `${r.effectiveNa}`;
-                document.getElementById('res-potassium').innerText = `${r.effectiveK}`;
-                document.getElementById('res-chloride').innerText = `${r.effectiveCl}`;
-                document.getElementById('res-sid').innerText = `${r.sidLight}`;
-                document.getElementById('res-single-portion').innerText = `${r.singlePortion}`;
+                if (protEl) {
+                    protEl.innerText = fmt(r.proteinTotalGPerKg);
+                    protEl.className = 'p-3 text-right font-bold tabular-nums ' + (
+                        (typeof r.proteinTotalGPerKg === 'number' && r.proteinTotalGPerKg > 4.5) ? 'text-red-700' : 'text-blue-800'
+                    );
+                }
+                setText('res-lipids-g', r.lipidsPNKg);
+                setText('res-lipid-vol', r.lipidVolDaily);
+                setText('res-calcium-mg', r.calciumMgKg);
+                setText('res-calcium-mmol', r.calciumMmolKg);
+                setText('res-phosphate-mg', r.phosphateMgKg);
+                setText('res-phosphate-mmol', r.phosphateMmolKg);
+                setText('res-sodium', r.effectiveNa);
+                setText('res-potassium', r.effectiveK);
+                setText('res-chloride', r.effectiveCl);
+                setText('res-sid', r.sidLight);
+                setText('res-single-portion', r.singlePortion);
 
                 // Total Intake fields
                 if (r.totalGIR !== undefined) {
-                    document.getElementById('res-total-gir').innerText = `${r.totalGIR}`;
+                    setText('res-total-gir', r.totalGIR);
                 }
                 if (r.totalLipidsGKg !== undefined) {
-                    document.getElementById('res-total-lipids').innerText = `${r.totalLipidsGKg}`;
+                    setText('res-total-lipids', r.totalLipidsGKg);
                 }
                 if (r.paaRatio !== undefined) {
                     const paaEl = document.getElementById('res-paa-ratio');
