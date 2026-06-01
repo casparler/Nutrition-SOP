@@ -526,6 +526,42 @@
                     </div>
                 </div>
 
+                <!-- B1 — 7-Tage-Trend: kompakte SVG-Sparklines aus dem history-Objekt.
+                     Zeigt Verlauf für Gewicht, Natrium-Zufuhr, BUN (Harnstoff) und kcal/kg.
+                     Hidden, solange keine 2+ Datenpunkte vorliegen. -->
+                <div id="trend-card" class="hidden bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-100 flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">📈 7-Tage-Trend</span>
+                        <span id="trend-meta" class="text-[10px] text-slate-400 tabular-nums">–</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-100">
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gewicht</p>
+                            <p id="spark-weight-val" class="text-base font-bold text-emerald-700 tabular-nums leading-tight">–</p>
+                            <div id="spark-weight" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-weight-delta" class="text-[10px] text-slate-400 tabular-nums">g</p>
+                        </div>
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Natrium</p>
+                            <p id="spark-sodium-val" class="text-base font-bold text-sky-700 tabular-nums leading-tight">–</p>
+                            <div id="spark-sodium" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-sodium-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/kg/d</p>
+                        </div>
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">BUN</p>
+                            <p id="spark-bun-val" class="text-base font-bold text-amber-700 tabular-nums leading-tight">–</p>
+                            <div id="spark-bun" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-bun-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/l</p>
+                        </div>
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Energie</p>
+                            <p id="spark-kcal-val" class="text-base font-bold text-orange-600 tabular-nums leading-tight">–</p>
+                            <div id="spark-kcal" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-kcal-delta" class="text-[10px] text-slate-400 tabular-nums">kcal/kg/d</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Main Result Card -->
                 <div id="result-card" class="bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
                     <div class="bg-blue-600 text-white px-4 py-3 flex justify-between items-center">
@@ -1138,6 +1174,41 @@
                 });
             }
 
+            // B1: Render mini SVG sparkline. data: array of numbers (oldest→newest).
+            // Liefert eine schlanke Linie mit End-Marker; keine Animation, hoher Kontrast.
+            function renderSparkline(containerId, data, opts = {}) {
+                const el = document.getElementById(containerId);
+                if (!el) return;
+                const valid = (data || []).filter(v => typeof v === 'number' && isFinite(v));
+                if (valid.length < 2) {
+                    el.innerHTML = '<span class="text-[10px] text-slate-300 italic">zu wenig Daten</span>';
+                    return;
+                }
+                const w = opts.width || 110, h = opts.height || 28, pad = 3;
+                const color = opts.color || '#0d9488';
+                const min = Math.min(...valid);
+                const max = Math.max(...valid);
+                const range = (max - min) || 1;
+                const stepX = (w - 2 * pad) / (valid.length - 1);
+                const pts = valid.map((v, i) => {
+                    const x = pad + i * stepX;
+                    // Wenn min === max: in der Mitte zeichnen.
+                    const y = max === min ? h / 2 : h - pad - ((v - min) / range) * (h - 2 * pad);
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                }).join(' ');
+                const lastIdx = valid.length - 1;
+                const lastX = pad + lastIdx * stepX;
+                const lastY = max === min ? h / 2 : h - pad - ((valid[lastIdx] - min) / range) * (h - 2 * pad);
+                // Fläche unter der Kurve dezent füllen
+                const area = `${pad},${h - pad} ${pts} ${lastX.toFixed(1)},${h - pad}`;
+                el.innerHTML =
+                    `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${opts.label || 'Trend'}" preserveAspectRatio="none">` +
+                    `<polyline fill="${color}" fill-opacity="0.10" stroke="none" points="${area}" />` +
+                    `<polyline fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" points="${pts}" />` +
+                    `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="${color}" />` +
+                    `</svg>`;
+            }
+
             const inputs = [
                 'birth-weight', 'current-weight', 'yesterday-weight', 'input-tfi',
                 'input-enteral', 'input-enteral-product', 'input-fm85', 'input-meal-frequency',
@@ -1664,6 +1735,87 @@
 
                 // Validation Box (Simulation Mode)
                 updateValidationBox(res, data);
+
+                // B1: 7-Tage-Trend persistieren + rendern.
+                // kcal/kg ist ein Output → wir speichern es pro Tag in history,
+                // damit die Sparkline auch dann den korrekten historischen Wert
+                // zeigt, wenn nur die aktuellen Inputs vorliegen.
+                try {
+                    const curDay = parseInt(document.getElementById('input-day').value) || 1;
+                    if (!history[String(curDay)]) history[String(curDay)] = {};
+                    if (typeof r.kcalPerKg === 'number' && isFinite(r.kcalPerKg)) {
+                        history[String(curDay)]['_kcal-kg'] = r.kcalPerKg;
+                    }
+                    localStorage.setItem('neo-history', JSON.stringify(history));
+                } catch (e) { /* localStorage quota / parse — non-blocking */ }
+                renderTrendCard();
+            }
+
+            // B1: Liest aus dem history-Objekt die letzten ≤7 Tage für ein bestimmtes
+            // Feld und gibt {values, days, latest} zurück. Lücken (undefined) werden
+            // ausgelassen — Sparkline zeigt nur tatsächlich gemessene Werte.
+            function getTrend(field, maxDays = 7) {
+                const curDay = parseInt(document.getElementById('input-day').value) || 1;
+                const start = Math.max(1, curDay - (maxDays - 1));
+                const values = [];
+                const days = [];
+                for (let d = start; d <= curDay; d++) {
+                    const dd = history[String(d)];
+                    if (!dd) continue;
+                    const raw = dd[field];
+                    if (raw === undefined || raw === null || raw === '') continue;
+                    const v = typeof raw === 'number' ? raw : parseFloat(raw);
+                    if (!isFinite(v)) continue;
+                    values.push(v);
+                    days.push(d);
+                }
+                return { values, days, latest: values[values.length - 1] };
+            }
+
+            // B1: Rendert alle Trend-Sparklines + Werte. Blendet die Card aus,
+            // solange noch nicht ein einziger Trend ≥2 Datenpunkte hat.
+            function renderTrendCard() {
+                const card = document.getElementById('trend-card');
+                if (!card) return;
+                const trends = {
+                    weight: { trend: getTrend('current-weight'), color: '#047857', unit: 'g',          decimals: 0, valId: 'spark-weight-val', sparkId: 'spark-weight', deltaId: 'spark-weight-delta', label: 'Gewichts-Trend' },
+                    sodium: { trend: getTrend('input-sodium'),   color: '#0284c7', unit: 'mmol/kg/d',  decimals: 1, valId: 'spark-sodium-val', sparkId: 'spark-sodium', deltaId: 'spark-sodium-delta', label: 'Natrium-Trend' },
+                    bun:    { trend: getTrend('input-urea'),     color: '#b45309', unit: 'mmol/l',     decimals: 1, valId: 'spark-bun-val',    sparkId: 'spark-bun',    deltaId: 'spark-bun-delta',    label: 'BUN-Trend' },
+                    kcal:   { trend: getTrend('_kcal-kg'),       color: '#ea580c', unit: 'kcal/kg/d',  decimals: 0, valId: 'spark-kcal-val',   sparkId: 'spark-kcal',   deltaId: 'spark-kcal-delta',   label: 'Energie-Trend' }
+                };
+
+                let anyData = false;
+                let maxDays = 0;
+                Object.values(trends).forEach(t => {
+                    const valEl = document.getElementById(t.valId);
+                    const deltaEl = document.getElementById(t.deltaId);
+                    if (t.trend.values.length >= 2) anyData = true;
+                    if (t.trend.values.length > maxDays) maxDays = t.trend.values.length;
+
+                    if (t.trend.values.length === 0) {
+                        if (valEl) valEl.textContent = '–';
+                        if (deltaEl) deltaEl.textContent = t.unit;
+                    } else {
+                        const last = t.trend.latest;
+                        if (valEl) valEl.textContent = last.toFixed(t.decimals);
+                        if (t.trend.values.length >= 2 && deltaEl) {
+                            const first = t.trend.values[0];
+                            const delta = last - first;
+                            const sign = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
+                            const color = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-slate-400';
+                            deltaEl.className = `text-[10px] tabular-nums ${color}`;
+                            deltaEl.textContent = `${sign} ${Math.abs(delta).toFixed(t.decimals)} ${t.unit}`;
+                        } else if (deltaEl) {
+                            deltaEl.className = 'text-[10px] text-slate-400 tabular-nums';
+                            deltaEl.textContent = t.unit;
+                        }
+                    }
+                    renderSparkline(t.sparkId, t.trend.values, { color: t.color, label: t.label });
+                });
+
+                const meta = document.getElementById('trend-meta');
+                if (meta) meta.textContent = anyData ? `${maxDays} Tag${maxDays === 1 ? '' : 'e'} im Verlauf` : '';
+                card.classList.toggle('hidden', !anyData);
             }
 
             // PDF Export
