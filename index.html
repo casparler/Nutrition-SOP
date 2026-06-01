@@ -678,6 +678,30 @@
                                     <td id="res-osmolarity" class="p-3 text-right font-bold text-blue-800">-</td>
                                     <td class="p-3 text-right text-gray-400 text-sm">mOsm/l</td>
                                 </tr>
+                                <!-- C1: Osmolaritäts-Breakdown — deskriptiv, kein Dosierungsvorschlag.
+                                     Zeigt prozentuale Beiträge von Glukose/AS/Na/K zur Gesamt-Osmolarität. -->
+                                <tr class="extra-detail hidden bg-blue-50/5">
+                                    <td colspan="3" class="px-3 pb-3 pt-0">
+                                        <div id="osm-breakdown" class="text-[11px] text-blue-900">
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="uppercase tracking-wider text-blue-700 font-bold text-[10px]">↳ Osmolaritäts-Aufschlüsselung</span>
+                                                <span id="osm-breakdown-total" class="text-blue-500 tabular-nums">–</span>
+                                            </div>
+                                            <div id="osm-breakdown-bar" class="flex h-2 w-full rounded overflow-hidden bg-blue-100" aria-hidden="true">
+                                                <div data-osm="glucose" class="bg-amber-400" style="width:0%"></div>
+                                                <div data-osm="protein" class="bg-emerald-500" style="width:0%"></div>
+                                                <div data-osm="sodium"  class="bg-sky-500"    style="width:0%"></div>
+                                                <div data-osm="potassium" class="bg-violet-500" style="width:0%"></div>
+                                            </div>
+                                            <div class="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 mt-2 tabular-nums">
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-amber-400"></span><span>Glukose: <strong id="osm-bd-glucose">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-emerald-500"></span><span>AS: <strong id="osm-bd-protein">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-sky-500"></span><span>Na⁺: <strong id="osm-bd-sodium">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-violet-500"></span><span>K⁺: <strong id="osm-bd-potassium">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                                 <tr class="extra-detail hidden">
                                     <td class="p-3">Ca:P Verhältnis <span id="tip-cap" class="text-gray-400 cursor-help ml-1">ⓘ</span></td>
                                     <td id="res-cap-ratio" class="p-3 text-right font-bold">-</td>
@@ -1068,10 +1092,50 @@
                 set('tip-lipids', `<strong>Lipide i.v.</strong><br>Tagesziel: ${t.lipidTarget.min}–${t.lipidTarget.max} g/kg/d`);
                 set('tip-energy', `<strong>Energie (gesamt)</strong><br>Tag ${t.energyDay}: ${t.energy.min}–${t.energy.max} kcal/kg/d`);
                 set('tip-glucose', '<strong>Glukose-Konz. (PN)</strong><br>Aus GIR und PN-Volumen; peripher typ. &lt; 12,5&nbsp;%.');
-                set('tip-osm', '<strong>Osmolarität</strong><br>Peripher &lt; 900 mOsm/l.');
+                // C1: Osmolarität-Tooltip mit deskriptivem Breakdown (Glukose/AS/Na/K)
+                const ob = res.results && res.results.osmolarityBreakdown;
+                if (ob && ob.total > 0) {
+                    const pct = (v) => Math.round((v / ob.total) * 100);
+                    set('tip-osm',
+                        `<strong>Osmolarität (PN)</strong>: ${ob.total} mOsm/l<br>` +
+                        `<span style="font-size:11px;line-height:1.4">` +
+                        `Glukose: ${ob.glucose} (${pct(ob.glucose)}%)<br>` +
+                        `Aminosäuren: ${ob.protein} (${pct(ob.protein)}%)<br>` +
+                        `Natrium: ${ob.sodium} (${pct(ob.sodium)}%)<br>` +
+                        `Kalium: ${ob.potassium} (${pct(ob.potassium)}%)<br>` +
+                        `Limit peripher: &lt; 900 mOsm/l` +
+                        `</span>`);
+                } else {
+                    set('tip-osm', '<strong>Osmolarität</strong><br>Peripher &lt; 900 mOsm/l.');
+                }
                 set('tip-cap', '<strong>Ca:P (molar)</strong><br>Ziel: 1,5:1 bis 1,7:1');
                 set('tip-npc', '<strong>NPC Lipid-Anteil</strong><br>ESPGHAN: 25–50% der Nicht-Protein-Kalorien aus Lipiden');
                 set('tip-npc-p', '<strong>NPC/Protein Ratio</strong><br>Ziel: 20–30 kcal NPC pro g Protein.<br>&lt; 20: Protein wird zur Energiegewinnung verbrannt.<br>&gt; 40: Verfettungsrisiko.');
+            }
+
+            // C1: Render Osmolaritäts-Breakdown (Stacked Bar + numerische Beiträge).
+            // Rein deskriptiv. Wenn keine PN läuft, alles auf '–'/0% zurücksetzen.
+            function renderOsmBreakdown(ob) {
+                const totalEl = document.getElementById('osm-breakdown-total');
+                const bar = document.getElementById('osm-breakdown-bar');
+                const ids = { glucose: 'osm-bd-glucose', protein: 'osm-bd-protein', sodium: 'osm-bd-sodium', potassium: 'osm-bd-potassium' };
+                if (!ob || !ob.total || ob.total <= 0) {
+                    if (totalEl) totalEl.textContent = '– keine PN';
+                    Object.values(ids).forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '–'; });
+                    if (bar) bar.querySelectorAll('[data-osm]').forEach(seg => seg.style.width = '0%');
+                    return;
+                }
+                if (totalEl) totalEl.textContent = `${ob.total} mOsm/l gesamt`;
+                Object.keys(ids).forEach(key => {
+                    const el = document.getElementById(ids[key]);
+                    if (el) el.textContent = ob[key];
+                    const seg = bar ? bar.querySelector(`[data-osm="${key}"]`) : null;
+                    if (seg) {
+                        const pct = (ob[key] / ob.total) * 100;
+                        seg.style.width = pct.toFixed(1) + '%';
+                        seg.title = `${key}: ${ob[key]} mOsm/l (${pct.toFixed(0)}%)`;
+                    }
+                });
             }
 
             const inputs = [
@@ -1349,6 +1413,7 @@
                 setText('res-glucose-conc', r.glucoseConc);
                 setText('res-gir', r.effectiveGIR);
                 setText('res-osmolarity', r.osmolarity);
+                renderOsmBreakdown(r.osmolarityBreakdown); // C1
                 setText('res-cap-ratio', r.caPRatio, ':1');
                 setText('res-weight-percentile', r.weightPercentile);
                 const protEl = document.getElementById('res-protein-total-gkg');

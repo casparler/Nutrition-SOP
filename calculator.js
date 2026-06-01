@@ -610,19 +610,35 @@ class NutritionCalculator {
             caPRatio = totalCaMmolKg.div(totalPMmolKg).toDecimalPlaces(2);
         }
 
-        // --- Step 10: Osmolarity ---
+        // --- Step 10: Osmolarity (+ Breakdown für UI/Klinische Tiefe) ---
+        // Beiträge der Hauptkomponenten zur Gesamt-Osmolarität (Glukose, AS, Na, K).
+        // Rein deskriptiv — keine Dosierungsempfehlung. Faustformel:
+        //   Glukose-Beitrag  = [g/l] × 5
+        //   AS-Beitrag       = [g/l] × 10
+        //   Na-Beitrag       = [mmol/l] × 2  (NaCl dissoziiert → 2 osmotisch aktive Teilchen)
+        //   K-Beitrag        = [mmol/l] × 2
         let osmolarity = D(0);
+        let osmolarityBreakdown = {
+            glucose: 0, protein: 0, sodium: 0, potassium: 0, total: 0
+        };
         if (pnDaily.gt(0)) {
             const pnLiters = pnDaily.div(1000);
             const glucoseGL = glucoseTotalG.div(pnLiters);
             const proteinGL = effectiveAS.times(weightKg).div(pnLiters);
             const naMmolL = effectiveNa.times(weightKg).div(pnLiters);
             const kMmolL = effectiveK.times(weightKg).div(pnLiters);
-            osmolarity = glucoseGL.times(5)
-                .plus(proteinGL.times(10))
-                .plus(naMmolL.times(2))
-                .plus(kMmolL.times(2))
-                .toDecimalPlaces(0);
+            const osmGlucose = glucoseGL.times(5);
+            const osmProtein = proteinGL.times(10);
+            const osmSodium = naMmolL.times(2);
+            const osmPotassium = kMmolL.times(2);
+            osmolarity = osmGlucose.plus(osmProtein).plus(osmSodium).plus(osmPotassium).toDecimalPlaces(0);
+            osmolarityBreakdown = {
+                glucose: osmGlucose.toDecimalPlaces(0).toNumber(),
+                protein: osmProtein.toDecimalPlaces(0).toNumber(),
+                sodium: osmSodium.toDecimalPlaces(0).toNumber(),
+                potassium: osmPotassium.toDecimalPlaces(0).toNumber(),
+                total: osmolarity.toNumber()
+            };
         }
 
         // --- Step 11: Meal Portions & Reminders ---
@@ -641,6 +657,7 @@ class NutritionCalculator {
             glucoseConc: glucoseConc.toNumber(),
             effectiveGIR: totalGIR.toDecimalPlaces(1).toNumber(),
             osmolarity: osmolarity.toNumber(),
+            osmolarityBreakdown: osmolarityBreakdown,
             caPRatio: caPRatio.toNumber(),
             proteinTotalGKg: proteinTotalGKg.toNumber(),
             effectiveAS: effectiveAS.toDecimalPlaces(2).toNumber(),
@@ -1000,6 +1017,7 @@ class NutritionCalculator {
                 glucoseConc: n.glucoseConc,
                 effectiveGIR: n.effectiveGIR,
                 osmolarity: n.osmolarity,
+                osmolarityBreakdown: n.osmolarityBreakdown,
                 caPRatio: n.caPRatio,
                 weightPercentile,
                 proteinTotalGPerKg: n.proteinTotalGKg,
