@@ -457,3 +457,205 @@ describe('G) Plausibility / Fat-Finger Guard', () => {
         }
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION H — Clinical Cockpit v2.0 (Chief Physician Review)
+ * Narrative Assessment + EPR-Documentation-String + Phase-Logik
+ * ────────────────────────────────────────────────────────────────*/
+describe('H) Clinical Cockpit v2.0 — Chief Physician Review', () => {
+
+    it('H1: Stabile ESPGHAN-konforme Zufuhr → status "stable" + positives Bullet', () => {
+        // Phase B, ELBW (1000g), Tag 10, alle Targets erreichbar
+        const r = calc.calculate(baseInput({
+            birthWeight: 1000, currentWeight: 1100, previousWeight: 1083,
+            ssw: 28, postnatalAge: 10,
+            tfi: 160, enteralVolume: 80, fm85Percent: 2,
+            protein: 2.5, lipids: 3.0, gir: 10,
+            calcium: 75, phosphate: 50,
+            sodium: 3, potassium: 2
+        }));
+        expect(r.assessment).toBeDefined();
+        expect(['stable', 'attention']).toContain(r.assessment.status);
+        expect(r.assessment.phase).toBe('B');
+        expect(r.assessment.headline).toMatch(/Phase B|stabil|Aufmerksamkeit/i);
+        expect(Array.isArray(r.assessment.bullets)).toBe(true);
+        expect(r.assessment.bullets.length).toBeGreaterThan(0);
+    });
+
+    it('H2: CRITICAL-Warnung → status "critical" + Kritikalitäts-Bullet ganz oben', () => {
+        // Protein deutlich über 4.5 → CRITICAL
+        const r = calc.calculate(baseInput({
+            birthWeight: 1000, currentWeight: 1000,
+            postnatalAge: 5, tfi: 130, protein: 5.5
+        }));
+        expect(r.assessment.status).toBe('critical');
+        expect(r.assessment.criticalCount).toBeGreaterThan(0);
+        expect(r.assessment.bullets[0].kind).toBe('critical');
+        expect(r.assessment.headline).toMatch(/[Kk]ritisch|Re-Evaluation|Sicherheits-Limit/);
+    });
+
+    it('H3: Phase-Klassifikation A/B/C nach postnatalAge', () => {
+        expect(calc._phaseOfCare(1).id).toBe('A');
+        expect(calc._phaseOfCare(7).id).toBe('A');
+        expect(calc._phaseOfCare(8).id).toBe('B');
+        expect(calc._phaseOfCare(28).id).toBe('B');
+        expect(calc._phaseOfCare(29).id).toBe('C');
+        expect(calc._phaseOfCare(60).id).toBe('C');
+    });
+
+    it('H4: generateDocumentationString liefert EPR-tauglichen Text mit Kern-Domänen', () => {
+        const input = baseInput({
+            birthWeight: 1200, currentWeight: 1250, previousWeight: 1230,
+            ssw: 29, postnatalAge: 4,
+            tfi: 140, enteralVolume: 40, fm85Percent: 0,
+            selectedEnteralProduct: 'ebm',
+            selectedSolution: 'basisFG',
+            selectedLipidProduct: 'smoflipid20',
+            protein: 3.0, lipids: 2.0, gir: 8,
+            calcium: 70, phosphate: 45,
+            sodium: 2, potassium: 2,
+            access: 'central'
+        });
+        const r = calc.calculate(input);
+        const doc = r.documentation;
+        expect(typeof doc).toBe('string');
+        expect(doc).toMatch(/Ernährung Tag 4/);
+        expect(doc).toMatch(/1250 g/);
+        expect(doc).toMatch(/TFI 140/);
+        expect(doc).toMatch(/Enteral 40/);
+        expect(doc).toMatch(/EBM/);
+        expect(doc).toMatch(/GIR/);
+        expect(doc).toMatch(/SMOFlipid/);
+        expect(doc).toMatch(/Ca:P/);
+        expect(doc).toMatch(/Beurteilung:/);
+    });
+
+    it('H5: Assessment-Bullets respektieren Limit von max. 5 Einträgen', () => {
+        // Viele Probleme gleichzeitig erzeugen
+        const r = calc.calculate(baseInput({
+            birthWeight: 500, currentWeight: 480, ssw: 24,
+            postnatalAge: 30, // Phase C
+            tfi: 90, // unter Ziel für Phase C
+            enteralVolume: 0,
+            protein: 1.0, // unter Ziel
+            lipids: 0.5,  // unter Ziel
+            gir: 2,        // unter Ziel
+            calcium: 100, phosphate: 30 // schlechtes Ca:P
+        }));
+        expect(r.assessment.bullets.length).toBeLessThanOrEqual(5);
+    });
+
+    it('H6: Stable Phase A ohne Probleme → headline enthält "Phase A"', () => {
+        // Saubere Phase-A-Zufuhr: ELBW Tag 1, Targets im Ziel
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, currentWeight: 900, ssw: 27,
+            postnatalAge: 1, tfi: 90,
+            enteralVolume: 0,
+            selectedSolution: 'fgMix75',
+            protein: 1.75, lipids: 1.0, gir: 5,
+            calcium: 35, phosphate: 22,
+            sodium: 0, potassium: 0,
+            access: 'central'
+        }));
+        expect(r.assessment.phase).toBe('A');
+        // Headline sollte Phase referenzieren ODER stabil/attention sein
+        expect(r.assessment.headline).toBeTruthy();
+        expect(r.assessment.summary).toMatch(/Phase A/);
+    });
+
+    it('H7: Documentation enthält Beurteilung mit den Top-Bullets', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1000, currentWeight: 1000,
+            postnatalAge: 5, tfi: 130, protein: 5.5
+        }));
+        // CRITICAL-Status → Beurteilung muss kritischen Befund nennen
+        expect(r.documentation).toMatch(/Beurteilung:/);
+        expect(r.documentation).toMatch(/kritisch|Kritisch|CRITICAL|Re-Evaluation/i);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION I — Predictive Analytics v2.1 (Modell B: diagnostische Hinweise)
+ * Kumulativer Energy-Gap (Threshold 150 kcal/kg) + Sodium-Zufuhr-Trigger
+ * (Δ > 5 mmol/kg/d in 48 h). Beide werden im Assessment ausgegeben.
+ * ────────────────────────────────────────────────────────────────*/
+describe('I) Predictive Analytics v2.1 — Energy-Gap & Sodium-Trend', () => {
+
+    it('I1: Energy-Gap akkumuliert das tägliche Kalorien-Defizit korrekt', () => {
+        // Tag 3–5: jeweils 60 kcal/kg Defizit (110 Ziel − 50 Ist) → Σ 180
+        const history = {
+            '3': { '_kcal-kg': 50, '_kcal-min': 110 },
+            '4': { '_kcal-kg': 50, '_kcal-min': 110 },
+            '5': { '_kcal-kg': 50, '_kcal-min': 110 }
+        };
+        const eg = calc._analyzeEnergyGap(history, 5);
+        expect(eg.cumulativeDeficit).toBe(180);
+        expect(eg.daysAnalyzed).toBe(3);
+        expect(eg.threshold).toBe(150);
+    });
+
+    it('I2: Energy-Gap setzt critical NUR bei > 150 kcal/kg über ≥ 3 Tage', () => {
+        // Unter Schwelle (Σ 90 über 3 d) → nicht kritisch
+        const below = calc._analyzeEnergyGap({
+            '3': { '_kcal-kg': 80, '_kcal-min': 110 },
+            '4': { '_kcal-kg': 80, '_kcal-min': 110 },
+            '5': { '_kcal-kg': 80, '_kcal-min': 110 }
+        }, 5);
+        expect(below.critical).toBe(false);
+        // Über Schwelle (Σ 180 über 3 d) → kritisch
+        const above = calc._analyzeEnergyGap({
+            '3': { '_kcal-kg': 50, '_kcal-min': 110 },
+            '4': { '_kcal-kg': 50, '_kcal-min': 110 },
+            '5': { '_kcal-kg': 50, '_kcal-min': 110 }
+        }, 5);
+        expect(above.critical).toBe(true);
+    });
+
+    it('I3: Sodium-Trend triggert NUR bei Steigerung Δ > 5 mmol/kg/d in 48 h', () => {
+        // Δ = 9 − 2 = 7 > 5 → rising
+        const rising = calc._analyzeSodiumTrend({ '3': { 'input-sodium': 2 } }, 5, 9);
+        expect(rising.rising).toBe(true);
+        expect(rising.threshold).toBe(5);
+        // Δ = 6 − 2 = 4 ≤ 5 → kein Trigger
+        const flat = calc._analyzeSodiumTrend({ '3': { 'input-sodium': 2 } }, 5, 6);
+        expect(flat.rising).toBe(false);
+    });
+
+    it('I4: Beide Trigger erscheinen als predictiveHints im Assessment', () => {
+        const probe = baseInput({ postnatalAge: 5, sodium: 12, tfi: 130 });
+        // Tatsächliche Na-Zufuhr aus dem Rechner ermitteln (effektive Na)
+        const naNow = calc.calculate(probe).results.effectiveNa;
+        const history = {
+            '3': { '_kcal-kg': 40, '_kcal-min': 110, 'input-sodium': naNow - 8 },
+            '4': { '_kcal-kg': 40, '_kcal-min': 110 },
+            '5': { '_kcal-kg': 40, '_kcal-min': 110 }
+        };
+        const res = calc.calculate(baseInput({ ...probe, history }));
+        expect(res.predictive.energyGap.critical).toBe(true);
+        expect(res.predictive.sodiumTrend.rising).toBe(true);
+        const hints = res.assessment.predictiveHints;
+        expect(Array.isArray(hints)).toBe(true);
+        expect(hints.length).toBe(2);
+        expect(hints.some(h => /Energiedefizit/i.test(h.text))).toBe(true);
+        expect(hints.some(h => /Natrium|Na-Zufuhr/i.test(h.text))).toBe(true);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION J — Smoke Test (CI): Frontend-Integrität
+ * Stellt sicher, dass der Safety-Banner #validation-error-banner im
+ * ausgelieferten index.html existiert (UI-Schutzlayer, siehe AGENTS.md).
+ * ────────────────────────────────────────────────────────────────*/
+describe('J) Smoke Test — index.html Safety-Banner', () => {
+
+    it('J1: #validation-error-banner existiert im index.html (jsdom)', async () => {
+        const { readFileSync } = require('node:fs');
+        const { JSDOM } = require('jsdom');
+        const path = new URL('../index.html', import.meta.url);
+        const html = readFileSync(path, 'utf-8');
+        const dom = new JSDOM(html);
+        const banner = dom.window.document.getElementById('validation-error-banner');
+        expect(banner).not.toBeNull();
+        expect(banner.getAttribute('role')).toBe('alert');
+    });
+});

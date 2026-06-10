@@ -1,7 +1,10 @@
-# AGENTS.md — NeoNutri Neonatologie-Rechner
+# AGENTS.md — NeoNutri Neonatologie-Rechner (v2.1)
 
 > **Verbindliche Leitlinien für alle KI-Agenten und Entwickler, die an diesem Projekt arbeiten.**
 > Dies ist eine **klinische Safety-First-Applikation**. Verstöße gegen die folgenden Regeln können zu Patientengefährdung führen.
+>
+> **Aktueller Stand:** v2.1 — Production Readiness & CI. Test-Suite: **65/65 grün** (Sektionen A–J).
+> CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) führt `npm test` bei jedem Push/PR aus.
 
 ---
 
@@ -9,7 +12,7 @@
 
 ### 1. Test-Suite (Vitest) — ALLE Tests müssen IMMER zu 100 % grün sein
 
-- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 53 klinische Tests** (Sektionen A–G; ursprünglich 31, in v1.2 um 13 Validierungs-Tests A4a–A4m und in v1.3 um 9 Type-safe-Parser-Tests A5a–A5i erweitert), die das gesamte Sicherheitsverhalten des Calculators absichern.
+- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 65 klinische Tests** (Sektionen A–J; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7] und v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
 - Die Anzahl darf wachsen, aber **nie schrumpfen**. Neue Tests gerne — alte nur mit klinischer Begründung anpassen.
 - **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — ALLE Tests müssen bestanden sein.**
 - **Nach JEDER Änderung an `calculator.js` muss `npm test` erneut grün sein, bevor die Aufgabe als abgeschlossen gilt.**
@@ -17,7 +20,7 @@
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
 
 ```bash
-npm test    # MUSS 31 passed, 0 failed zeigen
+npm test    # MUSS 65 passed, 0 failed zeigen
 ```
 
 ### 2. ELBW-Klassengrenze bei exakt 1000 g — SAKROSANKT
@@ -50,12 +53,23 @@ npm test    # MUSS 31 passed, 0 failed zeigen
 
 ---
 
+## 🔮 Predictive Analytics — „Modell B" (v2.1)
+
+- `_analyzeEnergyGap()` und `_analyzeSodiumTrend()` in [calculator.js](./calculator.js) liefern **ausschließlich diagnostische Hinweise**, niemals ein Stop-Signal oder eine harte Dosis-Sperre.
+- Ergebnisse landen in `res.predictive` und werden als `res.assessment.predictiveHints` (separates Array, **außerhalb** des 5er-Bullet-Caps) ausgegeben — damit Kern-Safety-Bullets nie verdrängt werden.
+- Schwellwerte sind klinisch begründet und dürfen nur mit Quelle + Datum geändert werden:
+  - **Energy-Gap:** kumulatives Defizit **> 150 kcal/kg** über **≥ 3 Tage** → Hinweis (Embleton 2001, konservativer Trigger).
+  - **Sodium-Trend:** Anstieg der Na-**Zufuhr** **Δ > 5 mmol/kg/d in 48 h** → Hinweis „Serum-Natrium kontrollieren".
+- Die History wird optional über `input.history` übergeben (Tag-Keys `"1"`, `"2"`, … mit Feldern `_kcal-kg`, `_kcal-min`, `input-sodium`). Fehlt sie, geben beide Funktionen `null` zurück — kein Fehler.
+
+---
+
 ## 📋 Standard-Workflow für jede Änderung an `calculator.js`
 
-1. **Vor der Änderung:** `npm test` ausführen → muss 31/31 grün sein. Sonst zuerst Bestand reparieren.
+1. **Vor der Änderung:** `npm test` ausführen → muss 65/65 grün sein. Sonst zuerst Bestand reparieren.
 2. **Während der Änderung:** Keine der drei Invarianten oben antasten.
-3. **Nach der Änderung:** `npm test` erneut ausführen → muss 31/31 grün sein.
-4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 31/31 wieder grün sind.
+3. **Nach der Änderung:** `npm test` erneut ausführen → muss 65/65 grün sein.
+4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 65/65 wieder grün sind.
 
 ---
 
@@ -65,7 +79,7 @@ npm test    # MUSS 31 passed, 0 failed zeigen
 |-------|-------|
 | [calculator.js](./calculator.js) | Safety Core Engine — Decimal.js, Validierung, Targets, Warnings |
 | [index.html](./index.html) | UI inkl. try-catch um `calculate()` und Error-Banner |
-| [tests/calculator.test.js](./tests/calculator.test.js) | 31 klinische Vitest-Tests (Sektionen A–G) |
+| [tests/calculator.test.js](./tests/calculator.test.js) | 65 klinische Vitest-Tests (Sektionen A–J) |
 | [NICU_NUTRITION_MASTER_PROTOCOL.md](./NICU_NUTRITION_MASTER_PROTOCOL.md) | Klinische Spezifikation (Single Source of Truth) |
 | [NEO_NUTRITION_MASTER_LOGIC.md](./NEO_NUTRITION_MASTER_LOGIC.md) | Logik-Spezifikation V11 |
 
@@ -106,7 +120,7 @@ cp index.html      backup_index_v{X.Y}.html
 cp calculator.js   backup_calculator_v{X.Y}.js
 cp AGENTS.md       backup_AGENTS_v{X.Y}.md
 
-# 2. Tests müssen 31/31 grün sein
+# 2. Tests müssen 65/65 grün sein
 npm test    # im Obsidian-Ordner
 
 # 3. Repo frisch in /tmp klonen (wenn nicht schon vorhanden)
@@ -145,7 +159,9 @@ git push -u origin feature/{name}-v{X.Y}
 | v1.0    | `main` | Ausgangsstand (calculator.js, index.html, logic.js, products.js) | live |
 | v1.1    | `feature/nicu-optimization-v1.1` | ValidationError-Layer, UI try-catch + Error-Banner, ELBW-Boundary `bw<=1000`, 31 Vitest-Tests, AGENTS.md | PR offen |
 | v1.2    | `feature/super-tool-v2-evolution` | EPIC 1 R-01/R-04: Erweiterter ValidationError-Layer (Gewicht/SSW/GIR/Protein/Lipide/Ca/P/FM85/Frequenz/PostnatalAge + non-numerische Strings) → 13 neue Tests A4a–A4m, **44 Tests total** | gemerged in Branch |
-| v1.3    | `feature/super-tool-v2-evolution` | EPIC 1 R-02: Type-safe Parser (`_safeParseNum()`) + Hard-Limits für naclMl/kclMl/carrierVolume/microVolume/secondary/hiddenSodium/length/head/previousWeight → 9 neue Tests A5a–A5i, **53 Tests total** | in Arbeit |
+| v1.3    | `feature/super-tool-v2-evolution` | EPIC 1 R-02: Type-safe Parser (`_safeParseNum()`) + Hard-Limits für naclMl/kclMl/carrierVolume/microVolume/secondary/hiddenSodium/length/head/previousWeight → 9 neue Tests A5a–A5i, **53 Tests total** | gemerged in Branch |
+| v2.0    | `feature/clinical-cockpit-v2.0` | Clinical Cockpit: `generateClinicalAssessment()` + `generateDocumentationString()` (Chief-Physician-Review, Phasen A/B/C, EPR-Copy) → 7 neue Tests H1–H7, **60 Tests total** | gemerged in Branch |
+| v2.1    | `feature/clinical-cockpit-v2.0` | Production Readiness & CI: `.github/workflows/ci.yml` (npm test bei Push/PR), Predictive Analytics Modell B — kumulativer Energy-Gap (Threshold 150 kcal/kg) + Sodium-Zufuhr-Trigger (Δ > 5 mmol/kg/d in 48 h), beide als `assessment.predictiveHints` ausgegeben; jsdom-Smoke-Test → 5 neue Tests I1–I4 + J1, **65 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```

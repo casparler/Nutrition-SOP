@@ -137,6 +137,295 @@ class NutritionCalculator {
     }
 
     /**
+     * PREDICTIVE — Energy Gap Index (v2.1, Modell B: nur Hinweis)
+     * Berechnet das kumulative Kalorien-Defizit der letzten N Tage aus dem
+     * history-Objekt. Schwellwert > 150 kcal/kg/d → Warning.
+     *
+     * History-Format (per Tag-Key "1","2",…):
+     *   { _kcal-kg: 95, _kcal-min: 110 }   // tatsächliche vs. minimale Zufuhr
+     *
+     * Quellen: Embleton et al. 2001 — kumulatives Defizit > 200 kcal/kg
+     *          korreliert mit Wachstumsversagen; 150 als konservativer Trigger.
+     */
+    _analyzeEnergyGap(history, postnatalAge, lookbackDays = 7) {
+        if (!history || typeof history !== 'object') return null;
+        const curDay = parseInt(postnatalAge) || 1;
+        const start = Math.max(1, curDay - (lookbackDays - 1));
+        let cumulativeDeficit = 0;
+        let daysCounted = 0;
+        for (let d = start; d <= curDay; d++) {
+            const dd = history[String(d)];
+            if (!dd) continue;
+            const actual = parseFloat(dd['_kcal-kg']);
+            const targetMin = parseFloat(dd['_kcal-min']);
+            if (!isFinite(actual) || !isFinite(targetMin)) continue;
+            daysCounted++;
+            const gap = targetMin - actual;
+            if (gap > 0) cumulativeDeficit += gap;
+        }
+        cumulativeDeficit = Math.round(cumulativeDeficit * 10) / 10;
+        return {
+            cumulativeDeficit,
+            daysAnalyzed: daysCounted,
+            threshold: 150,
+            critical: cumulativeDeficit > 150 && daysCounted >= 3
+        };
+    }
+
+    /**
+     * PREDICTIVE — Sodium Intake Trend (v2.1, Modell B: nur Hinweis)
+     * Erkennt eine signifikante Steigerung der Na-Zufuhr in den letzten 48h.
+     * Wichtig: bezieht sich auf ZUFUHR (mmol/kg/d), nicht auf Serum-Na — die
+     * App hat keinen Lab-Input für Serum-Na. Ein starker Anstieg ist aber
+     * ein valider Risiko-Trigger („Serum-Na kontrollieren").
+     *
+     * Trigger (v2.1, lt. EXECUTION-Spec): Steigerung Δ > 5 mmol/kg/d
+     *          zwischen aktueller Zufuhr und der von vor 48 h (Tag-2-Vorher).
+     *          Modell-B-Wording: „Hinweis, kein Stop-Signal".
+     */
+    _analyzeSodiumTrend(history, postnatalAge, currentNaIntake) {
+        if (!history || typeof history !== 'object') return null;
+        const curDay = parseInt(postnatalAge) || 1;
+        const dayMinus2 = String(curDay - 2);
+        const prevData = history[dayMinus2];
+        if (!prevData) return null;
+        const prevNa = parseFloat(prevData['input-sodium']);
+        if (!isFinite(prevNa)) return null;
+        const delta = currentNaIntake - prevNa;
+        return {
+            currentIntake: Math.round(currentNaIntake * 100) / 100,
+            previousIntake: Math.round(prevNa * 100) / 100,
+            delta: Math.round(delta * 100) / 100,
+            lookbackDays: 2,
+            threshold: 5,
+            rising: delta > 5
+        };
+    }
+
+    /**
+     * NICU Phase-Klassifikation (Master-Protokoll):
+     *   Phase A — Tag 1–7   (Transition, IWL-dominiert, Elektrolyt-Shift)
+     *   Phase B — Tag 8–28  (Aufbau, Wachstum, FM85-Eskalation)
+     *   Phase C — Tag 29+   (Konsolidierung, ggf. Eiweiß-Supplement)
+     */
+    _phaseOfCare(postnatalAge) {
+        const d = parseInt(postnatalAge) || 1;
+        if (d <= 7) return { id: 'A', label: 'Phase A (Tag 1–7, Transition)' };
+        if (d <= 28) return { id: 'B', label: 'Phase B (Tag 8–28, Aufbau)' };
+        return { id: 'C', label: 'Phase C (Tag 29+, Konsolidierung)' };
+    }
+
+    /**
+     * NARRATIVE CLINICAL ASSESSMENT (v2.0 — Chief Physician Review)
+     * Erzeugt eine kompakte klinische Beurteilung aus dem berechneten Ergebnis.
+     * KEIN Zahlen-Dump — sondern Headline + Bullets, die der Oberarzt in der Visite
+     * vorliest. Status: 'critical' (rot) | 'attention' (gelb) | 'stable' (grün).
+     *
+     * Quellen: ESPGHAN 2018 + NICU_NUTRITION_MASTER_PROTOCOL_V2.
+     */
+    generateClinicalAssessment(res, input) {
+        const r = res.results;
+        const c = res.comparisons;
+        const phase = this._phaseOfCare(input.postnatalAge);
+        const criticals = (res.warnings || []).filter(w => w.startsWith('CRITICAL'));
+        const attentions = (res.warnings || []).filter(w => !w.startsWith('CRITICAL'));
+
+        // --- Status-Klassifikation ---
+        let status, headline;
+        if (criticals.length > 0 || !res.isSafe) {
+            status = 'critical';
+            headline = criticals.length > 0
+                ? `Kritische Befunde (${criticals.length}) — sofortige Re-Evaluation`
+                : 'Sicherheits-Limit überschritten — Plan anpassen';
+        } else if (attentions.length > 0 ||
+                   ['protein', 'energy', 'lipids', 'tfi'].some(k => c[k] && c[k].status !== 'green')) {
+            status = 'attention';
+            headline = 'Aufmerksamkeit erforderlich — gezielte Anpassungen empfohlen';
+        } else {
+            status = 'stable';
+            headline = `${phase.label.split(' (')[0]}: Zufuhr stabil — Targets im Ziel`;
+        }
+
+        // --- Narrative Bullets (max. 5, priorisiert nach Schweregrad) ---
+        const bullets = [];
+        const push = (kind, text) => { if (bullets.length < 5) bullets.push({ kind, text }); };
+
+        // 1) Kritische Befunde zuerst
+        criticals.slice(0, 2).forEach(w => push('critical', w.replace(/^CRITICAL:\s*/, '')));
+
+        // 2) Target-Bewertungen (Energie, Protein, Lipide, TFI)
+        const targetBullet = (key, label, unit) => {
+            const cm = c[key];
+            if (!cm || !cm.target) return;
+            const v = cm.value;
+            const t = cm.target;
+            if (cm.status === 'green') {
+                push('positive', `${label} ${v} ${unit} → im Ziel (${t.min}–${t.max}).`);
+            } else if (v < t.min) {
+                push('warning', `${label}-Target unterschritten: ${v} ${unit} (Ziel ${t.min}–${t.max}).`);
+            } else if (v > t.max) {
+                push('warning', `${label}-Target überschritten: ${v} ${unit} (Ziel ${t.min}–${t.max}).`);
+            }
+        };
+        // Reihenfolge: Protein und Energie sind klinisch wichtigste Treiber
+        targetBullet('protein', 'Protein', 'g/kg/d');
+        targetBullet('energy', 'Energie', 'kcal/kg/d');
+        targetBullet('lipids', 'Lipide', 'g/kg/d');
+
+        // 3) Ca:P Ratio (Knochenstoffwechsel)
+        if (r.caPRatio > 0 && (r.caPRatio < 1.5 || r.caPRatio > 2.0)) {
+            push('warning', `Ca:P Ratio ${r.caPRatio}:1 optimierungsbedürftig (Ziel 1.5–2.0).`);
+        }
+
+        // 4) Wachstum (Phase B/C)
+        if (phase.id !== 'A' && typeof r.weightVelocity === 'number') {
+            if (r.weightVelocity < 0) {
+                push('warning', `Gewichtsverlust ${r.weightVelocity} g/kg/d — Trend evaluieren.`);
+            } else if (r.weightVelocity >= 15 && r.weightVelocity <= 25) {
+                push('positive', `Growth Velocity ${r.weightVelocity} g/kg/d → physiologisch.`);
+            } else if (r.weightVelocity < 15 && phase.id === 'C') {
+                push('warning', `Wachstumsstagnation (${r.weightVelocity} g/kg/d) — Fortifizierung prüfen.`);
+            }
+        }
+
+        // 5) NPC/Protein (energetische Effizienz)
+        if (bullets.length < 5 && r.npcPerProtein > 0 && (r.npcPerProtein < 20 || r.npcPerProtein > 40)) {
+            push('warning', `NPC/Protein ${r.npcPerProtein} kcal/g — ${r.npcPerProtein < 20 ? 'Energie zu knapp' : 'Verfettungsrisiko'}.`);
+        }
+
+        // Wenn nach allem KEIN Bullet, dann positives Default
+        if (bullets.length === 0) {
+            push('positive', 'Alle ESPGHAN-Targets im Zielbereich, keine CRITICAL-Flags.');
+        }
+
+        // --- Predictive Hints (v2.1, Modell B: diagnostische Hinweise, kein Stop) ---
+        // Aus der Trend-Analyse (res.predictive) abgeleitet. Bewusst SEPARAT von den
+        // bullets (5er-Cap), damit Kern-Safety-Bullets nie verdrängt werden.
+        const predictiveHints = [];
+        const pred = res.predictive || {};
+        if (pred.energyGap && pred.energyGap.critical) {
+            predictiveHints.push({
+                kind: 'hint',
+                text: `Kumulatives Energiedefizit ${pred.energyGap.cumulativeDeficit} kcal/kg über ` +
+                      `${pred.energyGap.daysAnalyzed} d (> ${pred.energyGap.threshold} kcal/kg) — ` +
+                      `PEW-/Wachstumsrisiko, Energiezufuhr-Trend prüfen.`
+            });
+        }
+        if (pred.sodiumTrend && pred.sodiumTrend.rising) {
+            predictiveHints.push({
+                kind: 'hint',
+                text: `Na-Zufuhr-Anstieg +${pred.sodiumTrend.delta} mmol/kg/d in 48 h ` +
+                      `(> ${pred.sodiumTrend.threshold}) — Serum-Natrium kontrollieren.`
+            });
+        }
+
+        // --- Summary (1–2 Sätze für die "Visite") ---
+        let summary;
+        if (status === 'critical') {
+            summary = `${phase.label}: ${criticals.length} kritische(r) Befund(e). Plan vor nächster Infusionsbestellung überarbeiten.`;
+        } else if (status === 'attention') {
+            const drift = bullets.filter(b => b.kind === 'warning').length;
+            summary = `${phase.label}: ${drift} Optimierungspunkt${drift === 1 ? '' : 'e'} identifiziert — siehe Bullets.`;
+        } else {
+            summary = `${phase.label}: Stabile Zufuhr, Plan kann fortgeführt werden.`;
+        }
+
+        return {
+            status,
+            headline,
+            summary,
+            bullets,
+            predictiveHints,
+            phase: phase.id,
+            phaseLabel: phase.label,
+            criticalCount: criticals.length,
+            attentionCount: attentions.length
+        };
+    }
+
+    /**
+     * ONE-CLICK CHARTING (v2.0 — Copy for Documentation)
+     * Erzeugt einen für die elektronische Patientenakte (EPR) optimierten String,
+     * den der Arzt direkt einfügen kann. Format ist kompakt, einzeilig-pro-Domäne,
+     * arztverständlich (deutsch, klinische Abkürzungen).
+     */
+    generateDocumentationString(res, input) {
+        const r = res.results;
+        const phase = this._phaseOfCare(input.postnatalAge);
+        const day = parseInt(input.postnatalAge) || 1;
+        const cw = parseFloat(input.currentWeight) || parseFloat(input.birthWeight) || 0;
+        const bw = parseFloat(input.birthWeight) || 0;
+        const ssw = parseInt(input.ssw) || 0;
+
+        // Korrigiertes GA: ssw + (day-1)/7 (vereinfacht)
+        const corrW = ssw + Math.floor((day - 1) / 7);
+        const corrD = (day - 1) % 7;
+        const corrGA = `${corrW}+${corrD}`;
+
+        // Produkt-Namen aufschlüsseln
+        const num = (v, dp = 1) => {
+            if (v === null || v === undefined) return '–';
+            const n = Number(v);
+            if (!isFinite(n)) return '–';
+            return n.toFixed(dp);
+        };
+
+        const fm85 = parseInt(input.fm85Percent) || 0;
+        const ep = input.selectedEnteralProduct || 'ebm';
+        const enteralName = { ebm: 'EBM', bebaFG1: 'Beba FG 1', bebaFG2: 'Beba FG 2',
+                              aptamilPre: 'Aptamil Pre', hippPre: 'Hipp Pre' }[ep] || ep;
+        const enteralLabel = fm85 > 0 ? `${enteralName} + FM85 ${fm85}%` : enteralName;
+
+        const lipidProd = input.selectedLipidProduct === 'smoflipid20' ? 'SMOFlipid 20%' : 'Standard 20%';
+        const sol = input.selectedSolution && input.selectedSolution !== 'none'
+            ? ({
+                fgMix75: 'FG-Mix 7,5%', basisFG: 'Basislösung FG',
+                basis100: 'Basis 100', basis120: 'Basis 120', basis150: 'Basis 150',
+                basisPeripher: 'Basis peripher'
+              }[input.selectedSolution] || input.selectedSolution)
+            : 'manuell';
+        const access = input.access === 'central' ? 'ZVK' : 'peripher';
+
+        const lines = [];
+        lines.push(`Ernährung Tag ${day} (${cw} g, korr. ${corrGA} SSW, ${phase.label}):`);
+        lines.push(`- TFI ${num(input.tfi, 0)} ml/kg/d (Ziel ${res.targets.tfi.min}–${res.targets.tfi.max})`);
+
+        if (r.enteralDaily > 0 || parseFloat(input.enteralVolume) > 0) {
+            const portion = r.singlePortion ? `, ${input.mealFrequency || 8}× ${num(r.singlePortion)} ml` : '';
+            lines.push(`- Enteral ${num(input.enteralVolume, 0)} ml/kg/d (${enteralLabel}${portion})`);
+        }
+
+        if (r.pnDaily > 0) {
+            lines.push(`- PN ${num(r.pnDaily, 0)} ml/d (${sol}, ${access}) → GIR ${num(r.effectiveGIR)} mg/kg/min, AS ${num(r.proteinTotalGPerKg, 2)} g/kg/d`);
+            lines.push(`- Lipide ${num(r.lipidsPNKg, 1)} g/kg/d (${lipidProd}, ${num(r.lipidVolDaily, 1)} ml/d)`);
+        }
+
+        const caP = r.caPRatio > 0 ? `Ca:P ${num(r.caPRatio, 2)}:1` : 'Ca:P –';
+        const paa = r.paaRatio > 0 ? `P:AA ${num(r.paaRatio, 2)} mmol/g` : 'P:AA –';
+        lines.push(`- Energie ${num(r.kcalPerKg, 0)} kcal/kg/d (PN ${num(r.kcalParenteralKg, 0)} / Enteral ${num(r.kcalEnteralKg, 0)}) | ${caP} | ${paa}`);
+
+        if (r.effectiveNa > 0 || r.effectiveK > 0 || r.effectiveCl > 0) {
+            lines.push(`- Elektrolyte: Na ${num(r.effectiveNa, 1)} | K ${num(r.effectiveK, 1)} | Cl ${num(r.effectiveCl, 1)} mmol/kg/d (SID ${num(r.sidLight, 1)})`);
+        }
+
+        if (typeof r.weightVelocity === 'number') {
+            lines.push(`- Growth Velocity ${num(r.weightVelocity, 1)} g/kg/d${bw && cw ? ` (BW ${bw} g → akt. ${cw} g)` : ''}`);
+        }
+
+        // Beurteilung — narrative Synthese
+        const ass = res.assessment;
+        if (ass) {
+            lines.push('');
+            lines.push(`Beurteilung: ${ass.headline}.`);
+            if (ass.bullets && ass.bullets.length) {
+                ass.bullets.slice(0, 3).forEach(b => lines.push(`  • ${b.text}`));
+            }
+        }
+
+        return lines.join('\n');
+    }
+
+    /**
      * Growth Velocity: g/kg/d
      * Formula: ((weight_today - weight_yesterday) / weight_today) * 1000
      */
@@ -1005,7 +1294,7 @@ class NutritionCalculator {
         }
 
         // --- Return ---
-        return {
+        const finalResult = {
             targets,
             recommendations,
             results: {
@@ -1077,6 +1366,21 @@ class NutritionCalculator {
             plausibilityFlags,
             fazit
         };
+
+        // --- v2.1: Predictive Analytics (Modell B — nur Hinweise) ---
+        // History wird optional über input.history übergeben (UI lebt im Frontend).
+        finalResult.predictive = {
+            energyGap: this._analyzeEnergyGap(input.history, postnatalAge),
+            sodiumTrend: this._analyzeSodiumTrend(input.history, postnatalAge, n.effectiveNa)
+        };
+
+        // --- v2.0: Chief Physician Review + Copy-for-Documentation ---
+        // Assessment muss VOR generateDocumentationString berechnet werden,
+        // weil letztere die Beurteilung an den EPR-String anhängt.
+        finalResult.assessment = this.generateClinicalAssessment(finalResult, input);
+        finalResult.documentation = this.generateDocumentationString(finalResult, input);
+
+        return finalResult;
     }
 }
 
