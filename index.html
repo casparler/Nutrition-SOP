@@ -21,13 +21,88 @@
         .accordion-content.open { max-height: 2000px; }
         .accordion-header { cursor: pointer; user-select: none; }
         .accordion-header:hover { background-color: #f9fafb; }
+
+        /* B2 — Sticky Safety-Banner: bleibt beim Scrollen am oberen Viewport-Rand,
+           damit eine kritische ValidationError nie aus dem Sichtfeld verschwindet.
+           Wirkt nur, wenn der Banner sichtbar ist (also nicht .hidden). */
+        #validation-error-banner:not(.hidden) {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 10px 25px -5px rgba(127, 29, 29, 0.35), 0 4px 6px -2px rgba(127, 29, 29, 0.15);
+            border-top: 4px solid #7f1d1d;
+        }
+        /* Inhalt etwas kompakter, damit der sticky Banner andere UI nicht unnötig
+           überdeckt. Akzent (border-left) bleibt aus Konsistenz mit no-sticky-Look. */
+        #validation-error-banner:not(.hidden) .banner-inner {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        /* v2.0 — Chief Physician Review (Status-Färbung) */
+        .cpr-stable    { background: linear-gradient(135deg,#ecfdf5,#d1fae5); border-color:#10b981; }
+        .cpr-attention { background: linear-gradient(135deg,#fffbeb,#fef3c7); border-color:#f59e0b; }
+        .cpr-critical  { background: linear-gradient(135deg,#fef2f2,#fee2e2); border-color:#ef4444; }
+        .cpr-stable    .cpr-headline { color:#065f46; }
+        .cpr-attention .cpr-headline { color:#92400e; }
+        .cpr-critical  .cpr-headline { color:#991b1b; }
+        .cpr-bullet-critical { background:#fee2e2; border-left:3px solid #ef4444; color:#7f1d1d; }
+        .cpr-bullet-warning  { background:#fef3c7; border-left:3px solid #f59e0b; color:#78350f; }
+        .cpr-bullet-positive { background:#d1fae5; border-left:3px solid #10b981; color:#065f46; }
+
+        /* v2.0 — Copy-for-Documentation Feedback-Animation */
+        @keyframes flashGreen { 0%{background:#10b981;color:#fff} 100%{background:#1f2937;color:#fff} }
+        .btn-copied { animation: flashGreen 1.2s ease-out; }
+
+        /* v2.0 — Zero-Scroll: kompaktere Sim-Buttons, weniger vertikales Padding */
+        #simulator-section button { padding-top:0.5rem; padding-bottom:0.5rem; }
+
+        /* ============================================================
+           v3.0 — NICU OBERARZT-EDITION
+           ============================================================ */
+
+        /* Zero-Scroll Cockpit-Grid: CPR + Quick-View + Energy-Gap + Trends
+           werden auf Tablet (≥768px) als kompaktes 2-Spalten-Raster gepackt,
+           damit das gesamte Cockpit ohne Scrollen sichtbar ist (1024×768). */
+        .cockpit-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+        @media (min-width: 768px) {
+            .cockpit-grid { grid-template-columns: 1fr 1fr; }
+            .cockpit-grid > .cockpit-full { grid-column: 1 / -1; }
+        }
+        /* Kurze Viewports (Tablet quer ~768px Höhe): Dichte erhöhen. */
+        @media (max-height: 820px) {
+            #cpr-card .px-4.py-3 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            #cpr-headline { font-size: 1rem; line-height: 1.25; }
+            #cpr-bullets { margin-top: 0.4rem; }
+            #cpr-bullets li { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+            #quick-view-card { padding: 0.85rem !important; }
+            #quick-view-card .text-3xl, #quick-view-card .text-4xl { font-size: 1.75rem !important; }
+        }
+
+        /* Energy-Gap-Index Kachel */
+        .egi-bar-track { background:#e5e7eb; border-radius:9999px; height:8px; overflow:hidden; }
+        .egi-bar-fill  { height:100%; border-radius:9999px; transition:width .4s ease; }
+        .egi-ok    { background:#10b981; } .egi-ok-text    { color:#065f46; }
+        .egi-watch { background:#f59e0b; } .egi-watch-text { color:#92400e; }
+        .egi-high  { background:#ef4444; } .egi-high-text  { color:#991b1b; }
+
+        /* v3.0 — Teaching Layer: klickbare Werte (Tablet-tauglich, kein Hover nötig) */
+        .teach { cursor: pointer; border-bottom: 1px dotted currentColor; }
+        .teach:hover, .teach:focus { opacity: .85; outline: none; }
+        #edu-modal .modal-content { max-width: 620px; }
+        #edu-modal h3 { color:#1e3a8a; }
+        .edu-algo { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.5; }
+        .edu-espghan { background:#eff6ff; border-left:4px solid #2563eb; border-radius:6px; padding:10px 12px; font-size:13px; line-height:1.5; }
+
+        /* v3.0 — Smart-Defaults Vorschlagsbox */
+        #smart-defaults-box { background:linear-gradient(135deg,#eef2ff,#e0e7ff); border:1px solid #c7d2fe; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen">
 
     <header class="bg-blue-800 text-white p-4 shadow-md no-print">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span class="text-sm font-normal opacity-75">v2.0 | V11 Master Logic</span></h1>
+            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span class="text-sm font-normal opacity-75">v3.0 | NICU Oberarzt-Edition</span></h1>
             <div class="flex items-center gap-6">
                 <div id="gv-header-display" class="hidden text-center">
                     <p class="text-[10px] uppercase tracking-wider opacity-75">Growth Velocity</p>
@@ -71,27 +146,70 @@
         </div>
     </div>
 
+    <!-- v3.0 — EDUCATIONAL OVERLAY (Teaching-Layer): ESPGHAN-Begründung + Algorithmus -->
+    <div id="edu-modal" class="modal no-print" role="dialog" aria-modal="true" aria-labelledby="edu-modal-title">
+        <div class="modal-content">
+            <div class="flex justify-between items-start border-b pb-3 mb-4">
+                <div>
+                    <p class="text-[10px] font-bold text-blue-600 uppercase tracking-widest">📚 Teaching-Layer</p>
+                    <h3 id="edu-modal-title" class="text-lg font-bold leading-tight">–</h3>
+                </div>
+                <button onclick="closeModal('edu-modal')" aria-label="Schließen" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <p id="edu-modal-intro" class="text-sm text-gray-700 mb-3"></p>
+            <div class="mb-3">
+                <p class="text-[11px] font-bold text-blue-800 uppercase tracking-wider mb-1">ESPGHAN / Leitlinie</p>
+                <div id="edu-modal-espghan" class="edu-espghan"></div>
+            </div>
+            <div class="mb-1">
+                <p class="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Zugrunde liegender Algorithmus</p>
+                <div id="edu-modal-algo" class="edu-algo"></div>
+            </div>
+            <div class="mt-5 pt-3 border-t text-right">
+                <button onclick="closeModal('edu-modal')" class="bg-blue-600 text-white px-4 py-2 rounded-md font-bold text-sm">Verstanden</button>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto p-4 md:p-6 lg:p-8 max-w-6xl">
 
-        <!-- KLINISCHE SIMULATIONEN -->
-        <section id="simulator-section" class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg shadow-sm p-4 mb-6 border-l-4 border-amber-500 no-print">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wider">🧪 Klinische Simulationen — Virtual NICU</h3>
-                <span id="sim-mode-badge" class="hidden bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase font-bold animate-pulse">Simulations-Modus</span>
+        <!-- VALIDATION ERROR BANNER (hidden by default; shown on ValidationError)
+             B2: wird beim Sichtbarwerden via CSS sticky am Viewport-Top fixiert. -->
+        <div id="validation-error-banner" role="alert" aria-live="assertive"
+             class="hidden bg-red-600 text-white border-l-4 border-red-800 rounded-lg shadow-lg p-4 mb-6">
+            <div class="banner-inner flex items-start gap-3">
+                <span class="text-2xl leading-none">⛔</span>
+                <div class="flex-1">
+                    <h3 class="font-bold text-base uppercase tracking-wide">Ungültige Eingabe — Berechnung abgebrochen</h3>
+                    <p id="validation-error-message" class="text-sm mt-1 font-medium"></p>
+                    <p id="validation-error-field" class="text-xs mt-1 opacity-90 italic"></p>
+                </div>
+                <button type="button" onclick="document.getElementById('validation-error-banner').classList.add('hidden')"
+                        class="text-white hover:bg-red-700 rounded px-2 py-1 text-sm font-bold" aria-label="Schließen">✕</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <button onclick="loadSimulation('elbw')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow transition text-sm">
-                    🫀 ELBW Start (550g)
-                    <span class="block text-[10px] font-normal opacity-80 mt-1">Tag 1 · Minimal-TFI · Nur Basislösung · 0 ml enteral</span>
-                </button>
-                <button onclick="loadSimulation('transition')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-lg shadow transition text-sm">
-                    🔄 Transition (1100g)
-                    <span class="block text-[10px] font-normal opacity-80 mt-1">Tag 5 · PN + EBM · SMOFlipid 2g/kg · FM85 Start</span>
-                </button>
-                <button onclick="loadSimulation('fullEnteral')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow transition text-sm">
-                    🍼 Full Enteral (2100g)
-                    <span class="block text-[10px] font-normal opacity-80 mt-1">Tag 14 · 150 ml/kg/d EBM + FM85 · PN = 0</span>
-                </button>
+        </div>
+
+        <!-- KLINISCHE SIMULATIONEN (v2.0: kompakt + ausklappbar für Zero-Scroll) -->
+        <section id="simulator-section" class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg shadow-sm mb-4 border-l-4 border-amber-500 no-print">
+            <button onclick="toggleSimSection()" class="w-full flex justify-between items-center px-4 py-2 cursor-pointer">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-xs font-bold text-amber-800 uppercase tracking-wider">🧪 Virtual NICU — Simulationen</h3>
+                    <span id="sim-mode-badge" class="hidden bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase font-bold animate-pulse">Sim-Modus</span>
+                </div>
+                <svg id="sim-section-icon" class="h-4 w-4 text-amber-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div id="sim-section-content" class="px-4 pb-3 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <button onclick="loadSimulation('elbw')" class="bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow transition text-xs">
+                        🫀 ELBW (550g, Tag 1)
+                    </button>
+                    <button onclick="loadSimulation('transition')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow transition text-xs">
+                        🔄 Transition (1100g, Tag 5)
+                    </button>
+                    <button onclick="loadSimulation('fullEnteral')" class="bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow transition text-xs">
+                        🍼 Full Enteral (2100g, Tag 14)
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -470,18 +588,79 @@
             </section>
 
             <!-- Results Panel -->
-            <section class="space-y-6">
+            <section class="space-y-4">
+
+              <!-- v3.0 — SMART DEFAULTS: Tages-basierte Startwert-Vorschläge (1-Klick bestätigen) -->
+              <div id="smart-defaults-box" class="hidden rounded-xl shadow-sm p-3 mb-3 no-print">
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                      <div class="flex items-center gap-2">
+                          <span class="text-base">💡</span>
+                          <span class="text-[11px] font-bold text-indigo-800 uppercase tracking-widest">Smart Defaults</span>
+                          <span id="sd-day-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/70 text-indigo-700">Tag –</span>
+                          <span class="teach text-indigo-400" tabindex="0" role="button" aria-label="Erklärung Smart Defaults" onclick="openEduModal('smartDefaults')" title="Erklärung & Algorithmus">ⓘ</span>
+                      </div>
+                      <button id="sd-apply-all" onclick="applySmartDefaults()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md transition">Alle übernehmen</button>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2 mt-2 text-center">
+                      <button type="button" onclick="applySmartDefault('input-tfi','sdTfi')" class="bg-white/70 hover:bg-white rounded-lg p-2 transition">
+                          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">TFI</p>
+                          <p id="sd-tfi" class="text-lg font-extrabold text-indigo-700 tabular-nums">–</p>
+                          <p class="text-[9px] text-slate-400">ml/kg/d · tippen</p>
+                      </button>
+                      <button type="button" onclick="applySmartDefault('input-protein','sdProtein')" class="bg-white/70 hover:bg-white rounded-lg p-2 transition">
+                          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Protein</p>
+                          <p id="sd-protein" class="text-lg font-extrabold text-indigo-700 tabular-nums">–</p>
+                          <p class="text-[9px] text-slate-400">g/kg/d · tippen</p>
+                      </button>
+                      <button type="button" onclick="applySmartDefault('input-lipids','sdLipids')" class="bg-white/70 hover:bg-white rounded-lg p-2 transition">
+                          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Lipide</p>
+                          <p id="sd-lipids" class="text-lg font-extrabold text-indigo-700 tabular-nums">–</p>
+                          <p class="text-[9px] text-slate-400">g/kg/d · tippen</p>
+                      </button>
+                  </div>
+                  <p id="sd-rationale" class="text-[10px] text-indigo-700/80 mt-2 leading-snug"></p>
+              </div>
+
+              <!-- v3.0 — ZERO-SCROLL COCKPIT-GRID (CPR + Quick-View + Energy-Gap + Trends) -->
+              <div class="cockpit-grid">
+
+                <!-- v2.0 — CHIEF PHYSICIAN REVIEW (narrative klinische Synthese) -->
+                <div id="cpr-card" class="cockpit-full cpr-stable rounded-xl shadow-lg border-2 overflow-hidden">
+                    <div class="px-4 py-2 flex items-center justify-between border-b border-black/5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🩺</span>
+                            <span class="text-[11px] font-bold uppercase tracking-widest cpr-headline opacity-75">Chief Physician Review</span>
+                            <span id="cpr-phase-badge" class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/70 cpr-headline">Phase –</span>
+                        </div>
+                        <button id="btn-copy-doc"
+                                class="bg-gray-800 hover:bg-black text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md flex items-center gap-1.5 transition no-print"
+                                title="Formatierten EPR-Text in die Zwischenablage kopieren">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span id="btn-copy-doc-label">Copy for Documentation</span>
+                        </button>
+                    </div>
+                    <div class="px-4 py-3">
+                        <p id="cpr-headline" class="cpr-headline font-bold text-lg leading-tight">Berechnung ausstehend…</p>
+                        <p id="cpr-summary" class="text-sm text-gray-700 mt-1 italic opacity-90">–</p>
+                        <ul id="cpr-bullets" class="mt-3 space-y-1.5 text-sm"></ul>
+                    </div>
+                </div>
+
                 <!-- Quick-View -->
-                <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-5 md:p-6">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4 text-center">Quick View</p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center items-center">
+                <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-4">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">Quick View</p>
+                    <div class="grid grid-cols-3 gap-3 text-center items-center">
                         <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Weight Velocity</p>
+                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Weight Velocity
+                                <span class="teach text-slate-400" tabindex="0" role="button" aria-label="Erklärung Weight Velocity" onclick="openEduModal('weightVelocity')" title="Erklärung & Algorithmus">ⓘ</span>
+                            </p>
                             <p id="qv-weight-velocity" class="text-3xl md:text-4xl font-extrabold text-emerald-800 tabular-nums">–</p>
                             <p class="text-xs text-slate-400 mt-1">g/kg/d</p>
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Gesamt-Energie</p>
+                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Gesamt-Energie
+                                <span class="teach text-slate-400" tabindex="0" role="button" aria-label="Erklärung Energie" onclick="openEduModal('energy')" title="Erklärung & Algorithmus">ⓘ</span>
+                            </p>
                             <p id="qv-kcal" class="text-3xl md:text-4xl font-extrabold text-orange-600 tabular-nums">–</p>
                             <p class="text-xs text-slate-400 mt-1">kcal/kg/d</p>
                         </div>
@@ -492,6 +671,60 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- v3.0 — ENERGY-GAP-INDEX: kumulatives Kaloriendefizit über alle Tage -->
+                <div id="egi-card" class="bg-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-4 flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">⚡ Energy-Gap-Index
+                            <span class="teach text-slate-400" tabindex="0" onclick="openEduModal('energyGap')" title="Erklärung & Algorithmus">ⓘ</span>
+                        </p>
+                        <span id="egi-severity" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">–</span>
+                    </div>
+                    <div class="flex items-baseline gap-1 justify-center my-1">
+                        <span id="egi-value" class="text-4xl font-extrabold tabular-nums text-slate-400">–</span>
+                        <span class="text-xs text-slate-400">kcal/kg kumulativ</span>
+                    </div>
+                    <div class="egi-bar-track mt-2"><div id="egi-bar" class="egi-bar-fill egi-ok" style="width:0%"></div></div>
+                    <p id="egi-meta" class="text-[11px] text-slate-500 mt-2 text-center leading-snug">Noch keine Verlaufsdaten</p>
+                </div>
+
+                <!-- B1 — 7-Tage-Trend: kompakte SVG-Sparklines aus dem history-Objekt.
+                     Zeigt Verlauf für Gewicht, Natrium-Zufuhr, BUN (Harnstoff) und kcal/kg.
+                     Hidden, solange keine 2+ Datenpunkte vorliegen. -->
+                <div id="trend-card" class="cockpit-full hidden bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-100 flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">📈 7-Tage-Trend</span>
+                        <span id="trend-meta" class="text-[10px] text-slate-400 tabular-nums">–</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-100">
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gewicht</p>
+                            <p id="spark-weight-val" class="text-base font-bold text-emerald-700 tabular-nums leading-tight">–</p>
+                            <div id="spark-weight" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-weight-delta" class="text-[10px] text-slate-400 tabular-nums">g</p>
+                        </div>
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Natrium</p>
+                            <p id="spark-sodium-val" class="text-base font-bold text-sky-700 tabular-nums leading-tight">–</p>
+                            <div id="spark-sodium" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-sodium-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/kg/d</p>
+                        </div>
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">BUN</p>
+                            <p id="spark-bun-val" class="text-base font-bold text-amber-700 tabular-nums leading-tight">–</p>
+                            <div id="spark-bun" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-bun-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/l</p>
+                        </div>
+                        <div class="p-3 text-center">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Energie</p>
+                            <p id="spark-kcal-val" class="text-base font-bold text-orange-600 tabular-nums leading-tight">–</p>
+                            <div id="spark-kcal" class="h-7 flex justify-center items-center mt-0.5"></div>
+                            <p id="spark-kcal-delta" class="text-[10px] text-slate-400 tabular-nums">kcal/kg/d</p>
+                        </div>
+                    </div>
+                </div>
+
+              </div><!-- /.cockpit-grid -->
 
                 <!-- Main Result Card -->
                 <div id="result-card" class="bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
@@ -644,6 +877,30 @@
                                     <td class="p-3">Osmolarität (PN) <span id="tip-osm" class="text-gray-400 cursor-help ml-1">ⓘ</span></td>
                                     <td id="res-osmolarity" class="p-3 text-right font-bold text-blue-800">-</td>
                                     <td class="p-3 text-right text-gray-400 text-sm">mOsm/l</td>
+                                </tr>
+                                <!-- C1: Osmolaritäts-Breakdown — deskriptiv, kein Dosierungsvorschlag.
+                                     Zeigt prozentuale Beiträge von Glukose/AS/Na/K zur Gesamt-Osmolarität. -->
+                                <tr class="extra-detail hidden bg-blue-50/5">
+                                    <td colspan="3" class="px-3 pb-3 pt-0">
+                                        <div id="osm-breakdown" class="text-[11px] text-blue-900">
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="uppercase tracking-wider text-blue-700 font-bold text-[10px]">↳ Osmolaritäts-Aufschlüsselung</span>
+                                                <span id="osm-breakdown-total" class="text-blue-500 tabular-nums">–</span>
+                                            </div>
+                                            <div id="osm-breakdown-bar" class="flex h-2 w-full rounded overflow-hidden bg-blue-100" aria-hidden="true">
+                                                <div data-osm="glucose" class="bg-amber-400" style="width:0%"></div>
+                                                <div data-osm="protein" class="bg-emerald-500" style="width:0%"></div>
+                                                <div data-osm="sodium"  class="bg-sky-500"    style="width:0%"></div>
+                                                <div data-osm="potassium" class="bg-violet-500" style="width:0%"></div>
+                                            </div>
+                                            <div class="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 mt-2 tabular-nums">
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-amber-400"></span><span>Glukose: <strong id="osm-bd-glucose">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-emerald-500"></span><span>AS: <strong id="osm-bd-protein">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-sky-500"></span><span>Na⁺: <strong id="osm-bd-sodium">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                                <div class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-sm bg-violet-500"></span><span>K⁺: <strong id="osm-bd-potassium">–</strong> <span class="text-blue-400">mOsm/l</span></span></div>
+                                            </div>
+                                        </div>
+                                    </td>
                                 </tr>
                                 <tr class="extra-detail hidden">
                                     <td class="p-3">Ca:P Verhältnis <span id="tip-cap" class="text-gray-400 cursor-help ml-1">ⓘ</span></td>
@@ -804,6 +1061,14 @@
             document.getElementById('solution-accordion-content').classList.toggle('open');
         }
 
+        // v2.0 — Zero-Scroll: Sim-Section toggle
+        function toggleSimSection() {
+            const el = document.getElementById('sim-section-content');
+            const icon = document.getElementById('sim-section-icon');
+            el.classList.toggle('hidden');
+            if (icon) icon.classList.toggle('rotate-180');
+        }
+
         function openSafetyModal() { document.getElementById('safety-modal').style.display = 'block'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
@@ -817,6 +1082,9 @@
             isSimulationMode = true;
             document.getElementById('sim-mode-badge').classList.remove('hidden');
             document.getElementById('validation-box').classList.remove('hidden');
+            // v2.0: Sim-Section ggf. ausklappen, damit Nutzer das Scenario sieht
+            const simContent = document.getElementById('sim-section-content');
+            if (simContent && simContent.classList.contains('hidden')) toggleSimSection();
 
             const scenarios = {
                 elbw: {
@@ -1030,15 +1298,333 @@
             function updateDynamicTooltips(res) {
                 const t = res.targets;
                 const set = (id, html) => { if (tipInstances[id]) tipInstances[id].setContent(html); };
-                set('tip-tfi', `<strong>TFI</strong><br>Tag ${t.effectiveDay}: ${t.tfi.min}–${t.tfi.max} ml/kg/d (Cap ${t.tfi.cap})`);
-                set('tip-protein', `<strong>Protein (gesamt)</strong><br>Ziel: ${t.protein.min}–${t.protein.max} g/kg/d`);
-                set('tip-lipids', `<strong>Lipide i.v.</strong><br>Tagesziel: ${t.lipidTarget.min}–${t.lipidTarget.max} g/kg/d`);
-                set('tip-energy', `<strong>Energie (gesamt)</strong><br>Tag ${t.energyDay}: ${t.energy.min}–${t.energy.max} kcal/kg/d`);
-                set('tip-glucose', '<strong>Glukose-Konz. (PN)</strong><br>Aus GIR und PN-Volumen; peripher typ. &lt; 12,5&nbsp;%.');
-                set('tip-osm', '<strong>Osmolarität</strong><br>Peripher &lt; 900 mOsm/l.');
-                set('tip-cap', '<strong>Ca:P (molar)</strong><br>Ziel: 1,5:1 bis 1,7:1');
-                set('tip-npc', '<strong>NPC Lipid-Anteil</strong><br>ESPGHAN: 25–50% der Nicht-Protein-Kalorien aus Lipiden');
-                set('tip-npc-p', '<strong>NPC/Protein Ratio</strong><br>Ziel: 20–30 kcal NPC pro g Protein.<br>&lt; 20: Protein wird zur Energiegewinnung verbrannt.<br>&gt; 40: Verfettungsrisiko.');
+                // v2.0 — Educational Layer: ESPGHAN-Begründung pro Hauptparameter
+                set('tip-tfi',
+                    `<strong>TFI (Tag ${t.effectiveDay})</strong>: ${t.tfi.min}–${t.tfi.max} ml/kg/d (Cap ${t.tfi.cap})<br>` +
+                    `<span style="font-size:11px">Master-Protokoll: stufenweise Steigerung nach Gewichtsklasse &amp; PNA.<br>` +
+                    `Bei invasiver Beatmung Cap auf 140 ml/kg/d (Lungen-Ödem-Risiko).<br>` +
+                    `ELBW Tag 1: stark restriktiv (IWL-dominiert, hyperton).</span>`);
+                set('tip-protein',
+                    `<strong>Protein (gesamt)</strong>: ${t.protein.min}–${t.protein.max} g/kg/d<br>` +
+                    `<span style="font-size:11px">ESPGHAN 2018: ELBW 3,5–4,0 · VLBW 3,0–3,5 · Term 2,5–3,0 g/kg/d.<br>` +
+                    `Frühstart hoher AS verhindert katabolen Stoffwechsel &amp; supportet Hirnentwicklung.<br>` +
+                    `Hard limit 4,5 g/kg/d: oberhalb metabolische Azidose &amp; Hyperammonämie-Risiko.</span>`);
+                set('tip-lipids',
+                    `<strong>Lipide i.v. (Tag ${t.effectiveDay})</strong>: ${t.lipidTarget.min}–${t.lipidTarget.max} g/kg/d<br>` +
+                    `<span style="font-size:11px">Master-Protokoll: Eskalation 1,0 → 4,0 g/kg/d über Tag 1–4.<br>` +
+                    `Liefert essentielle FA (LCPUFA) &amp; energetische Dichte (9–10 kcal/g).<br>` +
+                    `SMOFlipid 20% (ω-3-haltig) wegen IFALD-Prävention bevorzugt.<br>` +
+                    `Bei TG &gt; 250 mg/dl reduzieren (Hypertriglyzeridämie).</span>`);
+                set('tip-energy',
+                    `<strong>Energie (gesamt, Tag ${t.energyDay})</strong>: ${t.energy.min}–${t.energy.max} kcal/kg/d<br>` +
+                    `<span style="font-size:11px">ESPGHAN: Aufbau bis 110–135 kcal/kg/d (Phase B/C).<br>` +
+                    `Voraussetzung für Growth Velocity ≥ 15 g/kg/d.<br>` +
+                    `Unterhalb Phase A 45–60, Tag 2 60–80, Tag 3 80–100.</span>`);
+                set('tip-glucose',
+                    '<strong>Glukose-Konz. (PN)</strong><br>' +
+                    '<span style="font-size:11px">Aus Gesamt-Glukose ÷ PN-Volumen.<br>' +
+                    '<strong>Peripher: max. 12,5%</strong> (höher → Phlebitis-Risiko, hyperosmolar).<br>' +
+                    'Zentral: bis 25% (theoretisch), in Praxis 15–18%.</span>');
+                // C1: Osmolarität-Tooltip mit deskriptivem Breakdown (Glukose/AS/Na/K)
+                const ob = res.results && res.results.osmolarityBreakdown;
+                if (ob && ob.total > 0) {
+                    const pct = (v) => Math.round((v / ob.total) * 100);
+                    set('tip-osm',
+                        `<strong>Osmolarität (PN)</strong>: ${ob.total} mOsm/l<br>` +
+                        `<span style="font-size:11px;line-height:1.4">` +
+                        `Glukose: ${ob.glucose} (${pct(ob.glucose)}%)<br>` +
+                        `Aminosäuren: ${ob.protein} (${pct(ob.protein)}%)<br>` +
+                        `Natrium: ${ob.sodium} (${pct(ob.sodium)}%)<br>` +
+                        `Kalium: ${ob.potassium} (${pct(ob.potassium)}%)<br>` +
+                        `Limit peripher: &lt; 900 mOsm/l` +
+                        `</span>`);
+                } else {
+                    set('tip-osm', '<strong>Osmolarität</strong><br>Peripher &lt; 900 mOsm/l.');
+                }
+                // v2.0 — Educational Layer: ESPGHAN-Begründung + Physiologie
+                set('tip-cap',
+                    `<strong>Ca:P (molar)</strong>: ${res.results.caPRatio || '–'}:1<br>` +
+                    `<span style="font-size:11px">Ziel <strong>1,5–1,7:1</strong> (ESPGHAN 2018).<br>` +
+                    `Spiegelt die Hydroxyapatit-Stöchiometrie im Knochen wider.<br>` +
+                    `&lt; 1,5: Hyperkalzämie- &amp; PIFS-Risiko (Phosphat-Defizit).<br>` +
+                    `&gt; 2,0: Mineralisationsdefekt durch Ca-Überangebot.</span>`);
+                set('tip-npc',
+                    '<strong>NPC Lipid-Anteil</strong><br>' +
+                    '<span style="font-size:11px">ESPGHAN 2018: <strong>25–50%</strong> der Nicht-Protein-Kalorien aus Lipiden.<br>' +
+                    'Lipide liefern essentielle FA (LCPUFA, ω-3, ω-6) &amp; sind isokalorisch dichter (9 kcal/g vs 4 kcal/g Glukose).<br>' +
+                    '&lt; 25%: Risiko für EFA-Deficiency.<br>&gt; 50%: Cholestase- &amp; Hyperlipidämie-Risiko.</span>');
+                set('tip-npc-p',
+                    '<strong>NPC/Protein Ratio</strong><br>' +
+                    '<span style="font-size:11px">Ziel: <strong>20–30 kcal NPC pro g Protein</strong> (ESPGHAN).<br>' +
+                    '&lt; 20: Protein wird zur Energiegewinnung verbrannt → kein Wachstum.<br>' +
+                    '&gt; 40: Verfettungsrisiko, NEC-Trigger bei FG.</span>');
+            }
+
+            // v2.0 — Chief Physician Review: Card-Rendering nach jedem Update
+            function renderCPR(res) {
+                const a = res.assessment;
+                if (!a) return;
+                const card = document.getElementById('cpr-card');
+                card.classList.remove('cpr-stable', 'cpr-attention', 'cpr-critical');
+                card.classList.add(`cpr-${a.status}`);
+
+                document.getElementById('cpr-headline').textContent = a.headline || '–';
+                document.getElementById('cpr-summary').textContent = a.summary || '';
+                document.getElementById('cpr-phase-badge').textContent = a.phaseLabel
+                    ? a.phaseLabel.split(' (')[0]
+                    : `Phase ${a.phase || '–'}`;
+
+                const ul = document.getElementById('cpr-bullets');
+                ul.innerHTML = '';
+                (a.bullets || []).forEach(b => {
+                    const icon = b.kind === 'critical' ? '⛔' : b.kind === 'warning' ? '⚠️' : '✅';
+                    const li = document.createElement('li');
+                    li.className = `cpr-bullet-${b.kind} px-3 py-1.5 rounded text-sm flex gap-2 items-start`;
+                    li.innerHTML = `<span class="leading-none mt-0.5">${icon}</span><span>${b.text}</span>`;
+                    ul.appendChild(li);
+                });
+
+                // v2.1 — Predictive Hints (Modell B: diagnostische Hinweise, kein Stop)
+                (a.predictiveHints || []).forEach(h => {
+                    const li = document.createElement('li');
+                    li.className = 'cpr-bullet-hint px-3 py-1.5 rounded text-sm flex gap-2 items-start border border-dashed border-amber-300 bg-amber-50 text-amber-800';
+                    li.innerHTML = `<span class="leading-none mt-0.5">🔮</span><span><strong>Prädiktiver Hinweis:</strong> ${h.text}</span>`;
+                    ul.appendChild(li);
+                });
+            }
+
+            // ============================================================
+            // v3.0 — TEACHING-LAYER (Educational Overlay)
+            // Klickbare Werte öffnen ein Modal mit ESPGHAN-Begründung +
+            // dem zugrunde liegenden Algorithmus. Reines Lern-/Nachschlage-
+            // Tool — ändert keine Berechnung.
+            // ============================================================
+            const EDU_CONTENT = {
+                energy: {
+                    title: 'Gesamt-Energie (kcal/kg/d)',
+                    intro: 'Energiezufuhr aus Protein, Lipiden und Kohlenhydraten (enteral + parenteral) pro kg Körpergewicht und Tag.',
+                    espghan: 'ESPGHAN 2018: stufenweiser Aufbau auf <strong>110–135 kcal/kg/d</strong> (voll-enteral bis 140). Tag 1 ~45–60, Tag 2 ~60–80, Tag 3 ~80–100, ab Tag 4 Zielbereich. Unter-/Überschreitung erhöht Risiko für postnatale Wachstumsrestriktion bzw. Überernährung.',
+                    algo: 'kcal/kg/d = Σ(Protein g·4 + Kohlenhydrate g·4 + Lipide g·9 + enterale kcal) ÷ aktuellem Gewicht (kg). Zielspanne tagesabhängig aus getTargets(). Ampel: grün = im Ziel, gelb/rot = außerhalb.'
+                },
+                weightVelocity: {
+                    title: 'Weight Velocity (g/kg/d)',
+                    intro: 'Tägliche Gewichtszunahme bezogen auf das Körpergewicht — Schlüsselindikator für adäquates Wachstum.',
+                    espghan: 'Zielkorridor postnatal nach Stabilisierung: <strong>15–20 g/kg/d</strong> (entspricht intrauteriner Wachstumsrate). In der Transitionsphase (Tag 1–7) ist physiologischer Gewichtsverlust bis ~10 % normal.',
+                    algo: 'Weight Velocity = (aktuelles Gewicht − Vortagesgewicht) ÷ Vortagesgewicht(kg). Negative Werte in Phase A meist IWL-/Flüssigkeits-bedingt, nicht zwingend pathologisch.'
+                },
+                energyGap: {
+                    title: 'Energy-Gap-Index (kumulativ)',
+                    intro: 'Summe des täglichen Kalorien-Defizits (Ziel-Minimum minus Ist-Zufuhr) über alle dokumentierten Tage. Macht das schleichende „kumulative Defizit" sichtbar.',
+                    espghan: 'Embleton et al. 2001: Das früh akkumulierte Energiedefizit der ersten Lebenswochen korreliert linear mit späterer Wachstumsrestriktion. Konservativer Trigger in dieser App: ab <strong>&gt; 150 kcal/kg kumulativ</strong> steigt das PEW-Risiko deutlich.',
+                    algo: 'Index = Σ max(0, kcalMin_Tag − kcalIst_Tag) über alle History-Tage. Ampel: ok &lt; 75 ≤ watch ≤ 150 &lt; high. Diagnostischer Hinweis (Modell B) — niemals ein Stop-Signal.'
+                },
+                smartDefaults: {
+                    title: 'Smart Defaults',
+                    intro: 'Tages-basierte Startwert-Vorschläge für Flüssigkeit (TFI), Aminosäuren und Lipide. Der Arzt bestätigt statt frei zu tippen.',
+                    espghan: 'Werte stammen ausschließlich aus den hinterlegten Zielspannen (Master-Protokoll / ESPGHAN 2018). Es werden KEINE eigenen Schwellwerte erfunden.',
+                    algo: 'TFI = untere Zielgrenze (konservativer Aufbau, durch Beatmungs-Cap gedeckelt). Protein & Lipide = Mittelwert der jeweiligen Zielspanne. Quelle: getSmartDefaults() → getTargets().'
+                }
+            };
+
+            function openEduModal(key) {
+                const c = EDU_CONTENT[key];
+                if (!c) return;
+                document.getElementById('edu-modal-title').textContent = c.title;
+                document.getElementById('edu-modal-intro').textContent = c.intro;
+                document.getElementById('edu-modal-espghan').innerHTML = c.espghan;
+                document.getElementById('edu-modal-algo').innerHTML = c.algo;
+                document.getElementById('edu-modal').style.display = 'block';
+            }
+
+            // ============================================================
+            // v3.0 — ENERGY-GAP-INDEX Kachel
+            // Liest direkt aus dem (frischen) history-Objekt → kein 1-Zyklus-Lag.
+            // ============================================================
+            function renderEGI(hist) {
+                const valEl = document.getElementById('egi-value');
+                const barEl = document.getElementById('egi-bar');
+                const sevEl = document.getElementById('egi-severity');
+                const metaEl = document.getElementById('egi-meta');
+                if (!valEl) return;
+                const idx = (calculator && calculator.calculateEnergyGapIndex)
+                    ? calculator.calculateEnergyGapIndex(hist) : null;
+
+                if (!idx) {
+                    valEl.textContent = '–';
+                    valEl.className = 'text-4xl font-extrabold tabular-nums text-slate-400';
+                    if (barEl) { barEl.className = 'egi-bar-fill egi-ok'; barEl.style.width = '0%'; }
+                    if (sevEl) { sevEl.textContent = '–'; sevEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500'; }
+                    if (metaEl) metaEl.textContent = 'Noch keine Verlaufsdaten (kcal/kg pro Tag erfassen)';
+                    return;
+                }
+
+                const sevMap = {
+                    ok:    { label: 'OK',    bar: 'egi-ok',    txt: 'egi-ok-text',    pill: 'bg-emerald-100 text-emerald-700' },
+                    watch: { label: 'WATCH', bar: 'egi-watch', txt: 'egi-watch-text', pill: 'bg-amber-100 text-amber-700' },
+                    high:  { label: 'HIGH',  bar: 'egi-high',  txt: 'egi-high-text',  pill: 'bg-rose-100 text-rose-700' }
+                };
+                const s = sevMap[idx.severity] || sevMap.ok;
+                valEl.textContent = idx.cumulativeDeficit;
+                valEl.className = `text-4xl font-extrabold tabular-nums ${s.txt}`;
+                if (barEl) {
+                    // Balken relativ zur Threshold (150), gedeckelt bei 100 %.
+                    const pct = Math.min(100, Math.round((idx.cumulativeDeficit / idx.threshold) * 100));
+                    barEl.className = `egi-bar-fill ${s.bar}`;
+                    barEl.style.width = pct + '%';
+                }
+                if (sevEl) {
+                    sevEl.textContent = s.label;
+                    sevEl.className = `text-[10px] font-bold px-2 py-0.5 rounded-full ${s.pill}`;
+                }
+                if (metaEl) {
+                    const worst = idx.worstDay ? ` · stärkster Einbruch Tag ${idx.worstDay} (−${idx.worstGap})` : '';
+                    metaEl.textContent = `${idx.daysAnalyzed} Tag${idx.daysAnalyzed === 1 ? '' : 'e'} · Ø ${idx.dailyAverageGap} kcal/kg/d Defizit · Schwelle ${idx.threshold}${worst}`;
+                }
+            }
+
+            // ============================================================
+            // v3.0 — SMART DEFAULTS Rendering + Apply
+            // ============================================================
+            let lastSmartDefaults = null;
+            function renderSmartDefaults(res) {
+                const box = document.getElementById('smart-defaults-box');
+                if (!box) return;
+                const sd = res && res.smartDefaults;
+                if (!sd) { box.classList.add('hidden'); return; }
+                lastSmartDefaults = sd;
+                const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v === null || v === undefined) ? '–' : v; };
+                set('sd-tfi', sd.tfi);
+                set('sd-protein', sd.protein);
+                set('sd-lipids', sd.lipids);
+                const badge = document.getElementById('sd-day-badge');
+                if (badge) badge.textContent = `Tag ${sd.day}`;
+                const rat = document.getElementById('sd-rationale');
+                if (rat) rat.textContent = sd.rationale || '';
+                box.classList.remove('hidden');
+            }
+
+            // Übernimmt einen einzelnen Vorschlag in das zugehörige Eingabefeld.
+            function applySmartDefault(inputId, sdField) {
+                if (!lastSmartDefaults) return;
+                const map = { sdTfi: 'tfi', sdProtein: 'protein', sdLipids: 'lipids' };
+                const val = lastSmartDefaults[map[sdField]];
+                if (val === null || val === undefined) return;
+                const el = document.getElementById(inputId);
+                if (!el) return;
+                el.value = val;
+                el.dispatchEvent(new Event('input', { bubbles: true })); // triggert Persistenz + Recalc
+            }
+
+            // Übernimmt alle drei Vorschläge auf einmal.
+            function applySmartDefaults() {
+                applySmartDefault('input-tfi', 'sdTfi');
+                applySmartDefault('input-protein', 'sdProtein');
+                applySmartDefault('input-lipids', 'sdLipids');
+            }
+
+            // Diese Handler werden über inline onclick="" aufgerufen → global exponieren,
+            // da sie im DOMContentLoaded-Scope definiert sind.
+            window.openEduModal = openEduModal;
+            window.applySmartDefault = applySmartDefault;
+            window.applySmartDefaults = applySmartDefaults;
+
+            // v2.0 — Copy-for-Documentation: Clipboard API mit Fallback
+            async function copyDocumentation(text) {
+                const btn = document.getElementById('btn-copy-doc');
+                const lbl = document.getElementById('btn-copy-doc-label');
+                const origLabel = 'Copy for Documentation';
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(text);
+                    } else {
+                        // Fallback für ältere Browser / unsichere Kontexte
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                    lbl.textContent = '✓ Kopiert!';
+                    btn.classList.add('btn-copied');
+                    setTimeout(() => {
+                        lbl.textContent = origLabel;
+                        btn.classList.remove('btn-copied');
+                    }, 1500);
+                } catch (e) {
+                    console.error('[Clipboard]', e);
+                    lbl.textContent = '✗ Fehler';
+                    setTimeout(() => { lbl.textContent = origLabel; }, 1500);
+                }
+            }
+
+            // Letzter berechneter EPR-Text wird hier zwischengespeichert
+            let lastDocumentationString = '';
+            document.getElementById('btn-copy-doc').addEventListener('click', () => {
+                if (!lastDocumentationString) return;
+                copyDocumentation(lastDocumentationString);
+            });
+
+            // C1: Render Osmolaritäts-Breakdown (Stacked Bar + numerische Beiträge).
+            // Rein deskriptiv. Wenn keine PN läuft, alles auf '–'/0% zurücksetzen.
+            function renderOsmBreakdown(ob) {
+                const totalEl = document.getElementById('osm-breakdown-total');
+                const bar = document.getElementById('osm-breakdown-bar');
+                const ids = { glucose: 'osm-bd-glucose', protein: 'osm-bd-protein', sodium: 'osm-bd-sodium', potassium: 'osm-bd-potassium' };
+                if (!ob || !ob.total || ob.total <= 0) {
+                    if (totalEl) totalEl.textContent = '– keine PN';
+                    Object.values(ids).forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '–'; });
+                    if (bar) bar.querySelectorAll('[data-osm]').forEach(seg => seg.style.width = '0%');
+                    return;
+                }
+                if (totalEl) totalEl.textContent = `${ob.total} mOsm/l gesamt`;
+                Object.keys(ids).forEach(key => {
+                    const el = document.getElementById(ids[key]);
+                    if (el) el.textContent = ob[key];
+                    const seg = bar ? bar.querySelector(`[data-osm="${key}"]`) : null;
+                    if (seg) {
+                        const pct = (ob[key] / ob.total) * 100;
+                        seg.style.width = pct.toFixed(1) + '%';
+                        seg.title = `${key}: ${ob[key]} mOsm/l (${pct.toFixed(0)}%)`;
+                    }
+                });
+            }
+
+            // B1: Render mini SVG sparkline. data: array of numbers (oldest→newest).
+            // Liefert eine schlanke Linie mit End-Marker; keine Animation, hoher Kontrast.
+            function renderSparkline(containerId, data, opts = {}) {
+                const el = document.getElementById(containerId);
+                if (!el) return;
+                const valid = (data || []).filter(v => typeof v === 'number' && isFinite(v));
+                if (valid.length < 2) {
+                    el.innerHTML = '<span class="text-[10px] text-slate-300 italic">zu wenig Daten</span>';
+                    return;
+                }
+                const w = opts.width || 110, h = opts.height || 28, pad = 3;
+                const color = opts.color || '#0d9488';
+                const min = Math.min(...valid);
+                const max = Math.max(...valid);
+                const range = (max - min) || 1;
+                const stepX = (w - 2 * pad) / (valid.length - 1);
+                const pts = valid.map((v, i) => {
+                    const x = pad + i * stepX;
+                    // Wenn min === max: in der Mitte zeichnen.
+                    const y = max === min ? h / 2 : h - pad - ((v - min) / range) * (h - 2 * pad);
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                }).join(' ');
+                const lastIdx = valid.length - 1;
+                const lastX = pad + lastIdx * stepX;
+                const lastY = max === min ? h / 2 : h - pad - ((valid[lastIdx] - min) / range) * (h - 2 * pad);
+                // Fläche unter der Kurve dezent füllen
+                const area = `${pad},${h - pad} ${pts} ${lastX.toFixed(1)},${h - pad}`;
+                el.innerHTML =
+                    `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${opts.label || 'Trend'}" preserveAspectRatio="none">` +
+                    `<polyline fill="${color}" fill-opacity="0.10" stroke="none" points="${area}" />` +
+                    `<polyline fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" points="${pts}" />` +
+                    `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="${color}" />` +
+                    `</svg>`;
             }
 
             const inputs = [
@@ -1250,53 +1836,103 @@
                     secondarySolution: document.getElementById('input-secondary-solution').value || 'none',
                     secondaryRateKg: secRateKgD,
                     hiddenSodiumMmolKg: document.getElementById('input-hidden-sodium').value || 0,
-                    microVolume: document.getElementById('input-micro-vol-hidden').value || 0
+                    microVolume: document.getElementById('input-micro-vol-hidden').value || 0,
+                    // v3.0 — Verlaufsdaten (anonym, nur Tag-Keys) für Predictive Analytics
+                    // (Energy-Gap, Sodium-Trend) + Smart-Default-Kontext.
+                    history: history
                 };
 
-                const res = calculator.calculate(data);
+                // --- Safety-Layer: ValidationError aus calculator.js sauber abfangen ---
+                const errBanner = document.getElementById('validation-error-banner');
+                const errMsg = document.getElementById('validation-error-message');
+                const errField = document.getElementById('validation-error-field');
+
+                let res;
+                try {
+                    res = calculator.calculate(data);
+                } catch (err) {
+                    // ValidationError → klare rote UI-Meldung, kein Crash, kein Freeze
+                    if (err && err.name === 'ValidationError') {
+                        if (errMsg) errMsg.textContent = err.message;
+                        if (errField) errField.textContent = err.field ? `Betroffenes Feld: ${err.field}` : '';
+                        if (errBanner) {
+                            errBanner.classList.remove('hidden');
+                            errBanner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                        console.warn('[ValidationError]', err.field, err.message);
+                        return; // displayResults überspringen — alte Werte bleiben unverändert
+                    }
+                    // Andere Fehler: ebenfalls anzeigen, App nicht abstürzen lassen
+                    if (errMsg) errMsg.textContent = `Unerwarteter Fehler: ${err && err.message ? err.message : err}`;
+                    if (errField) errField.textContent = '';
+                    if (errBanner) {
+                        errBanner.classList.remove('hidden');
+                        errBanner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    console.error('[Calculator Error]', err);
+                    return;
+                }
+
+                // Erfolgreiche Berechnung → Banner ausblenden
+                if (errBanner) errBanner.classList.add('hidden');
                 displayResults(res, data);
             }
 
             function displayResults(res, data) {
                 const r = res.results;
 
+                // --- R-03 Defensive Display ---
+                // fmt() schützt vor 'undefined'/'NaN'-Anzeige in der UI.
+                // Liefert '–' für null/undefined/NaN, sonst den Wert.
+                // setText(id, value, suffix) setzt den Text robust und nur, wenn das Element existiert.
+                const fmt = (v) => (v === null || v === undefined || (typeof v === 'number' && !isFinite(v))) ? '–' : v;
+                const setText = (id, value, suffix = '') => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const shown = fmt(value);
+                    el.innerText = shown === '–' ? '–' : `${shown}${suffix}`;
+                };
+
                 // Volumes
-                document.getElementById('res-tfi-daily').innerText = `${r.totalDailyFluid} ml`;
-                document.getElementById('res-tfi-rate').innerText = `${r.rates.total} ml/h`;
-                document.getElementById('res-pn-daily').innerText = `${r.pnDaily} ml`;
-                document.getElementById('res-pn-rate').innerText = `${r.rates.pn} ml/h`;
-                document.getElementById('res-enteral-daily').innerText = `${r.enteralDaily} ml`;
-                document.getElementById('res-enteral-rate').innerText = `${r.rates.enteral} ml/h`;
+                setText('res-tfi-daily', r.totalDailyFluid, ' ml');
+                setText('res-tfi-rate', r.rates && r.rates.total, ' ml/h');
+                setText('res-pn-daily', r.pnDaily, ' ml');
+                setText('res-pn-rate', r.rates && r.rates.pn, ' ml/h');
+                setText('res-enteral-daily', r.enteralDaily, ' ml');
+                setText('res-enteral-rate', r.rates && r.rates.enteral, ' ml/h');
 
                 // Details
-                document.getElementById('res-glucose-conc').innerText = `${r.glucoseConc}`;
-                document.getElementById('res-gir').innerText = `${r.effectiveGIR}`;
-                document.getElementById('res-osmolarity').innerText = `${r.osmolarity}`;
-                document.getElementById('res-cap-ratio').innerText = `${r.caPRatio}:1`;
-                document.getElementById('res-weight-percentile').innerText = `${r.weightPercentile}`;
+                setText('res-glucose-conc', r.glucoseConc);
+                setText('res-gir', r.effectiveGIR);
+                setText('res-osmolarity', r.osmolarity);
+                renderOsmBreakdown(r.osmolarityBreakdown); // C1
+                setText('res-cap-ratio', r.caPRatio, ':1');
+                setText('res-weight-percentile', r.weightPercentile);
                 const protEl = document.getElementById('res-protein-total-gkg');
-                protEl.innerText = `${r.proteinTotalGPerKg}`;
-                protEl.className = 'p-3 text-right font-bold tabular-nums ' + (
-                    r.proteinTotalGPerKg > 4.5 ? 'text-red-700' : 'text-blue-800'
-                );
-                document.getElementById('res-lipids-g').innerText = `${r.lipidsPNKg}`;
-                document.getElementById('res-lipid-vol').innerText = `${r.lipidVolDaily}`;
-                document.getElementById('res-calcium-mg').innerText = `${r.calciumMgKg}`;
-                document.getElementById('res-calcium-mmol').innerText = `${r.calciumMmolKg}`;
-                document.getElementById('res-phosphate-mg').innerText = `${r.phosphateMgKg}`;
-                document.getElementById('res-phosphate-mmol').innerText = `${r.phosphateMmolKg}`;
-                document.getElementById('res-sodium').innerText = `${r.effectiveNa}`;
-                document.getElementById('res-potassium').innerText = `${r.effectiveK}`;
-                document.getElementById('res-chloride').innerText = `${r.effectiveCl}`;
-                document.getElementById('res-sid').innerText = `${r.sidLight}`;
-                document.getElementById('res-single-portion').innerText = `${r.singlePortion}`;
+                if (protEl) {
+                    protEl.innerText = fmt(r.proteinTotalGPerKg);
+                    protEl.className = 'p-3 text-right font-bold tabular-nums ' + (
+                        (typeof r.proteinTotalGPerKg === 'number' && r.proteinTotalGPerKg > 4.5) ? 'text-red-700' : 'text-blue-800'
+                    );
+                }
+                setText('res-lipids-g', r.lipidsPNKg);
+                setText('res-lipid-vol', r.lipidVolDaily);
+                setText('res-calcium-mg', r.calciumMgKg);
+                setText('res-calcium-mmol', r.calciumMmolKg);
+                setText('res-phosphate-mg', r.phosphateMgKg);
+                setText('res-phosphate-mmol', r.phosphateMmolKg);
+                setText('res-sodium', r.effectiveNa);
+                setText('res-potassium', r.effectiveK);
+                setText('res-chloride', r.effectiveCl);
+                setText('res-sid', r.sidLight);
+                setText('res-single-portion', r.singlePortion);
 
                 // Total Intake fields
                 if (r.totalGIR !== undefined) {
-                    document.getElementById('res-total-gir').innerText = `${r.totalGIR}`;
+                    setText('res-total-gir', r.totalGIR);
                 }
                 if (r.totalLipidsGKg !== undefined) {
-                    document.getElementById('res-total-lipids').innerText = `${r.totalLipidsGKg}`;
+                    setText('res-total-lipids', r.totalLipidsGKg);
                 }
                 if (r.paaRatio !== undefined) {
                     const paaEl = document.getElementById('res-paa-ratio');
@@ -1518,8 +2154,104 @@
                     );
                 }
 
+                // v2.0 — Chief Physician Review + EPR-Documentation
+                renderCPR(res);
+                lastDocumentationString = res.documentation || '';
+
                 // Validation Box (Simulation Mode)
                 updateValidationBox(res, data);
+
+                // B1: 7-Tage-Trend persistieren + rendern.
+                // kcal/kg ist ein Output → wir speichern es pro Tag in history,
+                // damit die Sparkline auch dann den korrekten historischen Wert
+                // zeigt, wenn nur die aktuellen Inputs vorliegen.
+                try {
+                    const curDay = parseInt(document.getElementById('input-day').value) || 1;
+                    if (!history[String(curDay)]) history[String(curDay)] = {};
+                    if (typeof r.kcalPerKg === 'number' && isFinite(r.kcalPerKg)) {
+                        history[String(curDay)]['_kcal-kg'] = r.kcalPerKg;
+                    }
+                    // v3.0 — Ziel-Minimum pro Tag persistieren, damit der
+                    // Energy-Gap-Index das tägliche Defizit (min − ist) bilden kann.
+                    const eMin = res.comparisons && res.comparisons.energy && res.comparisons.energy.target
+                        ? res.comparisons.energy.target.min : null;
+                    if (typeof eMin === 'number' && isFinite(eMin)) {
+                        history[String(curDay)]['_kcal-min'] = eMin;
+                    }
+                    localStorage.setItem('neo-history', JSON.stringify(history));
+                } catch (e) { /* localStorage quota / parse — non-blocking */ }
+                renderTrendCard();
+
+                // v3.0 — Energy-Gap-Index + Smart Defaults rendern (frische History).
+                renderEGI(history);
+                renderSmartDefaults(res);
+            }
+
+            // B1: Liest aus dem history-Objekt die letzten ≤7 Tage für ein bestimmtes
+            // Feld und gibt {values, days, latest} zurück. Lücken (undefined) werden
+            // ausgelassen — Sparkline zeigt nur tatsächlich gemessene Werte.
+            function getTrend(field, maxDays = 7) {
+                const curDay = parseInt(document.getElementById('input-day').value) || 1;
+                const start = Math.max(1, curDay - (maxDays - 1));
+                const values = [];
+                const days = [];
+                for (let d = start; d <= curDay; d++) {
+                    const dd = history[String(d)];
+                    if (!dd) continue;
+                    const raw = dd[field];
+                    if (raw === undefined || raw === null || raw === '') continue;
+                    const v = typeof raw === 'number' ? raw : parseFloat(raw);
+                    if (!isFinite(v)) continue;
+                    values.push(v);
+                    days.push(d);
+                }
+                return { values, days, latest: values[values.length - 1] };
+            }
+
+            // B1: Rendert alle Trend-Sparklines + Werte. Blendet die Card aus,
+            // solange noch nicht ein einziger Trend ≥2 Datenpunkte hat.
+            function renderTrendCard() {
+                const card = document.getElementById('trend-card');
+                if (!card) return;
+                const trends = {
+                    weight: { trend: getTrend('current-weight'), color: '#047857', unit: 'g',          decimals: 0, valId: 'spark-weight-val', sparkId: 'spark-weight', deltaId: 'spark-weight-delta', label: 'Gewichts-Trend' },
+                    sodium: { trend: getTrend('input-sodium'),   color: '#0284c7', unit: 'mmol/kg/d',  decimals: 1, valId: 'spark-sodium-val', sparkId: 'spark-sodium', deltaId: 'spark-sodium-delta', label: 'Natrium-Trend' },
+                    bun:    { trend: getTrend('input-urea'),     color: '#b45309', unit: 'mmol/l',     decimals: 1, valId: 'spark-bun-val',    sparkId: 'spark-bun',    deltaId: 'spark-bun-delta',    label: 'BUN-Trend' },
+                    kcal:   { trend: getTrend('_kcal-kg'),       color: '#ea580c', unit: 'kcal/kg/d',  decimals: 0, valId: 'spark-kcal-val',   sparkId: 'spark-kcal',   deltaId: 'spark-kcal-delta',   label: 'Energie-Trend' }
+                };
+
+                let anyData = false;
+                let maxDays = 0;
+                Object.values(trends).forEach(t => {
+                    const valEl = document.getElementById(t.valId);
+                    const deltaEl = document.getElementById(t.deltaId);
+                    if (t.trend.values.length >= 2) anyData = true;
+                    if (t.trend.values.length > maxDays) maxDays = t.trend.values.length;
+
+                    if (t.trend.values.length === 0) {
+                        if (valEl) valEl.textContent = '–';
+                        if (deltaEl) deltaEl.textContent = t.unit;
+                    } else {
+                        const last = t.trend.latest;
+                        if (valEl) valEl.textContent = last.toFixed(t.decimals);
+                        if (t.trend.values.length >= 2 && deltaEl) {
+                            const first = t.trend.values[0];
+                            const delta = last - first;
+                            const sign = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
+                            const color = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-slate-400';
+                            deltaEl.className = `text-[10px] tabular-nums ${color}`;
+                            deltaEl.textContent = `${sign} ${Math.abs(delta).toFixed(t.decimals)} ${t.unit}`;
+                        } else if (deltaEl) {
+                            deltaEl.className = 'text-[10px] text-slate-400 tabular-nums';
+                            deltaEl.textContent = t.unit;
+                        }
+                    }
+                    renderSparkline(t.sparkId, t.trend.values, { color: t.color, label: t.label });
+                });
+
+                const meta = document.getElementById('trend-meta');
+                if (meta) meta.textContent = anyData ? `${maxDays} Tag${maxDays === 1 ? '' : 'e'} im Verlauf` : '';
+                card.classList.toggle('hidden', !anyData);
             }
 
             // PDF Export
