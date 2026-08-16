@@ -437,15 +437,11 @@ describe('F) Solution Configurator & Enterale Logik', () => {
  * ────────────────────────────────────────────────────────────────*/
 describe('G) Plausibility / Fat-Finger Guard', () => {
 
-    it('G1: TFI > 200 → Plausibility-Flag', () => {
-        // Da die App heute keinen harten Throw besitzt, prüfen wir alternativ den Flag
-        try {
-            const r = calc.calculate(baseInput({ tfi: 250 }));
-            expect(r.plausibilityFlags.some(f => f.includes('TFI'))).toBe(true);
-        } catch (_e) {
-            // Falls die Validierung künftig hart abbricht, ist das ebenfalls akzeptabel
-            expect(true).toBe(true);
-        }
+    it('G1: TFI > 300 → Plausibility-Flag (v3.1: Schwelle von 200 auf 300 angehoben)', () => {
+        // 200–300 ml/kg/d ist in der polyuren Phase real und darf KEIN
+        // Fat-Finger-Modal auslösen. Erst > 300 gilt als Tippfehler-verdächtig.
+        const r = calc.calculate(baseInput({ tfi: 320 }));
+        expect(r.plausibilityFlags.some(f => f.includes('TFI'))).toBe(true);
     });
 
     it('G2: Gewicht > 6000g → Plausibility-Flag', () => {
@@ -829,5 +825,346 @@ describe('M) Frontend-Integration v3.0 — Teaching, EGI, Smart Defaults, Histor
         // patient-id ist NICHT Teil des persistierten inputs-Arrays.
         const inputsBlock = html.split('const inputs = [')[1].split('];')[0];
         expect(inputsBlock).not.toMatch(/patient-id/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION N — v3.1: Enteraler Aufbau, TFI-Stufen, enterale Supplemente
+ * ────────────────────────────────────────────────────────────────*/
+describe('N) Enteraler Aufbau — Zielvolumen & Steigerungs-Logik', () => {
+
+    it('N1: ELBW (800 g) → enterales Ziel 160–180 ml/kg/d', () => {
+        const t = calc.getTargets(baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 10 }));
+        expect(t.enteralTarget.min).toBe(160);
+        expect(t.enteralTarget.max).toBe(180);
+        expect(t.enteralTarget.key).toBe('elbw');
+    });
+
+    it('N2: Reifgeborenes (3200 g, 39 SSW) → enterales Ziel 130–160 ml/kg/d', () => {
+        const t = calc.getTargets(baseInput({ birthWeight: 3200, currentWeight: 3200, ssw: 39, postnatalAge: 7 }));
+        expect(t.enteralTarget.min).toBe(130);
+        expect(t.enteralTarget.max).toBe(160);
+        expect(t.enteralTarget.key).toBe('term');
+    });
+
+    it('N3: Spätes Frühgeborenes (2000 g, 34 SSW) → 150–170 ml/kg/d', () => {
+        const t = calc.getTargets(baseInput({ birthWeight: 2000, currentWeight: 2000, ssw: 34, postnatalAge: 7 }));
+        expect(t.enteralTarget.min).toBe(150);
+        expect(t.enteralTarget.max).toBe(170);
+    });
+
+    it('N4: Unreifere Einstufung gewinnt — 1800 g bei 30 SSW → VLBW-Ziel', () => {
+        const t = calc.getTargets(baseInput({ birthWeight: 1800, currentWeight: 1800, ssw: 30, postnatalAge: 7 }));
+        expect(t.enteralTarget.key).toBe('vlbw');
+        expect(t.enteralTarget.min).toBe(160);
+    });
+
+    it('N5: Beatmungs-Cap begrenzt das enterale Ziel (invasiv → max 140)', () => {
+        const t = calc.getTargets(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 10, ventilationStatus: 'invasive'
+        }));
+        expect(t.enteralTarget.max).toBe(140);
+        expect(t.enteralTarget.capped).toBe(true);
+    });
+
+    it('N6: Aufbau-Korridor steigt mit dem Lebenstag und deckelt am Ziel', () => {
+        const d1 = calc.getTargets(baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 1 }));
+        const d5 = calc.getTargets(baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 5 }));
+        const d30 = calc.getTargets(baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 30 }));
+        expect(d1.enteralRamp.expected).toBe(10);          // trophisch
+        expect(d5.enteralRamp.expected).toBe(70);          // 10 + 4×15
+        expect(d30.enteralRamp.expected).toBe(180);        // gedeckelt am Ziel-Max
+    });
+
+    it('N7: Enteral unter Korridor → Steigerungs-Hinweis MIT Toleranz-Vorbehalt', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 8,
+            tfi: 150, enteralVolume: 40
+        }));
+        const hint = r.warnings.find(w => w.includes('Aufbau-Korridor'));
+        expect(hint).toBeTruthy();
+        expect(hint).toMatch(/Steigerung um/);
+        expect(hint).toMatch(/nur bei guter Toleranz/);
+        expect(r.results.enteralPhase).toBe('advancing');
+    });
+
+    it('N8: Enteral im Korridor → KEIN Steigerungs-Hinweis', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 5,
+            tfi: 150, enteralVolume: 95
+        }));
+        expect(r.warnings.some(w => w.includes('Aufbau-Korridor'))).toBe(false);
+    });
+
+    it('N9: Vollnahrung erreicht → Phase "full" + PN-Beendigung als Reminder', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1600, ssw: 30, postnatalAge: 20,
+            tfi: 180, enteralVolume: 165, gir: 4, protein: 1, lipids: 1
+        }));
+        expect(r.results.enteralPhase).toBe('full');
+        expect(r.reminders.some(x => x.includes('Beendigung der parenteralen'))).toBe(true);
+    });
+
+    it('N10: enteralGap ist nie negativ und beschreibt den Abstand zum Korridor', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 800, ssw: 26, postnatalAge: 6,
+            tfi: 150, enteralVolume: 0
+        }));
+        expect(r.results.enteralGap).toBeGreaterThanOrEqual(0);
+        expect(r.results.enteralGap).toBe(r.results.enteralExpectedToday);
+    });
+});
+
+describe('N-TFI) Gestufte Flüssigkeits-Grenzen v3.1', () => {
+
+    it('N11: TFI 250 ml/kg/d (polyure Phase) wird BERECHNET, nicht blockiert', () => {
+        expect(() => calc.calculate(baseInput({ tfi: 250 }))).not.toThrow();
+        const r = calc.calculate(baseInput({ tfi: 250 }));
+        expect(r.results.totalDailyFluid).toBeGreaterThan(0);
+    });
+
+    it('N12: TFI 190 → Hinweis, TFI 250 → Warnung, TFI 150 → keins von beidem', () => {
+        const w190 = calc.calculate(baseInput({ tfi: 190 })).warnings.join(' | ');
+        const w250 = calc.calculate(baseInput({ tfi: 250 })).warnings.join(' | ');
+        const w150 = calc.calculate(baseInput({ tfi: 150 })).warnings.join(' | ');
+        expect(w190).toMatch(/oberhalb des üblichen Korridors/);
+        expect(w250).toMatch(/polyurer Phase/);
+        expect(w150).not.toMatch(/oberhalb des üblichen Korridors|polyurer Phase/);
+    });
+
+    it('N13: TFI 250 löst KEIN Fat-Finger-Flag mehr aus', () => {
+        const r = calc.calculate(baseInput({ tfi: 250 }));
+        expect(r.plausibilityFlags.some(f => f.includes('TFI'))).toBe(false);
+    });
+
+    it('N14: TFI > 400 bricht weiterhin hart ab (ValidationError)', () => {
+        expect(() => calc.calculate(baseInput({ tfi: 450 }))).toThrow();
+        expect(() => calc.calculate(baseInput({ tfi: 1200 }))).toThrow();
+    });
+});
+
+describe('N-SUP) Enterale Supplemente — Liquigen & Aptamil Eiweiß+', () => {
+
+    it('N15: Liquigen 2 ml/kg/d → +9 kcal/kg/d und +1.0 g Fett/kg/d', () => {
+        const base = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150 }));
+        const withLiq = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150, liquigenMlKg: 2 }));
+        expect(withLiq.results.liquigenKcalKg).toBe(9);
+        expect(withLiq.results.liquigenFatGKg).toBe(1);
+        expect(withLiq.results.kcalEnteralKg - base.results.kcalEnteralKg).toBeCloseTo(9, 1);
+        expect(withLiq.results.enteralFatGKg - base.results.enteralFatGKg).toBeCloseTo(1, 2);
+    });
+
+    it('N16: Aptamil Eiweiß+ 1 g/kg/d → +0.82 g Protein/kg/d und +3.4 kcal/kg/d', () => {
+        const base = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150 }));
+        const withApt = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150, aptamilProteinGKg: 1 }));
+        expect(withApt.results.aptamilProteinNetGKg).toBeCloseTo(0.82, 2);
+        expect(withApt.results.proteinTotalGPerKg - base.results.proteinTotalGPerKg).toBeCloseTo(0.82, 2);
+        expect(withApt.results.kcalEnteralKg - base.results.kcalEnteralKg).toBeCloseTo(3.4, 1);
+    });
+
+    it('N17: Aptamil Eiweiß+ liefert Ca und P mit (Osteopenie-Bilanz)', () => {
+        const base = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150 }));
+        const withApt = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150, aptamilProteinGKg: 2 }));
+        expect(withApt.results.enteralCaMgKg - base.results.enteralCaMgKg).toBeCloseTo(24.52, 1);
+        expect(withApt.results.enteralPMgKg - base.results.enteralPMgKg).toBeCloseTo(10.48, 1);
+    });
+
+    it('N18: Supplemente erhöhen NICHT die Gesamtflüssigkeit (Zumischung)', () => {
+        const base = calc.calculate(baseInput({ enteralVolume: 100, tfi: 150 }));
+        const withSup = calc.calculate(baseInput({
+            enteralVolume: 100, tfi: 150, liquigenMlKg: 4, aptamilProteinGKg: 2
+        }));
+        expect(withSup.results.totalDailyFluid).toBe(base.results.totalDailyFluid);
+        expect(withSup.results.enteralDaily).toBe(base.results.enteralDaily);
+    });
+
+    it('N19: Unplausible Supplement-Dosen brechen hart ab (Fat-Finger)', () => {
+        expect(() => calc.calculate(baseInput({ liquigenMlKg: 50 }))).toThrow();
+        expect(() => calc.calculate(baseInput({ aptamilProteinGKg: 20 }))).toThrow();
+    });
+
+    it('N20: Supplemente erscheinen in der EPR-Dokumentation', () => {
+        const input = baseInput({ enteralVolume: 120, tfi: 150, liquigenMlKg: 2, aptamilProteinGKg: 1 });
+        const res = calc.calculate(input);
+        const doc = calc.generateDocumentationString(res, input);
+        expect(doc).toMatch(/Liquigen 2\.0 ml\/kg\/d/);
+        expect(doc).toMatch(/Aptamil Eiweiß\+ 1\.0 g\/kg\/d/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION O — v3.2: Klinisches Review (Oberarzt-Gegenlesen)
+ * Behebt drei Befunde aus dem Review von v3.1:
+ *   O1–O6  Zielkonflikt Enteral-Ziel ↔ Protein-/Energielimit
+ *   O7–O10 Nahrungspause (NPO) darf nicht zum Füttern nudgen
+ *   O11–O13 Enteral-Ampel gegen Tages-Korridor statt Endziel
+ *   O14–O16 Enterales Natrium in der Bilanz sichtbar
+ * ────────────────────────────────────────────────────────────────*/
+describe('O) Zielkonflikt Enteral-Ziel ↔ Nährstoffgrenzen', () => {
+
+    it('O1: EBM ohne FM85 → Ziel bleibt bei 160–180 (nichts limitiert)', () => {
+        const t = calc.getTargets(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 25, fm85Percent: 0
+        }));
+        expect(t.enteralTarget.min).toBe(160);
+        expect(t.enteralTarget.max).toBe(180);
+        expect(t.enteralTarget.limitedBy).toBe(null);
+    });
+
+    it('O2: EBM + FM85 4 % → Ziel wird durch die Protein-Obergrenze gedeckelt', () => {
+        const t = calc.getTargets(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 25, fm85Percent: 4
+        }));
+        // Fortifiziert: 1,13 + 4×0,4675 = 3,0 g/100 ml → 4,5 g/kg/d bei 150 ml/kg/d
+        expect(t.enteralTarget.max).toBe(150);
+        expect(t.enteralTarget.limitedBy).toBe('protein');
+        expect(t.enteralTarget.unlimited.max).toBe(180);
+    });
+
+    it('O3: KERNTEST — am Ziel-Maximum wird KEIN Limit mehr gesprengt', () => {
+        // Genau der Fall, der v3.1 widersprüchlich machte.
+        for (const fm85 of [0, 1, 2, 3, 4]) {
+            const input = baseInput({
+                birthWeight: 1100, currentWeight: 1400, ssw: 28, postnatalAge: 25,
+                ventilationStatus: 'spontaneous', fm85Percent: fm85,
+                gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0
+            });
+            const t = calc.getTargets(input);
+            const r = calc.calculate({ ...input, tfi: t.enteralTarget.max, enteralVolume: t.enteralTarget.max });
+            expect(r.results.proteinTotalGPerKg,
+                `FM85 ${fm85}% bei ${t.enteralTarget.max} ml/kg/d`).toBeLessThanOrEqual(calc.LIMITS.PROTEIN.max);
+            expect(r.results.kcalPerKg,
+                `FM85 ${fm85}% bei ${t.enteralTarget.max} ml/kg/d`).toBeLessThanOrEqual(t.energy.max);
+        }
+    });
+
+    it('O4: Am Ziel-Maximum widersprechen sich Phase und Warnungen nicht', () => {
+        const input = baseInput({
+            birthWeight: 1100, currentWeight: 1400, ssw: 28, postnatalAge: 25,
+            ventilationStatus: 'spontaneous', fm85Percent: 4,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0
+        });
+        const t = calc.getTargets(input);
+        const r = calc.calculate({ ...input, tfi: t.enteralTarget.max, enteralVolume: t.enteralTarget.max });
+        expect(r.results.enteralPhase).toBe('full');
+        expect(r.warnings.some(w => /Überernährung|über Zielbereich/.test(w))).toBe(false);
+        expect(r.safetyChecks.proteinLimit).toBe(true);
+    });
+
+    it('O5: Beba FG 1 (2,9 g Protein/100 ml) wird ebenfalls gedeckelt', () => {
+        const t = calc.getTargets(baseInput({
+            birthWeight: 1400, ssw: 30, postnatalAge: 20, selectedEnteralProduct: 'bebaFG1'
+        }));
+        expect(t.enteralTarget.max).toBeLessThanOrEqual(155);
+        expect(t.enteralTarget.limitedBy).toBeTruthy();
+    });
+
+    it('O6: Beatmungs-Cap bleibt die strengste Grenze, wenn er greift', () => {
+        const t = calc.getTargets(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 20,
+            ventilationStatus: 'invasive', fm85Percent: 0
+        }));
+        expect(t.enteralTarget.max).toBe(140);
+        expect(t.enteralTarget.limitedBy).toBe('ventilation');
+    });
+});
+
+describe('O-NPO) Nahrungspause', () => {
+
+    it('O7: Bei Nahrungspause KEIN Steigerungs-Hinweis', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 8, tfi: 140,
+            enteralVolume: 0, feedingPaused: true, feedingPauseReason: 'nec'
+        }));
+        expect(r.warnings.some(w => w.includes('Aufbau-Korridor'))).toBe(false);
+        expect(r.recommendations.enteralAdvance).toBe(null);
+        expect(r.results.enteralPhase).toBe('paused');
+    });
+
+    it('O8: Ohne Pause feuert der Hinweis am selben Tag weiterhin', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 8, tfi: 140, enteralVolume: 0
+        }));
+        expect(r.warnings.some(w => w.includes('Aufbau-Korridor'))).toBe(true);
+    });
+
+    it('O9: Pausengrund wird ausgewiesen und in der EPR-Doku dokumentiert', () => {
+        const input = baseInput({
+            postnatalAge: 8, tfi: 140, enteralVolume: 0,
+            feedingPaused: true, feedingPauseReason: 'unstable'
+        });
+        const r = calc.calculate(input);
+        expect(r.results.feedingPauseReason).toMatch(/instabil/i);
+        expect(calc.generateDocumentationString(r, input)).toMatch(/Nahrungspause/);
+    });
+
+    it('O10: Unbekannter Grund fällt sicher auf "Sonstiger Grund" zurück', () => {
+        const r = calc.calculate(baseInput({
+            feedingPaused: true, feedingPauseReason: '<script>'
+        }));
+        expect(r.results.feedingPauseReason).toBe('Sonstiger Grund');
+    });
+});
+
+describe('O-AMPEL) Enteral-Ampel gegen Tages-Korridor', () => {
+
+    it('O11: ELBW Tag 2 ohne enterale Zufuhr ist NICHT rot (Alarm-Fatigue)', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 2, tfi: 100, enteralVolume: 0
+        }));
+        // Korridor Tag 2 = 25 ml/kg/d, Schritt 15 → Lücke 25 ≤ 2×15 → gelb, nicht rot
+        expect(r.comparisons.enteral.status).not.toBe('red');
+    });
+
+    it('O12: Deutlich unter Korridor → rot', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 10, tfi: 140, enteralVolume: 10
+        }));
+        expect(r.comparisons.enteral.status).toBe('red');
+    });
+
+    it('O13: Bei Nahrungspause ist die Ampel neutral', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 10, tfi: 140,
+            enteralVolume: 0, feedingPaused: true, feedingPauseReason: 'nec'
+        }));
+        expect(r.comparisons.enteral.status).toBe('neutral');
+    });
+});
+
+describe('O-NA) Enterales Natrium in der Bilanz', () => {
+
+    it('O14: Kind auf Vollnahrung zeigt sein Natrium nicht mehr als 0', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1100, currentWeight: 1400, ssw: 28, postnatalAge: 25,
+            ventilationStatus: 'spontaneous', tfi: 150, enteralVolume: 150, fm85Percent: 4,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0
+        }));
+        expect(r.results.effectiveNa).toBe(0);                 // PN-Anteil korrekt 0
+        expect(r.results.totalNaMmolKg).toBeGreaterThan(1);    // enteral wird sichtbar
+        expect(r.results.totalNaMmolKg).toBeCloseTo(r.results.enteralNaMmolKg, 2);
+    });
+
+    it('O15: Gesamt-Na = PN + enteral', () => {
+        const r = calc.calculate(baseInput({
+            postnatalAge: 20, tfi: 150, enteralVolume: 80, fm85Percent: 2, sodium: 3
+        }));
+        expect(r.results.totalNaMmolKg)
+            .toBeCloseTo(r.results.effectiveNa + r.results.enteralNaMmolKg, 2);
+    });
+
+    it('O16: Hypernatriämie-Warnung bei ELBW greift jetzt auch über enterales Na', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, currentWeight: 900, ssw: 26, postnatalAge: 6,
+            tfi: 200, enteralVolume: 150, fm85Percent: 4, sodium: 4
+        }));
+        expect(r.results.totalNaMmolKg).toBeGreaterThan(5);
+        expect(r.warnings.some(w => /Hypernatriämie/.test(w))).toBe(true);
+    });
+
+    it('O17: Gesamt-Na erscheint in der EPR-Dokumentation', () => {
+        const input = baseInput({ postnatalAge: 20, tfi: 150, enteralVolume: 100, fm85Percent: 4, sodium: 3 });
+        const doc = calc.generateDocumentationString(calc.calculate(input), input);
+        expect(doc).toMatch(/Na .* gesamt \(PN /);
     });
 });

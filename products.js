@@ -182,8 +182,22 @@ const NeoProducts = {
             fortifiedEBM: { kcal: 85, protein: 3.0, carbs: 8.6 }
         },
         aptamilProtein: {
+            id: 'aptamilProtein',
             name: 'Aptamil Eiweiß+',
-            per100gPowder: { kcal: 338, protein: 82.1, sodium_mg: 776, calcium_mg: 1226, phosphorus_mg: 524 }
+            unit: 'g Pulver/kg/d',
+            description: 'Enterale Eiweiß-Supplementierung bei niedrigem BUN trotz Fortifizierung',
+            per100gPowder: { kcal: 338, protein: 82.1, fat: 0, carbs: 0, sodium_mg: 776, calcium_mg: 1226, phosphorus_mg: 524 }
+        },
+        // Liquigen (Nutricia) — MCT-Emulsion 50 %, 4,5 kcal/ml.
+        // Quelle: Nutricia Produktdatenblatt (100 ml = 450 kcal, 50 g Fett, davon
+        // 96,4 % MCT; Protein 0 g, KH 0 g, Na 5 mg).
+        // Hinweis: Wird der Nahrung zugemischt → KEIN zusätzliches TFI-Volumen.
+        liquigen: {
+            id: 'liquigen',
+            name: 'Liquigen (MCT-Emulsion 50 %)',
+            unit: 'ml/kg/d',
+            description: 'Energie-/Fettanreicherung; Volumen ist im enteralen Volumen enthalten',
+            per100ml: { kcal: 450, protein: 0, fat: 50, carbs: 0, sodium_mg: 5, calcium_mg: 0, phosphorus_mg: 0 }
         }
     },
 

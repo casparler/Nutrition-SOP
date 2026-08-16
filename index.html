@@ -370,8 +370,52 @@
                                             <option value="6">6× (4-stdl.)</option>
                                         </select>
                                     </div>
+                                    <!-- v3.1: Enterale Supplemente -->
+                                    <div class="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                                        <h5 class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-2">Enterale Supplemente</h5>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Liquigen <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
+                                        <input type="number" id="input-liquigen" step="0.5" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <p class="text-[10px] text-gray-500 mt-1">MCT 50 % — 4,5 kcal/ml, 0,5 g Fett/ml</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Aptamil Eiweiß+ <span class="text-gray-400 font-normal">(g Pulver/kg/d)</span></label>
+                                        <input type="number" id="input-aptamil-protein" step="0.1" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <p class="text-[10px] text-gray-500 mt-1">82,1 g Eiweiß/100 g — 3,38 kcal/g</p>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <p class="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">Supplement-Volumen wird der Nahrung zugemischt und zählt <strong>nicht</strong> zusätzlich zur Gesamtflüssigkeit.</p>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- v3.1/3.2: ENTERALER AUFBAU -->
+                    <div class="pt-2 border-t border-gray-100">
+                        <div class="flex items-center gap-2 mt-2 mb-2">
+                            <input type="checkbox" id="input-feeding-paused" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <label for="input-feeding-paused" class="text-sm font-medium text-gray-700">Nahrungspause (NPO)</label>
+                            <select id="input-feeding-pause-reason" class="ml-auto text-xs rounded-md border-gray-300 border p-1 bg-white" disabled>
+                                <option value="nec">NEC-Verdacht / Abdomen</option>
+                                <option value="unstable">Hämodynamisch instabil</option>
+                                <option value="periop">Peri-operativ</option>
+                                <option value="other">Sonstiger Grund</option>
+                            </select>
+                        </div>
+                        <div id="enteral-advance-box" class="rounded-md border border-green-200 bg-green-50 p-3">
+                            <div class="flex justify-between items-baseline">
+                                <h4 class="text-xs font-bold text-green-700 uppercase tracking-wider">Enteraler Aufbau</h4>
+                                <span id="res-enteral-phase" class="text-[10px] font-bold px-2 py-0.5 rounded bg-green-600 text-white">–</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-sm">
+                                <div class="text-gray-600">Aktuell:</div><div id="res-enteral-current" class="text-right font-bold">– ml/kg/d</div>
+                                <div class="text-gray-600">Ziel (Vollnahrung):</div><div id="res-enteral-goal" class="text-right font-bold">– ml/kg/d</div>
+                                <div class="text-gray-600">Korridor heute:</div><div id="res-enteral-expected" class="text-right font-bold">– ml/kg/d</div>
+                            </div>
+                            <p id="res-enteral-advice" class="text-[11px] text-gray-700 mt-2"></p>
+                            <p id="res-enteral-limit" class="text-[10px] text-amber-800 mt-1"></p>
                         </div>
                     </div>
 
@@ -391,6 +435,8 @@
                                     <div class="border-t border-emerald-200 pt-1">Ca (enteral):</div><div id="res-enteral-ca" class="text-right font-bold border-t border-emerald-200 pt-1">– mg/kg/d</div>
                                     <div>P (enteral):</div><div id="res-enteral-p" class="text-right font-bold">– mg/kg/d</div>
                                     <div>Na (enteral):</div><div id="res-enteral-na" class="text-right font-bold">– mmol/kg/d</div>
+                                    <div class="border-t border-emerald-200 pt-1">davon Liquigen:</div><div id="res-liquigen-detail" class="text-right font-bold border-t border-emerald-200 pt-1">– kcal/kg/d</div>
+                                    <div>davon Eiweiß+:</div><div id="res-aptamil-detail" class="text-right font-bold">– g/kg/d</div>
                                 </div>
                             </div>
                         </div>
@@ -1630,6 +1676,8 @@
             const inputs = [
                 'birth-weight', 'current-weight', 'yesterday-weight', 'input-tfi',
                 'input-enteral', 'input-enteral-product', 'input-fm85', 'input-meal-frequency',
+                'input-liquigen', 'input-aptamil-protein',
+                'input-feeding-paused', 'input-feeding-pause-reason',
                 'input-carrier', 'input-urea', 'input-gir',
                 'input-protein', 'input-lipids', 'input-lipid-infusion',
                 'input-calcium', 'input-phosphate',
@@ -1661,9 +1709,20 @@
                 }
             });
 
+            // v3.2: Pausen-Grund nur aktivierbar, wenn Nahrungspause gesetzt ist
+            (function bindFeedingPause() {
+                const cb = document.getElementById('input-feeding-paused');
+                const sel = document.getElementById('input-feeding-pause-reason');
+                if (!cb || !sel) return;
+                const sync = () => { sel.disabled = !cb.checked; };
+                cb.addEventListener('change', sync);
+                sync();
+            })();
+
             // Bind listeners
             const selectIds = ['input-invasive-ventilation', 'input-ssw', 'input-ssw-days', 'input-birth-date', 'input-fm85', 'input-enteral-product',
-                               'input-meal-frequency', 'input-lipid-infusion', 'input-access', 'input-solution', 'input-secondary-solution'];
+                               'input-meal-frequency', 'input-lipid-infusion', 'input-access', 'input-solution', 'input-secondary-solution',
+                               'input-feeding-paused', 'input-feeding-pause-reason'];
             inputs.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -1809,6 +1868,10 @@
                     tfi: parseFloat(document.getElementById('input-tfi').value) || 0,
                     enteralVolume: document.getElementById('input-enteral').value || 0,
                     fm85Percent: document.getElementById('input-fm85').value || 0,
+                    liquigenMlKg: (document.getElementById('input-liquigen') || {}).value || 0,
+                    aptamilProteinGKg: (document.getElementById('input-aptamil-protein') || {}).value || 0,
+                    feedingPaused: !!(document.getElementById('input-feeding-paused') || {}).checked,
+                    feedingPauseReason: (document.getElementById('input-feeding-pause-reason') || {}).value || 'other',
                     carrierVolume: document.getElementById('input-carrier').value || 0,
                     urea: rawUrea === '' || rawUrea == null ? null : parseFloat(rawUrea),
                     gir: document.getElementById('input-gir').value || 0,
@@ -1921,7 +1984,7 @@
                 setText('res-calcium-mmol', r.calciumMmolKg);
                 setText('res-phosphate-mg', r.phosphateMgKg);
                 setText('res-phosphate-mmol', r.phosphateMmolKg);
-                setText('res-sodium', r.effectiveNa);
+                setText('res-sodium', r.totalNaMmolKg !== undefined ? r.totalNaMmolKg : r.effectiveNa);
                 setText('res-potassium', r.effectiveK);
                 setText('res-chloride', r.effectiveCl);
                 setText('res-sid', r.sidLight);
@@ -1964,6 +2027,62 @@
                     document.getElementById('res-enteral-ca').innerText = `${r.enteralCaMgKg} mg/kg/d`;
                     document.getElementById('res-enteral-p').innerText = `${r.enteralPMgKg} mg/kg/d`;
                     document.getElementById('res-enteral-na').innerText = `${r.enteralNaMmolKg || 0} mmol/kg/d`;
+                    const liqEl = document.getElementById('res-liquigen-detail');
+                    if (liqEl) liqEl.innerText = `${r.liquigenKcalKg || 0} kcal/kg/d`;
+                    const aptEl = document.getElementById('res-aptamil-detail');
+                    if (aptEl) aptEl.innerText = `${r.aptamilProteinNetGKg || 0} g/kg/d`;
+                }
+
+                // --- v3.1: Enteraler Aufbau ---
+                if (r.enteralTarget) {
+                    const phaseLabels = {
+                        none:      { text: 'nicht begonnen', cls: 'bg-gray-400' },
+                        trophic:   { text: 'trophisch',      cls: 'bg-amber-500' },
+                        advancing: { text: 'im Aufbau',      cls: 'bg-blue-600' },
+                        full:      { text: 'Vollnahrung',    cls: 'bg-green-600' },
+                        paused:    { text: 'Nahrungspause',  cls: 'bg-amber-600' }
+                    };
+                    const ph = phaseLabels[r.enteralPhase] || phaseLabels.none;
+                    const phEl = document.getElementById('res-enteral-phase');
+                    if (phEl) {
+                        phEl.innerText = ph.text;
+                        phEl.className = `text-[10px] font-bold px-2 py-0.5 rounded text-white ${ph.cls}`;
+                    }
+                    const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.innerText = txt; };
+                    setTxt('res-enteral-current', `${r.enteralVolKg} ml/kg/d`);
+                    setTxt('res-enteral-goal', `${r.enteralTarget.min}–${r.enteralTarget.max} ml/kg/d`);
+                    setTxt('res-enteral-expected', `~${r.enteralExpectedToday} ml/kg/d`);
+                    const advEl = document.getElementById('res-enteral-advice');
+                    if (advEl) {
+                        if (r.feedingPaused) {
+                            advEl.innerText = `Nahrungspause aktiv (${r.feedingPauseReason}). Aufbau-Empfehlungen sind ausgesetzt.`;
+                        } else if (r.enteralPhase === 'full') {
+                            advEl.innerText = `Vollnahrungs-Ziel erreicht (${r.enteralTarget.label}). Weitere Optimierung über Anreicherung, nicht über Volumen.`;
+                        } else if (r.enteralGap >= 10) {
+                            advEl.innerText = `${r.enteralGap} ml/kg/d unter dem Korridor. Steigerung erwägen — nur bei guter Toleranz (weiches Abdomen, unauffällige Reste, kein NEC-Verdacht).`;
+                        } else {
+                            advEl.innerText = `Im Korridor für Lebenstag. Zielklasse: ${r.enteralTarget.label}.`;
+                        }
+                    }
+                    const limEl = document.getElementById('res-enteral-limit');
+                    if (limEl) {
+                        const t = r.enteralTarget;
+                        const why = {
+                            ventilation: `Beatmungs-Cap ${t.cap} ml/kg/d`,
+                            protein: `Protein-Obergrenze bei ${t.product}`,
+                            energy: `Energie-Tagesziel bei ${t.product}`
+                        }[t.limitedBy];
+                        limEl.innerText = why
+                            ? `Ziel begrenzt (statt ${t.unlimited.min}–${t.unlimited.max}): ${why}.`
+                            : '';
+                    }
+                    const boxEl = document.getElementById('enteral-advance-box');
+                    if (boxEl) {
+                        const paused = r.feedingPaused;
+                        boxEl.className = paused
+                            ? 'rounded-md border border-amber-200 bg-amber-50 p-3'
+                            : 'rounded-md border border-green-200 bg-green-50 p-3';
+                    }
                 }
 
                 // Length and Head Z-Scores

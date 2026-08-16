@@ -20,11 +20,38 @@ class ValidationError extends Error {
 class NutritionCalculator {
     constructor() {
         this.LIMITS = {
-            TFI: { min: 40, max: 200, unit: 'ml/kg/d' },
+            // TFI: Gestufte Grenzen (v3.1).
+            //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
+            //   warn  200 → Warnung (nur bei polyurer Phase / hohem renalem Verlust plausibel)
+            //   max   400 → harter Fat-Finger-Stopp (ValidationError)
+            // Begründung: Frühgeborene in der polyuren Phase erhalten regelhaft
+            // 200–300 ml/kg/d. Ein harter Stopp bei 200 blockierte reale Klinik.
+            TFI: { min: 40, hint: 180, warn: 200, max: 400, unit: 'ml/kg/d' },
             GIR: { min: 3, max: 12, unit: 'mg/kg/min' },
             PROTEIN: { max: 4.5, unit: 'g/kg/d' },
             LIPIDS: { max: 4.0, unit: 'g/kg/d' },
             OSM_PERIPHERAL: 900
+        };
+        // --- Enterale Zielvolumina (Vollnahrung) nach Reifegrad, v3.1 ---
+        // Quellen: ESPGHAN CoN 2022 (Enteral Nutrition in Preterm Infants) —
+        //   stabile wachsende Frühgeborene benötigen 150–180 ml/kg/d;
+        //   Einzelfälle bis 200 ml/kg/d möglich und sicher.
+        // Reifgeborene: 130–160 ml/kg/d (physiologischer Bedarf ab Tag 5–7).
+        this.ENTERAL_TARGETS = {
+            elbw:    { min: 160, max: 180, label: 'ELBW / < 1000 g' },
+            vlbw:    { min: 160, max: 180, label: 'VLBW / < 32 SSW' },
+            latePre: { min: 150, max: 170, label: 'Spätes Frühgeborenes 32–36 SSW' },
+            term:    { min: 130, max: 160, label: 'Reifgeborenes ≥ 37 SSW' }
+        };
+        // Aufbau-Fahrplan (Orientierungskorridor, KEINE Vorgabe).
+        // start = Tag 1 (trophische Ernährung), step = Steigerung pro Tag.
+        // Quelle: DGPM/GNPI S2k enterale Ernährung; SIFT-Trial 2019
+        // (30 ml/kg/d nicht NEC-ungünstiger als 18, aber langsamerer Aufbau
+        //  bei ELBW etabliert).
+        this.ENTERAL_RAMP = {
+            elbw: { start: 10, step: 15 },
+            vlbw: { start: 15, step: 20 },
+            other: { start: 20, step: 25 }
         };
         this.CALORIES = { GLUCOSE: 4.0, LIPIDS_STANDARD: 9.0, LIPIDS_SMOFLIPID: 10.0, PROTEIN: 4.0 };
         this.MOLAR_MASS = { CALCIUM: 40.08, PHOSPHORUS: 30.97 };
@@ -78,6 +105,36 @@ class NutritionCalculator {
         return v;
     }
 
+    /**
+     * Nährstoffdichte der aktuell gewählten enteralen Nahrung inkl. Fortifizierung.
+     * Fallback-Tabelle spiegelt products.js (window.NeoProducts kann fehlen, z.B. im Test).
+     * @returns {{proteinPer100:number, kcalPer100:number, label:string}}
+     */
+    _enteralDensity(input) {
+        const fm85 = Math.max(0, parseInt(input.fm85Percent) || 0);
+        const id = input.selectedEnteralProduct || 'ebm';
+        const FALLBACK = {
+            ebm:        { protein: 1.13, kcal: 71, name: 'EBM' },
+            bebaFG1:    { protein: 2.90, kcal: 80, name: 'Beba FG 1' },
+            bebaFG2:    { protein: 2.05, kcal: 73, name: 'Beba FG 2' },
+            aptamilPre: { protein: 1.30, kcal: 66, name: 'Aptamil Pre' },
+            hippPre:    { protein: 1.25, kcal: 66, name: 'Hipp Pre' }
+        };
+        let base = FALLBACK[id] || FALLBACK.ebm;
+        if (typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.enteralProducts) {
+            const p = window.NeoProducts.enteralProducts.find(x => x.id === id);
+            if (p && p.per100ml) base = { protein: p.per100ml.protein, kcal: p.per100ml.kcal, name: p.name };
+        }
+        // FM85 wird nur der Muttermilch zugesetzt (100er-Regel: 1 % ≙ 0,4675 g Protein
+        // und 3,5 kcal pro 100 ml — identisch zur Fortifizierungslogik in Step 7).
+        const fortified = (id === 'ebm' && fm85 > 0);
+        return {
+            proteinPer100: fortified ? base.protein + fm85 * 0.4675 : base.protein,
+            kcalPer100:    fortified ? base.kcal + fm85 * 3.5 : base.kcal,
+            label:         fortified ? `${base.name} + FM85 ${fm85} %` : base.name
+        };
+    }
+
     getTargets(input) {
         const bw = parseFloat(input.birthWeight) || 1000;
         const age = Math.max(1, parseInt(input.postnatalAge) || 1);
@@ -125,6 +182,70 @@ class NutritionCalculator {
         const lipidDayKey = Math.min(effectiveDay, 4);
         const lipidTarget = this.LIPID_TARGETS[lipidDayKey];
 
+        // --- Enterale Zielvolumina (Vollnahrung), v3.1 ---
+        // Reifegrad-Klassifikation: Geburtsgewicht UND Gestationsalter,
+        // jeweils die unreifere Einstufung gewinnt (Safety-First).
+        let entKey;
+        if (bw <= 1000) entKey = 'elbw';
+        else if (bw <= 1500 || ssw < 32) entKey = 'vlbw';
+        else if (ssw < 37) entKey = 'latePre';
+        else entKey = 'term';
+        const entBase = this.ENTERAL_TARGETS[entKey];
+
+        // --- Deckelung des Zielvolumens (v3.2) ---
+        // Drei unabhängige Obergrenzen, die kleinste gewinnt:
+        //   1. Beatmungs-Cap (begrenzt die Gesamtflüssigkeit)
+        //   2. Protein-Obergrenze: bei Vollnahrung deckt die Nahrung das Protein
+        //      allein — das Volumen darf LIMITS.PROTEIN.max nicht überschreiten.
+        //   3. Energie-Obergrenze: analog für das Energie-Tagesziel.
+        // Ohne diese Kopplung widerspricht sich die App: Sie fordert eine
+        // Volumensteigerung und warnt gleichzeitig vor Überernährung
+        // (z.B. EBM + FM85 4 % bei 175 ml/kg/d → 5,25 g Protein/kg/d).
+        const dens = this._enteralDensity(input);
+        const floor5 = v => Math.max(0, Math.floor(v / 5) * 5);
+        const volAtProteinMax = dens.proteinPer100 > 0
+            ? floor5(this.LIMITS.PROTEIN.max * 100 / dens.proteinPer100) : Infinity;
+        const volAtEnergyMax = dens.kcalPer100 > 0
+            ? floor5(energyMax * 100 / dens.kcalPer100) : Infinity;
+
+        let entMax = Math.min(entBase.max, tfiCap, volAtProteinMax, volAtEnergyMax);
+        // Zielkorridor bleibt 20 ml/kg/d breit, Untergrenze nie unter 120.
+        let entMin = Math.min(entBase.min, Math.max(120, entMax - 20));
+        if (entMin > entMax) entMin = entMax;
+
+        let limitedBy = null;
+        if (entMax === tfiCap && tfiCap < entBase.max) limitedBy = 'ventilation';
+        else if (entMax === volAtProteinMax && volAtProteinMax < entBase.max) limitedBy = 'protein';
+        else if (entMax === volAtEnergyMax && volAtEnergyMax < entBase.max) limitedBy = 'energy';
+
+        const enteralTarget = {
+            min: entMin,
+            max: entMax,
+            label: entBase.label,
+            key: entKey,
+            capped: limitedBy !== null,
+            limitedBy,
+            cap: tfiCap,
+            product: dens.label,
+            // Transparenz für den Teaching-Layer
+            volAtProteinMax: isFinite(volAtProteinMax) ? volAtProteinMax : null,
+            volAtEnergyMax: isFinite(volAtEnergyMax) ? volAtEnergyMax : null,
+            unlimited: { min: entBase.min, max: entBase.max }
+        };
+
+        // --- Aufbau-Korridor für den aktuellen Lebenstag ---
+        // NICHT gedeckelt auf effectiveDay 14 — der Aufbau läuft real weiter.
+        const rampKey = entKey === 'elbw' ? 'elbw' : (entKey === 'vlbw' ? 'vlbw' : 'other');
+        const ramp = this.ENTERAL_RAMP[rampKey];
+        const rampRaw = ramp.start + (age - 1) * ramp.step;
+        const enteralRamp = {
+            expected: Math.max(0, Math.min(enteralTarget.max, rampRaw)),
+            step: ramp.step,
+            start: ramp.start,
+            // Tag, an dem der Korridor rechnerisch die Vollnahrungs-Untergrenze erreicht
+            dayToFullFeeds: Math.max(1, Math.ceil((enteralTarget.min - ramp.start) / ramp.step) + 1)
+        };
+
         return {
             tfi: { min: tfiMin, max: tfiMax, cap: tfiCap },
             protein: { min: proteinMin, max: proteinMax },
@@ -132,7 +253,9 @@ class NutritionCalculator {
             energy: { min: energyMin, max: energyMax },
             energyDay,
             effectiveDay,
-            lipidTarget
+            lipidTarget,
+            enteralTarget,
+            enteralRamp
         };
     }
 
@@ -484,8 +607,21 @@ class NutritionCalculator {
 
         if (r.enteralDaily > 0 || parseFloat(input.enteralVolume) > 0) {
             const portion = r.singlePortion ? `, ${input.mealFrequency || 8}× ${num(r.singlePortion)} ml` : '';
-            lines.push(`- Enteral ${num(input.enteralVolume, 0)} ml/kg/d (${enteralLabel}${portion})`);
+            const entGoal = r.enteralTarget ? `, Ziel ${r.enteralTarget.min}–${r.enteralTarget.max}` : '';
+            lines.push(`- Enteral ${num(input.enteralVolume, 0)} ml/kg/d (${enteralLabel}${portion}${entGoal})`);
         }
+        if (r.feedingPaused) {
+            lines.push(`- Enteral: Nahrungspause (${r.feedingPauseReason})`);
+        }
+        // v3.1: Enterale Supplemente separat dokumentieren
+        const supp = [];
+        if (parseFloat(input.liquigenMlKg) > 0) {
+            supp.push(`Liquigen ${num(input.liquigenMlKg, 1)} ml/kg/d (${num(r.liquigenKcalKg, 0)} kcal/kg/d)`);
+        }
+        if (parseFloat(input.aptamilProteinGKg) > 0) {
+            supp.push(`Aptamil Eiweiß+ ${num(input.aptamilProteinGKg, 1)} g/kg/d (${num(r.aptamilProteinNetGKg, 2)} g Protein/kg/d)`);
+        }
+        if (supp.length) lines.push(`- Supplemente: ${supp.join(', ')}`);
 
         if (r.pnDaily > 0) {
             lines.push(`- PN ${num(r.pnDaily, 0)} ml/d (${sol}, ${access}) → GIR ${num(r.effectiveGIR)} mg/kg/min, AS ${num(r.proteinTotalGPerKg, 2)} g/kg/d`);
@@ -497,7 +633,7 @@ class NutritionCalculator {
         lines.push(`- Energie ${num(r.kcalPerKg, 0)} kcal/kg/d (PN ${num(r.kcalParenteralKg, 0)} / Enteral ${num(r.kcalEnteralKg, 0)}) | ${caP} | ${paa}`);
 
         if (r.effectiveNa > 0 || r.effectiveK > 0 || r.effectiveCl > 0) {
-            lines.push(`- Elektrolyte: Na ${num(r.effectiveNa, 1)} | K ${num(r.effectiveK, 1)} | Cl ${num(r.effectiveCl, 1)} mmol/kg/d (SID ${num(r.sidLight, 1)})`);
+            lines.push(`- Elektrolyte: Na ${num(r.totalNaMmolKg ?? r.effectiveNa, 1)} gesamt (PN ${num(r.effectiveNa, 1)}) | K ${num(r.effectiveK, 1)} | Cl ${num(r.effectiveCl, 1)} mmol/kg/d (SID ${num(r.sidLight, 1)})`);
         }
 
         if (typeof r.weightVelocity === 'number') {
@@ -576,9 +712,16 @@ class NutritionCalculator {
         });
 
         // Flüssigkeit & Glucose
+        // v3.1: Hard-Limit von 200 auf 400 ml/kg/d angehoben. Begründung:
+        // Frühgeborene in der polyuren Phase (Tag 2–5, extreme Unreife,
+        // Hyperglykämie-assoziierte osmotische Diurese) erhalten regelhaft
+        // 200–300 ml/kg/d. Der bisherige harte Stopp bei 200 blockierte die
+        // Berechnung in genau diesen Situationen. Abgestufte Signalisierung
+        // erfolgt jetzt über Warnungen (Hinweis ab 180, Warnung ab 200)
+        // statt über einen Berechnungs-Abbruch.
         validate(input.tfi, 'tfi', {
-            min: 0, max: 200,
-            maxMsg: `TFI ${input.tfi} ml/kg/d überschreitet das klinische Maximum (200 ml/kg/d).`
+            min: 0, max: this.LIMITS.TFI.max,
+            maxMsg: `TFI ${input.tfi} ml/kg/d überschreitet das absolute Maximum (${this.LIMITS.TFI.max} ml/kg/d) — Tippfehler?`
         });
         validate(input.gir, 'gir', {
             min: 0, max: 25,
@@ -616,6 +759,15 @@ class NutritionCalculator {
         validate(input.mealFrequency, 'mealFrequency', {
             min: 1, max: 24,
             minMsg: `Mahlzeiten-Frequenz muss ≥ 1 sein.`
+        });
+        // --- v3.1: Enterale Supplemente ---
+        validate(input.liquigenMlKg, 'liquigenMlKg', {
+            min: 0, max: 20,
+            maxMsg: `Liquigen ${input.liquigenMlKg} ml/kg/d überschreitet realistisches Maximum (20) — Tippfehler?`
+        });
+        validate(input.aptamilProteinGKg, 'aptamilProteinGKg', {
+            min: 0, max: 5,
+            maxMsg: `Aptamil Eiweiß+ ${input.aptamilProteinGKg} g/kg/d überschreitet realistisches Maximum (5) — Tippfehler?`
         });
 
         // Labor
@@ -696,6 +848,22 @@ class NutritionCalculator {
         const secondarySolution = input.secondarySolution || 'none';
         const secondaryRateKg = D(sp(input.secondaryRateKg, 'secondaryRateKg', { defaultValue: 0 }));
         const hiddenSodiumMmolKg = D(sp(input.hiddenSodiumMmolKg, 'hiddenSodiumMmolKg', { defaultValue: 0 }));
+        // v3.1: Enterale Supplemente (Volumen ist im enteralen Volumen enthalten)
+        const liquigenMlKg = D(sp(input.liquigenMlKg, 'liquigenMlKg', { defaultValue: 0 }));
+        const aptamilProteinGKg = D(sp(input.aptamilProteinGKg, 'aptamilProteinGKg', { defaultValue: 0 }));
+        // v3.2: Bewusste Nahrungspause (NPO). Unterdrückt den Steigerungs-Hinweis
+        // und die Ziel-Ampel — der Rechner darf ein bewusst nüchternes Kind
+        // (NEC-Verdacht, Instabilität, peri-OP) nicht zum Füttern drängen.
+        const feedingPaused = input.feedingPaused === true || input.feedingPaused === 'true';
+        const FEED_PAUSE_REASONS = {
+            nec: 'NEC-Verdacht / Abdomen auffällig',
+            unstable: 'Hämodynamisch instabil',
+            periop: 'Peri-operativ',
+            other: 'Sonstiger Grund'
+        };
+        const feedingPauseReason = feedingPaused
+            ? (FEED_PAUSE_REASONS[input.feedingPauseReason] || FEED_PAUSE_REASONS.other)
+            : null;
 
         // --- Step 0: Growth Percentile ---
         let weightPercentile = 'N/A';
@@ -924,6 +1092,31 @@ class NutritionCalculator {
             }
         }
 
+        // --- Step 7b: Enterale Supplemente (v3.1) ---
+        // Liquigen (MCT 50 %): 100 ml = 450 kcal, 50 g Fett, 0 g Protein,
+        //   0 g KH, 5 mg Na. Wird der Nahrung zugemischt → kein zusätzliches TFI.
+        // Aptamil Eiweiß+: 100 g Pulver = 338 kcal, 82,1 g Protein,
+        //   776 mg Na, 1226 mg Ca, 524 mg P.
+        const liquigenKcalKg = liquigenMlKg.times('4.5').toDecimalPlaces(2);
+        const liquigenFatGKg = liquigenMlKg.times('0.5').toDecimalPlaces(3);
+        const liquigenNaMmolKg = liquigenMlKg.times('0.05').div(23).toDecimalPlaces(4);
+
+        const aptamilKcalKg = aptamilProteinGKg.times('3.38').toDecimalPlaces(2);
+        const aptamilProteinNetGKg = aptamilProteinGKg.times('0.821').toDecimalPlaces(3);
+        const aptamilNaMmolKg = aptamilProteinGKg.times('7.76').div(23).toDecimalPlaces(4);
+        const aptamilCaMgKg = aptamilProteinGKg.times('12.26').toDecimalPlaces(2);
+        const aptamilPMgKg = aptamilProteinGKg.times('5.24').toDecimalPlaces(2);
+
+        const supplementKcalKg = liquigenKcalKg.plus(aptamilKcalKg).toDecimalPlaces(2);
+
+        // In die enteralen Summen einrechnen
+        enteralProteinGKg = enteralProteinGKg.plus(aptamilProteinNetGKg).toDecimalPlaces(3);
+        enteralKcalKg = enteralKcalKg.plus(supplementKcalKg).toDecimalPlaces(2);
+        enteralFatGKg = enteralFatGKg.plus(liquigenFatGKg).toDecimalPlaces(3);
+        enteralNaMmolKg = enteralNaMmolKg.plus(liquigenNaMmolKg).plus(aptamilNaMmolKg).toDecimalPlaces(3);
+        enteralCaMgKg = enteralCaMgKg.plus(aptamilCaMgKg).toDecimalPlaces(2);
+        enteralPMgKg = enteralPMgKg.plus(aptamilPMgKg).toDecimalPlaces(2);
+
         // Effective Ca/P in mg/kg/d AND mmol/kg/d (PN only)
         const effectiveCaMg = effectiveCa_mmol.times(this.MOLAR_MASS.CALCIUM).toDecimalPlaces(1);
         const effectivePMg = effectiveP_mmol.times(this.MOLAR_MASS.PHOSPHORUS).toDecimalPlaces(1);
@@ -939,6 +1132,13 @@ class NutritionCalculator {
         // Add secondary Na + Cl to electrolyte balance
         effectiveNa = effectiveNa.plus(secondaryNaMmolKg).plus(hiddenSodiumMmolKg).toDecimalPlaces(2);
         const effectiveCl = naclMl.plus(kclMl).plus(secondaryClMmolKg).toDecimalPlaces(2);
+
+        // v3.2: Gesamt-Natrium = parenteral + enteral.
+        // `effectiveNa` bleibt bewusst der reine PN-Wert (bestehende Osmolaritäts-
+        // und Lösungs-Logik hängt daran). Für klinische Bewertung, Warnungen und
+        // den Sodium-Trend gilt der Gesamtwert — ein Kind auf Vollnahrung bezieht
+        // sein Natrium sonst unsichtbar über die (fortifizierte) Milch.
+        const totalNaMmolKg = effectiveNa.plus(enteralNaMmolKg).toDecimalPlaces(2);
 
         // --- AUDIT: SID-light (Strong Ion Difference) ---
         // SID = (Na + K) - Cl [mmol/kg/d] — proxy for metabolic acid-base
@@ -1051,6 +1251,7 @@ class NutritionCalculator {
             effectiveCaMmol: effectiveCaMmol.toNumber(),
             effectivePMmol: effectivePMmol.toNumber(),
             effectiveNa: effectiveNa.toDecimalPlaces(2).toNumber(),
+            totalNaMmolKg: totalNaMmolKg.toNumber(),
             effectiveK: effectiveK.toDecimalPlaces(2).toNumber(),
             effectiveCl: effectiveCl.toDecimalPlaces(2).toNumber(),
             singlePortion: singlePortion.toNumber(),
@@ -1065,6 +1266,14 @@ class NutritionCalculator {
             enteralCarbsGKg: enteralCarbsGKg.toDecimalPlaces(2).toNumber(),
             enteralKcalKg: enteralKcalKg.toDecimalPlaces(1).toNumber(),
             enteralNaMmolKg: enteralNaMmolKg.toDecimalPlaces(2).toNumber(),
+            // v3.1 — Supplemente einzeln ausgewiesen (Transparenz für Verordnung)
+            liquigenMlKg: liquigenMlKg.toNumber(),
+            liquigenKcalKg: liquigenKcalKg.toDecimalPlaces(1).toNumber(),
+            liquigenFatGKg: liquigenFatGKg.toDecimalPlaces(2).toNumber(),
+            aptamilProteinGKg: aptamilProteinGKg.toNumber(),
+            aptamilProteinNetGKg: aptamilProteinNetGKg.toDecimalPlaces(2).toNumber(),
+            aptamilKcalKg: aptamilKcalKg.toDecimalPlaces(1).toNumber(),
+            supplementKcalKg: supplementKcalKg.toDecimalPlaces(1).toNumber(),
             totalCaMgKg: totalCaMgKg.toNumber(),
             totalPMgKg: totalPMgKg.toNumber(),
             totalGIRIncEnteral: totalGIRIncEnteral.toNumber(),
@@ -1165,6 +1374,83 @@ class NutritionCalculator {
             warnings.push(`Warnung: Enterale Zufuhr (${n.enteralVolKg} ml/kg/d) übersteigt TFI (${tfi.toNumber()} ml/kg/d) – Volumen prüfen.`);
         }
 
+        // --- v3.1: Gestufte TFI-Signalisierung statt hartem Stopp bei 200 ---
+        // Der harte Abbruch liegt jetzt bei 400 ml/kg/d (reiner Fat-Finger-Schutz).
+        // Klinisch relevante Zwischenstufen werden als Hinweis/Warnung ausgegeben,
+        // damit die polyure Phase des Frühgeborenen abbildbar bleibt.
+        const tfiNum = tfi.toNumber();
+        if (tfiNum > this.LIMITS.TFI.warn) {
+            warnings.push(
+                `Warnung: TFI ${tfiNum} ml/kg/d ist sehr hoch. Plausibel nur bei polyurer Phase, ` +
+                `hohem renalem oder insensiblem Verlust. Ein-/Ausfuhrbilanz, Serum-Natrium und Gewichtsverlauf engmaschig kontrollieren.`
+            );
+        } else if (tfiNum > this.LIMITS.TFI.hint) {
+            warnings.push(
+                `Hinweis: TFI ${tfiNum} ml/kg/d oberhalb des üblichen Korridors. ` +
+                `Bei polyurer Phase adäquat — sonst Volumenbedarf und BPD-/PDA-Risiko prüfen.`
+            );
+        }
+
+        // --- v3.1: Enteraler Aufbau — Zielvolumen, Korridor, Steigerungs-Empfehlung ---
+        // Modell B (Hinweis, kein Stop-Signal): Der Rechner schlägt eine Steigerung
+        // vor, wenn das enterale Volumen unter dem Aufbau-Korridor des Lebenstags
+        // liegt. Die Entscheidung über die tatsächliche Steigerung trifft immer
+        // das Behandlungsteam anhand der Toleranz.
+        const et = targets.enteralTarget;
+        const er = targets.enteralRamp;
+        const entNum = n.enteralVolKg;
+        let enteralPhase;
+        if (feedingPaused) enteralPhase = 'paused';
+        else if (entNum <= 0) enteralPhase = 'none';
+        else if (entNum < 25) enteralPhase = 'trophic';   // trophische Ernährung (ESPGHAN: ≤ 24 ml/kg/d)
+        else if (entNum < et.min) enteralPhase = 'advancing';
+        else enteralPhase = 'full';
+
+        if (feedingPaused) {
+            reminders.push(
+                `💡 Nahrungspause aktiv (${feedingPauseReason}) — Aufbau-Empfehlungen ausgesetzt. ` +
+                `Bei Wiederbeginn: Indikation und Startvolumen neu festlegen.`
+            );
+        }
+
+        if (!feedingPaused && enteralPhase !== 'full' && er.expected > 0) {
+            const gap = this._round(er.expected - entNum, 0);
+            if (gap >= 10) {
+                const stepNow = Math.min(er.step, gap);
+                warnings.push(
+                    `Hinweis: Enteral ${entNum} ml/kg/d liegt ${gap} ml/kg/d unter dem Aufbau-Korridor ` +
+                    `für Lebenstag ${postnatalAge} (~${er.expected} ml/kg/d, Ziel ${et.min}–${et.max} ml/kg/d). ` +
+                    `Steigerung um ${stepNow} ml/kg/d erwägen — nur bei guter Toleranz ` +
+                    `(weiches Abdomen, unauffällige Reste, kein NEC-Verdacht, stabile Kreislaufsituation).`
+                );
+            }
+        }
+        if (enteralPhase === 'full') {
+            if (n.pnDaily > 0) {
+                reminders.push(
+                    `💡 Enterales Ziel erreicht (${entNum} ml/kg/d ≥ ${et.min}) — Beendigung der parenteralen Ernährung prüfen.`
+                );
+            }
+            if (entNum > et.max) {
+                warnings.push(
+                    `Hinweis: Enteral ${entNum} ml/kg/d oberhalb des Zielkorridors (${et.min}–${et.max} ml/kg/d, ${et.label}). ` +
+                    `Bei unzureichendem Wachstum vertretbar — vorrangig Anreicherung statt Volumen steigern.`
+                );
+            }
+        }
+        // Begrenzungs-Hinweis nur, wenn enteral überhaupt läuft (sonst reines Rauschen
+        // in den ersten Lebenstagen).
+        if (et.capped && entNum > 0 && !feedingPaused) {
+            const why = {
+                ventilation: `Beatmungs-Cap ${et.cap} ml/kg/d — Energiedichte über Fortifizierung/Liquigen erhöhen`,
+                protein: `Protein-Obergrenze ${this.LIMITS.PROTEIN.max} g/kg/d bei ${et.product} — höheres Volumen führt zu Proteinüberschuss`,
+                energy: `Energie-Tagesziel bei ${et.product} — höheres Volumen führt zu Überernährung`
+            }[et.limitedBy];
+            reminders.push(
+                `💡 Enterales Ziel auf ${et.min}–${et.max} ml/kg/d begrenzt (statt ${et.unlimited.min}–${et.unlimited.max}): ${why}.`
+            );
+        }
+
         // Hinweis (amber) — BUN-Trigger
         if (urea !== null && urea < 3.0 && n.enteralVolKg >= 100) {
             warnings.push('Hinweis: Harnstoff < 3 mmol/l bei Vollernährung – Eiweiß-Supplementierung prüfen.');
@@ -1252,8 +1538,8 @@ class NutritionCalculator {
             if (tfi.lt(100) && postnatalAge >= 2) {
                 warnings.push('Hinweis: ELBW Tag 2–7 mit TFI < 100 ml/kg/d — IWL-bedingte Hypernatriämie-Gefahr. Na-Kontrolle empfohlen.');
             }
-            if (n.effectiveNa > 5) {
-                warnings.push(`Warnung: Na-Zufuhr ${n.effectiveNa} mmol/kg/d bei ELBW Tag 1–7 — Hypernatriämie-Risiko (inkl. Hidden Sodium).`);
+            if (n.totalNaMmolKg > 5) {
+                warnings.push(`Warnung: Na-Zufuhr ${n.totalNaMmolKg} mmol/kg/d gesamt bei ELBW Tag 1–7 — Hypernatriämie-Risiko (PN ${n.effectiveNa} + enteral ${n.enteralNaMmolKg}, inkl. Hidden Sodium).`);
             }
         }
 
@@ -1278,7 +1564,10 @@ class NutritionCalculator {
 
         // --- AUDIT: Fat-Finger Guard (3-SD Plausibilitäts-Check) ---
         const plausibilityFlags = [];
-        if (tfi.gt(0) && (tfi.lt(30) || tfi.gt(200))) {
+        // v3.1: Flag erst ab 300 ml/kg/d — 200–300 ist in der polyuren Phase real
+        // und wird über die gestufte Warnung oben abgebildet, nicht über den
+        // Fat-Finger-Modal.
+        if (tfi.gt(0) && (tfi.lt(30) || tfi.gt(300))) {
             plausibilityFlags.push(`TFI ${tfi.toNumber()} ml/kg/d`);
         }
         if (n.effectiveGIR > 0 && (n.effectiveGIR < 1 || n.effectiveGIR > 18)) {
@@ -1290,8 +1579,8 @@ class NutritionCalculator {
         if (n.lipidsPNKg > 5) {
             plausibilityFlags.push(`Lipide ${n.lipidsPNKg} g/kg/d`);
         }
-        if (n.effectiveNa > 10) {
-            plausibilityFlags.push(`Na ${n.effectiveNa} mmol/kg/d`);
+        if (n.totalNaMmolKg > 10) {
+            plausibilityFlags.push(`Na ${n.totalNaMmolKg} mmol/kg/d (gesamt)`);
         }
         if (currentWeightG.gt(0) && (currentWeightG.lt(200) || currentWeightG.gt(6000))) {
             plausibilityFlags.push(`Gewicht ${currentWeightG.toNumber()} g`);
@@ -1316,7 +1605,26 @@ class NutritionCalculator {
             tfi: { value: tfi.toNumber(), target: targets.tfi, status: checkStatus(tfi.toNumber(), targets.tfi) },
             protein: { value: n.proteinTotalGKg, target: targets.protein, status: checkStatus(n.proteinTotalGKg, targets.protein) },
             lipids: { value: n.lipidsPNKg, target: targets.lipidTarget, status: checkStatus(n.lipidsPNKg, targets.lipidTarget) },
-            energy: { value: n.kcalPerKg, target: targets.energy, status: checkStatus(n.kcalPerKg, targets.energy) }
+            energy: { value: n.kcalPerKg, target: targets.energy, status: checkStatus(n.kcalPerKg, targets.energy) },
+            // v3.2: Das enterale Volumen wird gegen den Korridor des AKTUELLEN
+            // Lebenstags bewertet, nicht gegen das Endziel — sonst leuchtet die
+            // Kachel bei jedem Kind in der ersten Lebenswoche rot (Alarm-Fatigue).
+            enteral: {
+                value: n.enteralVolKg,
+                target: targets.enteralTarget,
+                expectedToday: targets.enteralRamp.expected,
+                status: (() => {
+                    if (feedingPaused) return 'neutral';
+                    const gap = targets.enteralRamp.expected - n.enteralVolKg;
+                    if (gap <= 0) return 'green';
+                    // Toleranz skaliert mit der Steigerungsrate: bis zu zwei
+                    // versäumte Aufbauschritte sind gelb, erst darüber rot.
+                    // Fixe 20 ml/kg/d wären in den ersten Lebenstagen zu streng
+                    // (Tag 2 ohne Nahrung wäre sonst rot).
+                    if (gap <= 2 * targets.enteralRamp.step) return 'yellow';
+                    return 'red';
+                })()
+            }
         };
 
         // --- Step 14: Safety Checks ---
@@ -1343,6 +1651,11 @@ class NutritionCalculator {
             protein: `${targets.protein.min}–${targets.protein.max} g/kg/d`,
             lipids: `${targets.lipidTarget.min}–${targets.lipidTarget.max} g/kg/d`,
             energy: `${targets.energy.min}–${targets.energy.max} kcal/kg/d`,
+            // v3.1 — enteraler Aufbau
+            enteral: `${targets.enteralTarget.min}–${targets.enteralTarget.max} ml/kg/d (${targets.enteralTarget.label})`,
+            enteralAdvance: (!feedingPaused && enteralPhase !== 'full' && targets.enteralRamp.expected > (n.enteralVolKg + 9))
+                ? `Steigerung um bis zu ${Math.min(targets.enteralRamp.step, this._round(targets.enteralRamp.expected - n.enteralVolKg, 0))} ml/kg/d erwägen (Korridor Tag ${postnatalAge}: ~${targets.enteralRamp.expected} ml/kg/d) — nur bei guter Toleranz`
+                : null,
             lipidEscalation,
             fortification: (n.enteralVolKg >= 100 && fm85Percent < 4 && selectedEnteralProduct === 'ebm')
                 ? 'FM85 Titrationsplan: Steigerung auf 4% empfohlen'
@@ -1412,10 +1725,26 @@ class NutritionCalculator {
                 calciumMmolKg: n.effectiveCaMmol,
                 phosphateMmolKg: n.effectivePMmol,
                 effectiveNa: n.effectiveNa,
+                totalNaMmolKg: n.totalNaMmolKg,
                 effectiveK: n.effectiveK,
                 effectiveCl: n.effectiveCl,
                 secondaryDaily: n.secondaryDaily,
                 singlePortion: n.singlePortion,
+                // v3.1 — enteraler Aufbau & Supplemente
+                enteralVolKg: n.enteralVolKg,
+                enteralPhase,
+                feedingPaused,
+                feedingPauseReason,
+                enteralTarget: targets.enteralTarget,
+                enteralExpectedToday: targets.enteralRamp.expected,
+                enteralGap: feedingPaused ? 0 : this._round(Math.max(0, targets.enteralRamp.expected - n.enteralVolKg), 0),
+                liquigenMlKg: n.liquigenMlKg,
+                liquigenKcalKg: n.liquigenKcalKg,
+                liquigenFatGKg: n.liquigenFatGKg,
+                aptamilProteinGKg: n.aptamilProteinGKg,
+                aptamilProteinNetGKg: n.aptamilProteinNetGKg,
+                aptamilKcalKg: n.aptamilKcalKg,
+                supplementKcalKg: n.supplementKcalKg,
                 rates: {
                     total: totalDailyFluid.div(24).toDecimalPlaces(1).toNumber(),
                     pn: pnDaily.div(24).toDecimalPlaces(1).toNumber(),
@@ -1464,7 +1793,7 @@ class NutritionCalculator {
         finalResult.predictive = {
             energyGap: this._analyzeEnergyGap(input.history, postnatalAge),
             energyGapIndex: this.calculateEnergyGapIndex(input.history),
-            sodiumTrend: this._analyzeSodiumTrend(input.history, postnatalAge, n.effectiveNa)
+            sodiumTrend: this._analyzeSodiumTrend(input.history, postnatalAge, n.totalNaMmolKg)
         };
 
         // --- v3.0: Smart Defaults (Tages-basierte Startwert-Vorschläge) ---
