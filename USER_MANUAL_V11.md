@@ -1,8 +1,11 @@
 # NeoNutri V11 - Benutzerhandbuch & Klinische Referenz
 
-**Version:** 2.0 | **Master Logic:** V11  
+**Version:** 3.2 | **Master Logic:** V11  
 **Zielgruppe:** Neonatologen, Ärzte in Weiterbildung, NICU-Pflegepersonal  
 **Basis:** ESPGHAN 2018/2022, Level-1-NICU Hausstandard 2026
+
+> **Für den Stationsalltag genügt die Kurzfassung:** `STATIONSANLEITUNG.md` (Schnellstart,
+> Ampellogik, häufige Meldungen). Dieses Handbuch ist die ausführliche Referenz.
 
 ---
 
@@ -15,6 +18,10 @@
 5. [Fehlerbehebung & Warnungen](#5-fehlerbehebung--warnungen)
 6. [Workflow für die tägliche Visite](#6-workflow-für-die-tägliche-visite)
 7. [Cheatsheet (Schnellreferenz)](#7-cheatsheet-schnellreferenz)
+8. [Clinical Cockpit und Teaching-Layer](#8-clinical-cockpit-und-teaching-layer)
+9. [Enteraler Aufbau und Nahrungspause](#9-enteraler-aufbau-und-nahrungspause)
+10. [Enterale Supplemente](#10-enterale-supplemente)
+11. [Flüssigkeitsgrenzen und polyure Phase](#11-flüssigkeitsgrenzen-und-polyure-phase)
 
 ---
 
@@ -338,7 +345,7 @@ TFI 100 ml − Enteral 10 ml − Spülflüssigkeit 10 ml = PN-Volumen 80 ml
 | **CRITICAL: Glucose-Konz. 15% > 12,5% (peripher)** | Hochkonzentrierte Glukose | Glucose-Konzentration reduzieren, peripherer Zugang maximal 12.5% |
 | **CRITICAL: Lipide 4.5 g/kg > 4.0** | Überdosierung | Lipid auf 3.0–3.5 g/kg reduzieren, TG-Kontrolle |
 | **CRITICAL: Triglyzeride 280 mg/dl > 250** | Hypertriglyceridämie | Lipid-Pause oder auf 0.5–1.0 g/kg reduzieren (ESPGHAN) |
-| **CRITICAL: TFI 150 ml/kg bei invasiver Beatmung** | Hyperhydratation-Risiko | TFI auf ≤ 140 ml/kg reduzieren (BPD/PDA-Prävention) |
+| **TFI über Beatmungs-Cap (140 ml/kg/d invasiv)** | Hyperhydratation-Risiko | TFI auf ≤ 140 ml/kg/d reduzieren (BPD/PDA-Prävention). Seit v3.1 gestufter Hinweis statt hartem Abbruch, siehe Kapitel 11 |
 | **CRITICAL: SID −2 mmol/kg — Azidose-Gefahr** | Hyperchlorämie | NaCl-Konzentrate reduzieren, Na-Acetat erwägen |
 | **CRITICAL: Ausfällungsrisiko Ca+P 80 mmol/l** | Ca/P-Überdosierung | Ca ODER P reduzieren, Lösung verwerfen, neu ansetzen |
 
@@ -350,7 +357,7 @@ TFI 100 ml − Enteral 10 ml − Spülflüssigkeit 10 ml = PN-Volumen 80 ml
 |-------------|---------------|---------------------|
 | **Protein 2.8 g/kg < 3.5 g/kg (ELBW Tag 4+)** | Unterversorgung | AS-Zufuhr steigern auf 3.5–4.0 g/kg/d |
 | **Energie 95 kcal/kg < 110 (Tag 4+)** | Wachstumsphase-Defizit | Glukose oder Lipide erhöhen |
-| **Harnstoff 2.5 mmol/l < 3.0 (enteral ≥ 100 ml/kg)** | Eiweiß-Katabolie bei Vollernährung | +0.5 g/kg Protein (Aptamil Eiweiß+) |
+| **Harnstoff 2.5 mmol/l < 3.0 (enteral ≥ 100 ml/kg)** | Eiweiß-Katabolie bei Vollernährung | Aptamil Eiweiß+ über das enterale Supplement-Feld eingeben, seit v3.1 rechnerisch abgebildet (Kapitel 10) |
 | **Ca:P Ratio 2.3:1 außerhalb 1.5–1.7** | Mineralstoff-Ungleichgewicht | Phosphat steigern (z.B. Glycophos 1 mmol/kg) |
 | **Lipid-Anteil NPC 18% < 25%** | Metabolische Imbalance | Lipide erhöhen, Glucose-Anteil senken |
 | **NPC/P 15 kcal/g < 20** | Protein wird energetisch verbrannt | Energie steigern (Glucose/Lipide) |
@@ -389,15 +396,19 @@ zu hoch für dieses Volumen (Limit 72 mmol/l).
 
 | **Parameter** | **Plausibel** | **Unplausibel** |
 |---------------|--------------|----------------|
-| TFI | 30–200 ml/kg/d | < 30 oder > 200 |
+| TFI | 30–300 ml/kg/d | < 30 oder > 300 (hart abgewiesen ab 400, Kapitel 11) |
 | GIR | 1–18 mg/kg/min | < 1 oder > 18 |
 | Gewicht | 200–6000 g | < 200 oder > 6000 |
 | Protein | 0–6 g/kg/d | > 6 |
-| Na | 0–10 mmol/kg/d | > 10 |
+| Na (gesamt, parenteral + enteral) | 0–10 mmol/kg/d | > 10 |
 
 **Modal-Fenster:**  
 → Wenn Grenzwert überschritten: Pop-up "⚠️ Plausibilitäts-Check" mit Liste der auffälligen Werte.  
-→ Button: "Klinisch plausibel ✓" (z.B. bei hydropsischem Kind mit 150 ml/kg TFI).
+→ Button: "Klinisch plausibel ✓".
+
+**Änderung in v3.1:** Bis dahin wurde jede Gesamtflüssigkeit über 200 ml/kg/d als unplausibel
+behandelt und die Berechnung abgebrochen. Das war klinisch falsch kalibriert, weil Frühgeborene
+in der polyuren Phase regelhaft 200 bis 300 ml/kg/d erhalten. Details in Kapitel 11.
 
 ---
 
@@ -413,6 +424,8 @@ zu hoch für dieses Volumen (Limit 72 mmol/l).
 - TFI (ml/kg/d)
 - Enterales Volumen (ml/kg/d), Nahrungsart (EBM, Beba FG, etc.)
 - FM85-Prozent (wenn EBM)
+- Enterale Supplemente (Liquigen, Aptamil Eiweiß+), falls verordnet
+- Checkbox "Nahrungspause", falls das Kind bewusst nüchtern bleibt
 
 **3. Parenterale Ernährung**  
 - **Entweder:** Basislösung auswählen (z.B. "Basislösung FG") → fertig!
@@ -423,6 +436,7 @@ zu hoch für dieses Volumen (Limit 72 mmol/l).
 - Sicherheit GRÜN? → Gut.
 - Energie im Zielbereich? → Gut.
 - Weight Velocity ≥ 15 g/kg/d? → Gut.
+- Kachel "Enteraler Aufbau": Phase und Abstand zum Tages-Korridor.
 
 **5. Klinisches Fazit lesen**  
 - "Top 3 Optimierungen" → Notiz für morgen.
@@ -455,8 +469,12 @@ zu hoch für dieses Volumen (Limit 72 mmol/l).
 
 ## 7. Cheatsheet (Schnellreferenz)
 
-→ **Siehe separates Dokument:** `NEONUTRI_CHEATSHEET_V11.pdf`  
-(Inhalt auf nächster Seite als Markdown-Vorlage)
+→ **Siehe separates Dokument:** `NEONUTRI_CHEATSHEET_V11.md`
+
+Das Cheatsheet wird dort gepflegt und enthält seit v3.2 zusätzlich die Abschnitte zum
+enteralen Aufbau, zu den gestuften Flüssigkeitsgrenzen und zu den enteralen
+Supplementen. Der folgende Anhang ist die Druckvorlage des Kernteils; bei Abweichungen
+gilt das separate Dokument.
 
 ---
 
@@ -598,14 +616,216 @@ Einheiten: AS/Gluc in g/kg, Na/K in mmol/kg, Ca/P in mmol/kg.
 
 ---
 
+## 8. Clinical Cockpit und Teaching-Layer
+
+Seit Version 2.0 fasst das Cockpit die Bewertung des Plans zusammen, statt sie über
+einzelne Warnungen zu verteilen.
+
+### 8.1 Klinische Beurteilung
+
+Der Rechner ordnet den Patienten einer Phase zu (Transition, Stabilisierung,
+Wachstum) und formuliert daraus eine Kurzbeurteilung mit den wichtigsten Punkten.
+Die Zahl der Kernpunkte ist auf fünf begrenzt, damit sicherheitsrelevante Hinweise
+nicht durch Nebensächlichkeiten verdrängt werden.
+
+### 8.2 Verlaufsdokumentation
+
+Über die Schaltfläche zur Dokumentation wird ein Textblock erzeugt, der sich direkt in
+die Akte übernehmen lässt. Er enthält Lebenstag, Gewicht, korrigiertes Gestationsalter,
+Gesamtflüssigkeit mit Zielbereich, enterale und parenterale Zufuhr, Energie, Calcium
+zu Phosphat, Elektrolyte sowie seit v3.1 die enteralen Supplemente und eine etwaige
+Nahrungspause.
+
+### 8.3 Energy-Gap-Index
+
+Der Index summiert das tägliche Kaloriendefizit über den dokumentierten Verlauf. Er
+setzt voraus, dass an den Vortagen Werte erfasst wurden. Bewertung: unter 75 kcal/kg
+unauffällig, 75 bis 150 kcal/kg beobachten, über 150 kcal/kg relevantes kumulatives
+Defizit mit erhöhtem Risiko für postnatale Wachstumsrestriktion.
+
+Der Index ist ein Hinweis, keine Sperre. Er ersetzt nicht die Beurteilung von Gewicht,
+Länge und Kopfumfang im Verlauf.
+
+### 8.4 Smart Defaults
+
+Für den jeweiligen Lebenstag schlägt der Rechner Werte für Gesamtflüssigkeit, Protein
+und Lipide vor, die sich aus den Zielbereichen ableiten. Die Vorschläge lassen sich
+einzeln übernehmen. Sie sind ein Startpunkt für die Verordnung und berücksichtigen
+weder Komorbiditäten noch die aktuelle Bilanz.
+
+### 8.5 Teaching-Layer
+
+Klickbare Werte öffnen eine Erläuterung mit der zugrunde liegenden Empfehlung und dem
+Rechenweg. Der Layer ist für die Weiterbildung gedacht und beeinflusst die Berechnung
+nicht.
+
+---
+
+## 9. Enteraler Aufbau und Nahrungspause
+
+### 9.1 Zielvolumen für Vollnahrung
+
+Bis Version 3.0 kannte der Rechner kein enterales Ziel. Er bewertete das enterale
+Volumen nur indirekt über die Fortifizierungs-Trigger. Seit v3.1 führt er ein
+Zielvolumen nach Reifegrad, wobei die unreifere Einstufung aus Geburtsgewicht und
+Gestationsalter maßgeblich ist.
+
+| Klasse | Kriterium | Basisziel |
+|---|---|---|
+| ELBW | Geburtsgewicht ≤ 1000 g | 160–180 ml/kg/d |
+| VLBW | ≤ 1500 g oder < 32 SSW | 160–180 ml/kg/d |
+| Spätes Frühgeborenes | 32 bis 36 SSW | 150–170 ml/kg/d |
+| Reifgeborenes | ≥ 37 SSW | 130–160 ml/kg/d |
+
+Grundlage ist das ESPGHAN-Positionspapier zur enteralen Ernährung Frühgeborener von
+2022, wonach stabile wachsende Frühgeborene 150 bis 180 ml/kg/d benötigen und im
+Einzelfall auch 200 ml/kg/d sicher sind.
+
+### 9.2 Warum das Ziel manchmal niedriger ausfällt
+
+Das Basisziel gilt für gering angereicherte Nahrung. Mit steigender Anreicherung ist
+die Proteinobergrenze von 4,5 g/kg/d vor dem Volumenziel erreicht. Der Rechner
+begrenzt das Zielvolumen deshalb zusätzlich anhand der Nährstoffdichte der
+eingestellten Nahrung. Ohne diese Kopplung würde die Anwendung gleichzeitig eine
+Volumensteigerung fordern und vor Überernährung warnen.
+
+Beispiel Muttermilch bei einem sehr kleinen Frühgeborenen, spontan atmend:
+
+| FM85 | Zielvolumen | begrenzender Faktor |
+|---|---|---|
+| 0 bis 1 % | 160–180 ml/kg/d | keiner |
+| 2 % | 150–170 ml/kg/d | Energieziel |
+| 3 % | 145–165 ml/kg/d | Energieziel |
+| 4 % | 130–150 ml/kg/d | Proteinobergrenze |
+
+Bei invasiver Beatmung greift zusätzlich der Cap von 140 ml/kg/d. Die Kachel benennt
+jeweils den maßgeblichen Grund der Begrenzung.
+
+Praktische Konsequenz: Wer bei hoher Anreicherung ein höheres Volumen erreichen will,
+muss die Fortifizierung zurücknehmen. Beides gleichzeitig zu steigern führt über die
+Proteingrenze.
+
+### 9.3 Aufbau-Korridor
+
+Für jeden Lebenstag berechnet die Anwendung ein orientierendes Volumen aus Startwert
+und täglicher Steigerung.
+
+| Klasse | Tag 1 | Steigerung pro Tag |
+|---|---|---|
+| ELBW | 10 ml/kg/d | 15 ml/kg/d |
+| VLBW | 15 ml/kg/d | 20 ml/kg/d |
+| Übrige | 20 ml/kg/d | 25 ml/kg/d |
+
+Liegt das aktuelle Volumen mehr als 10 ml/kg/d unter dem Korridor, erscheint ein
+Steigerungsvorschlag mit dem Vorbehalt guter Toleranz. Die Werte stammen aus der
+S2k-Leitlinie zur enteralen Ernährung und dem SIFT-Trial 2019 und sind kein
+Hausstandard. Weicht die lokale Praxis ab, gilt die lokale Praxis.
+
+### 9.4 Phasen und Ampel
+
+| Phase | Bedingung |
+|---|---|
+| nicht begonnen | 0 ml/kg/d |
+| trophisch | unter 25 ml/kg/d |
+| im Aufbau | unter dem Zielminimum |
+| Vollnahrung | Zielminimum erreicht |
+| Nahrungspause | Feld gesetzt |
+
+Die Farbe der Kachel bewertet den Abstand zum Korridor des aktuellen Lebenstages, nicht
+zum Endziel. Grün ab erreichtem Korridor, gelb bis zu zwei versäumten Aufbauschritten,
+darüber rot. Diese Bewertung wurde in v3.2 korrigiert; zuvor wurde gegen das Endziel
+verglichen, wodurch jedes Kind der ersten Lebenswoche eine rote Kachel hatte.
+
+Ist Vollnahrung erreicht und läuft weiterhin eine parenterale Ernährung, erscheint ein
+Hinweis auf deren Beendigung.
+
+### 9.5 Nahrungspause
+
+Das Feld "Nahrungspause" wird gesetzt, wenn ein Kind bewusst nüchtern bleibt. Als Grund
+stehen Verdacht auf nekrotisierende Enterokolitis, hämodynamische Instabilität,
+perioperative Nüchternheit und ein Sammeleintrag zur Verfügung.
+
+Bei gesetzter Pause entfallen Steigerungsvorschlag und Ampelbewertung, die Phase wird
+als Nahrungspause ausgewiesen und der Grund erscheint in der Verlaufsdokumentation.
+
+Das Feld sollte konsequent gesetzt werden. Ohne es meldet die Anwendung bei einem
+bewusst nüchternen Kind einen Rückstand gegenüber dem Korridor und argumentiert damit
+gegen die klinische Entscheidung.
+
+---
+
+## 10. Enterale Supplemente
+
+| Präparat | Eingabe | Nährstoffgehalt |
+|---|---|---|
+| Liquigen, MCT-Emulsion 50 % | ml/kg/d, maximal 20 | 4,5 kcal und 0,5 g Fett je ml |
+| Aptamil Eiweiß+ | g Pulver/kg/d, maximal 5 | 0,821 g Protein und 3,38 kcal je g, zusätzlich 7,76 mg Natrium, 12,26 mg Calcium und 5,24 mg Phosphat je g |
+
+Beide Präparate gehen in Energie, Makronährstoffe und Elektrolytbilanz ein. Der
+Proteinanteil aus Aptamil Eiweiß+ wird auf die Gesamtproteinzufuhr angerechnet und
+damit auch gegen die Obergrenze von 4,5 g/kg/d geprüft.
+
+**Volumen.** Beide werden der Nahrung zugemischt und erhöhen die Gesamtflüssigkeit
+nicht. Wird ein Supplement getrennt verabreicht, muss das Volumen manuell
+berücksichtigt werden.
+
+**Liquigen.** Das Präparat liefert ausschließlich mittelkettige Triglyzeride und damit
+keine essenziellen Fettsäuren. Es dient der Energieanreicherung bei limitiertem Volumen
+und ersetzt keine ausgewogene Fettzufuhr. Übliche Dosierungen liegen deutlich unter dem
+technischen Maximum von 20 ml/kg/d, das nur als Schutz vor Eingabefehlern dient.
+
+**Aptamil Eiweiß+.** Indikation ist ein niedriger Harnstoff unter 3 mmol/l bei
+enteraler Ernährung über 100 ml/kg/d trotz ausgeschöpfter Fortifizierung. Der
+Calcium- und Phosphatgehalt geht in die Bilanz zur Osteopenieprävention ein.
+
+---
+
+## 11. Flüssigkeitsgrenzen und polyure Phase
+
+### 11.1 Was sich in v3.1 geändert hat
+
+Bis Version 3.0 brach die Berechnung bei einer Gesamtflüssigkeit über 200 ml/kg/d mit
+einer Fehlermeldung ab. Das war klinisch falsch kalibriert: Frühgeborene in der
+polyuren Phase, typischerweise Tag 2 bis 5 bei extremer Unreife oder bei osmotischer
+Diurese im Rahmen einer Hyperglykämie, erhalten regelhaft 200 bis 300 ml/kg/d. Die
+Anwendung versagte damit in genau den Situationen, in denen eine Nachrechnung am
+ehesten hilfreich ist.
+
+### 11.2 Gestufte Grenzen
+
+| Schwelle | Verhalten |
+|---|---|
+| über 180 ml/kg/d | Hinweis: oberhalb des üblichen Korridors |
+| über 200 ml/kg/d | Warnung: nur bei polyurer Phase oder hohen Verlusten plausibel, Bilanz, Serumnatrium und Gewichtsverlauf engmaschig kontrollieren |
+| über 300 ml/kg/d | Plausibilitätsfenster (Verdacht auf Eingabefehler) |
+| über 400 ml/kg/d | Berechnung wird abgewiesen |
+
+Die Berechnung läuft bis 400 ml/kg/d vollständig durch. Der Rechner kommentiert also,
+statt zu blockieren.
+
+### 11.3 Natriumbilanz bei hoher Flüssigkeitszufuhr
+
+Die Anwendung weist seit v3.2 das Gesamtnatrium aus Summe von parenteraler und
+enteraler Zufuhr aus. Zuvor erschien bei einem Kind auf Vollnahrung eine Natriumzufuhr
+von 0 mmol/kg/d, obwohl über fortifizierte Muttermilch etwa 1,3 mmol/kg/d zugeführt
+wurden.
+
+Die Anzeige bezieht sich auf die Zufuhr, nicht auf den Serumspiegel. Gerade in der
+polyuren Phase ersetzt sie keine Bestimmung des Serumnatriums, weil die renalen
+Verluste nicht abgebildet werden.
+
+---
+
 ## Impressum & Haftungsausschluss
 
 **Entwickler:** Level-1-NICU Clinical Decision Support Team  
 **Validierung:** Lead Neonatologist, Health Informatics Architect  
 **Referenzen:**
 - ESPGHAN 2018/2022: "Nutritional Care of Preterm Infants"
+- ESPGHAN Committee on Nutrition (2022): "Enteral Nutrition in Preterm Infants"
 - Koletzko et al. (2022): "Pediatric Parenteral Nutrition"
 - Fenton et al. (2013): "Preterm Growth Charts"
+- Dorling et al. (2019): "Controlled Trial of Two Incremental Milk-Feeding Rates in Preterm Infants" (SIFT)
 
 **Haftungsausschluss:**  
 Dieses Tool dient der **klinischen Entscheidungsunterstützung** und ersetzt KEINE ärztliche Überprüfung. Alle Berechnungen sind validiert, aber die **finale Verantwortung** liegt beim verschreibenden Arzt. Bei Abweichungen von Leitlinien immer Oberarzt/Konsiliararzt einbeziehen.
