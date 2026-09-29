@@ -76,9 +76,11 @@ describe('A) Extreme Edge Cases — vom User explizit gefordert', () => {
         });
         const r = calc.calculate(input);
 
-        // Protokoll: ELBW Tag 1 → TFI 80–100 ml/kg/d
-        expect(r.targets.tfi.min).toBe(80);
-        expect(r.targets.tfi.max).toBe(100);
+        // Hausstandard ab v3.4: ELBW Tag 1 → TFI 70–90 ml/kg/d.
+        // Vorher 80–100 (= ESPGHAN 2018). Bewusst 10 ml/kg/d restriktiver,
+        // Freigabe Neonatologe 28.09.2026, Begruendung in AGENTS.md.
+        expect(r.targets.tfi.min).toBe(70);
+        expect(r.targets.tfi.max).toBe(90);
 
         // Lipid-Ziel Tag 1: 1.0–2.0 g/kg/d
         expect(r.targets.lipidTarget.min).toBe(1.0);
@@ -284,10 +286,21 @@ describe('B) Safety Core — CRITICAL Limits triggern korrekt', () => {
  * ────────────────────────────────────────────────────────────────*/
 describe('C) ESPGHAN Targets & Tiered Alerts', () => {
 
-    it('C1: VLBW (1000g) Tag 3 — TFI-Ziel 120–140 ml/kg/d', () => {
+    it('C1: Geburtsgewicht exakt 1000 g Tag 3 — ELBW-Zweig, TFI-Ziel 110–130 ml/kg/d', () => {
+        // Boundary-Test der sakrosankten Invariante 2: bei exakt 1000 g greift
+        // der ELBW-Zweig. Die Zahlenwerte sind mit v3.4 von 120–140 auf
+        // 110–130 gesunken (Hausabweichung, siehe AGENTS.md); der geprüfte
+        // Grenzfall bleibt unveraendert.
         const r = calc.getTargets({ birthWeight: 1000, postnatalAge: 3, ssw: 28 });
-        expect(r.tfi.min).toBe(120);
-        expect(r.tfi.max).toBe(140);
+        expect(r.tfi.min).toBe(110);
+        expect(r.tfi.max).toBe(130);
+        // 1000 g muss ELBW sein, auch beim Protein (v3.4: Grenze angeglichen)
+        expect(r.protein.min).toBe(3.5);
+        expect(r.protein.max).toBe(4.0);
+        // 1001 g faellt in den VLBW-Zweig und liegt niedriger
+        const v = calc.getTargets({ birthWeight: 1001, postnatalAge: 3, ssw: 28 });
+        expect(v.tfi.min).toBe(100);
+        expect(v.protein.min).toBe(3.0);
     });
 
     it('C2: Term-Baby SSW 38 — Protein-Ziel 2.5–3.0 g/kg/d', () => {
@@ -723,8 +736,8 @@ describe('L) Smart Defaults v3.0 — Tages-basierte Vorschläge', () => {
     it('L1: ELBW Tag 1 → restriktive TFI-Untergrenze + AS-Mittelwert', () => {
         const sd = calc.getSmartDefaults(baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 1 }));
         expect(sd.day).toBe(1);
-        // ELBW Tag 1: TFI 80–100 → Start 80; Protein 3.5–4.0 → Ø 3.8 (auf 1 NK gerundet)
-        expect(sd.tfi).toBe(80);
+        // ELBW Tag 1 ab v3.4: TFI 70–90 → Start 70; Protein 3.5–4.0 → Ø 3.8
+        expect(sd.tfi).toBe(70);
         expect(sd.protein).toBe(3.8);
     });
 
@@ -747,9 +760,9 @@ describe('L) Smart Defaults v3.0 — Tages-basierte Vorschläge', () => {
         expect(sd.tfi).toBeLessThanOrEqual(140);
     });
 
-    it('L4: rationale referenziert Quelle (Master-Protokoll/ESPGHAN)', () => {
+    it('L4: rationale nennt die Grundlage (hausinterner Standard/ESPGHAN)', () => {
         const sd = calc.getSmartDefaults(baseInput({ postnatalAge: 3 }));
-        expect(sd.rationale).toMatch(/ESPGHAN|Master-Protokoll/);
+        expect(sd.rationale).toMatch(/ESPGHAN|hausinterner Standard/);
         expect(sd.rationale).toMatch(/Tag 3/);
     });
 
@@ -1166,5 +1179,291 @@ describe('O-NA) Enterales Natrium in der Bilanz', () => {
         const input = baseInput({ postnatalAge: 20, tfi: 150, enteralVolume: 100, fm85Percent: 4, sodium: 3 });
         const doc = calc.generateDocumentationString(calc.calculate(input), input);
         expect(doc).toMatch(/Na .* gesamt \(PN /);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION P — v3.3: Sprache und Quick-View-Layout
+ * ────────────────────────────────────────────────────────────────*/
+describe('P) Sprache im sichtbaren Teil der App', () => {
+    let ui;
+    beforeAll(async () => {
+        const { readFileSync } = await import('node:fs');
+        ui = readFileSync(new URL('../index.html', import.meta.url), 'utf-8');
+    });
+
+    it('P1: Keine "Master-Protokoll"/"Master Logic"-Formulierungen im UI-Text', () => {
+        // Code-Kommentare bleiben erlaubt (u.a. die sakrosankte ELBW-Grenzmarkierung
+        // in calculator.js), aber nichts davon darf den Nutzern angezeigt werden.
+        const sichtbar = ui
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/^\s*\/\/.*$/gm, '')
+            .replace(/\/\*[\s\S]*?\*\//g, '');
+        expect(sichtbar).not.toMatch(/Master[- ]?(Protokoll|Protocol|Logic|Logik)/i);
+    });
+
+    it('P2: rationale der Smart Defaults nennt den hausinternen Standard', () => {
+        const sd = calc.getSmartDefaults(baseInput({ postnatalAge: 3 }));
+        expect(sd.rationale).toMatch(/hausinterner Standard/);
+        expect(sd.rationale).not.toMatch(/Master/i);
+    });
+
+    it('P3: Keine englischen Titel-Anleihen im gerenderten Text', async () => {
+        // Gegen den tatsaechlich sichtbaren Text pruefen, nicht gegen den
+        // Quelltext: Code-Kommentare duerfen die Begriffe weiter enthalten.
+        const { JSDOM } = await import('jsdom');
+        const doc = new JSDOM(ui).window.document;
+        // script/style-Knoten entfernen: deren Inhalt zaehlt zu textContent,
+        // ist aber nie sichtbar (dort stehen die Code-Kommentare).
+        doc.querySelectorAll('script, style').forEach(el => el.remove());
+        const text = doc.body.textContent;
+        expect(text).not.toMatch(/Chief Physician Review/);
+        expect(text).not.toMatch(/Oberarzt-Edition/);
+        expect(text).toMatch(/Klinische Beurteilung/);
+        expect(text).not.toMatch(/Master[- ]?(Protokoll|Protocol|Logic|Logik)/i);
+    });
+});
+
+describe('P-QV) Quick-View skaliert mit der Kachelbreite', () => {
+    let ui, css;
+    beforeAll(async () => {
+        const { readFileSync } = await import('node:fs');
+        ui = readFileSync(new URL('../index.html', import.meta.url), 'utf-8');
+        css = ui.split('<style>')[1].split('</style>')[0];
+    });
+
+    it('P4: Werte nutzen .qv-value statt fester Tailwind-Groessen', () => {
+        const i = ui.indexOf('id="quick-view-card"');
+        expect(i).toBeGreaterThan(-1);
+        const block = ui.slice(i, ui.indexOf('id="egi-card"'));
+        expect(block).toMatch(/class="qv-value/);
+        expect(block).not.toMatch(/text-3xl|text-4xl/);
+    });
+
+    it('P5: displayResults setzt beim Faerben KEINE Groessenklassen zurueck', () => {
+        // Kernursache des Ueberlaufs: qvK.className enthielt text-4xl und
+        // ueberschrieb damit das responsive Verhalten der Kachel.
+        const setters = [
+            ...(ui.match(/qvK\.className\s*=\s*'[^']*'/g) || []),
+            ...(ui.match(/qvSafe\.className\s*=\s*'[^']*'/g) || [])
+        ];
+        expect(setters.length).toBeGreaterThanOrEqual(3);
+        setters.forEach(s => {
+            expect(s).not.toMatch(/text-3xl|text-4xl/);
+            expect(s).toMatch(/qv-value/);
+        });
+    });
+
+    it('P6: .qv-value ist container-basiert dimensioniert und bricht nicht um', () => {
+        expect(css).toMatch(/#quick-view-card\s*\{[^}]*container-type:\s*inline-size/);
+        expect(css).toMatch(/\.qv-value\s*\{[^}]*font-size:\s*clamp\([^)]*cqw/);
+        expect(css).toMatch(/\.qv-value\s*\{[^}]*white-space:\s*nowrap/);
+    });
+
+    it('P7: Fallback fuer Browser ohne Container Queries vorhanden', () => {
+        expect(css).toMatch(/@supports not \(container-type: inline-size\)/);
+    });
+
+    it('P8: Spalten koennen schrumpfen, sonst laeuft das Raster ueber', () => {
+        expect(css).toMatch(/\.qv-grid\s*\{[^}]*minmax\(0,\s*1fr\)/);
+        expect(css).toMatch(/\.qv-cell\s*\{[^}]*min-width:\s*0/);
+    });
+
+    it('P9: Labels und Einheiten kuerzen statt umzubrechen', () => {
+        expect(css).toMatch(/\.qv-label\s*\{[^}]*text-overflow:\s*ellipsis/);
+        expect(css).toMatch(/\.qv-unit\s*\{[^}]*text-overflow:\s*ellipsis/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION Q — v3.4: Flüssigkeits-Zieltabelle, Gewichtsverlauf, Zubereitung
+ * ────────────────────────────────────────────────────────────────*/
+describe('Q) Flüssigkeits-Zielspannen', () => {
+
+    const tfi = (bw, day, extra = {}) =>
+        calc.getTargets({ birthWeight: bw, postnatalAge: day, ssw: 26, ...extra }).tfi;
+
+    it('Q1: ELBW-Kurve liegt 10 ml/kg/d unter ESPGHAN 2018', () => {
+        expect([tfi(800, 1).min, tfi(800, 1).max]).toEqual([70, 90]);
+        expect([tfi(800, 2).min, tfi(800, 2).max]).toEqual([90, 110]);
+        expect([tfi(800, 3).min, tfi(800, 3).max]).toEqual([110, 130]);
+        expect([tfi(800, 4).min, tfi(800, 4).max]).toEqual([130, 150]);
+    });
+
+    it('Q2: VLBW-Kurve ist eigenständig und liegt unter der ELBW-Kurve', () => {
+        // Bis v3.3 war der VLBW-Zweig eine Kopie des ELBW-Zweigs.
+        for (const d of [1, 2, 3, 4]) {
+            expect(tfi(1200, d).min, `Tag ${d}`).toBeLessThanOrEqual(tfi(800, d).min);
+        }
+        expect([tfi(1200, 1).min, tfi(1200, 1).max]).toEqual([60, 80]);
+        expect([tfi(1200, 3).min, tfi(1200, 3).max]).toEqual([100, 120]);
+    });
+
+    it('Q3: Zweig über 1500 g bleibt auf ESPGHAN', () => {
+        expect([tfi(2500, 1).min, tfi(2500, 1).max]).toEqual([60, 80]);
+        expect([tfi(2500, 3).min, tfi(2500, 3).max]).toEqual([100, 120]);
+        expect([tfi(2500, 4).min, tfi(2500, 4).max]).toEqual([120, 140]);
+    });
+
+    it('Q4: Ab Tag 5 Plateau statt Rampe gegen den Cap', () => {
+        // Vorher lieferte 120 + (Tag-3) x 20, gedeckelt bei 180, ab Tag 6
+        // die entartete Spanne 180–180.
+        for (const d of [5, 7, 10, 20, 60]) {
+            expect([tfi(800, d).min, tfi(800, d).max], `Tag ${d}`).toEqual([150, 170]);
+            expect([tfi(2500, d).min, tfi(2500, d).max], `Tag ${d}`).toEqual([140, 160]);
+        }
+    });
+
+    it('Q5: Keine Inversion — kleinere Kinder bekommen nie weniger', () => {
+        for (const d of [1, 2, 3, 4, 5, 10]) {
+            expect(tfi(800, d).min, `Tag ${d}`).toBeGreaterThanOrEqual(tfi(1200, d).min);
+            expect(tfi(1200, d).min, `Tag ${d}`).toBeGreaterThanOrEqual(tfi(2500, d).min);
+        }
+    });
+
+    it('Q6: Beatmungs-Cap greift weiterhin', () => {
+        const t = tfi(800, 10, { ventilationStatus: 'invasive' });
+        expect(t.max).toBe(140);
+        expect(t.cap).toBe(140);
+    });
+
+    it('Q7: Klassengrenze 1000 g gilt jetzt auch fürs Protein (Invariante 2)', () => {
+        expect(calc.getTargets({ birthWeight: 1000, postnatalAge: 3, ssw: 28 }).protein.min).toBe(3.5);
+        expect(calc.getTargets({ birthWeight: 1001, postnatalAge: 3, ssw: 28 }).protein.min).toBe(3.0);
+    });
+});
+
+describe('Q-GEW) Gewichtsverlauf als Kontrollgröße', () => {
+
+    it('Q8: Kein Gewichtsverlust bei hoher Zufuhr → Hinweis', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 800, ssw: 26, postnatalAge: 4, tfi: 150
+        }));
+        expect(r.warnings.some(w => /Gewichtsverlust bisher nur/.test(w))).toBe(true);
+        expect(r.results.weightChangePercent).toBe(0);
+    });
+
+    it('Q9: Physiologischer Verlust → kein Hinweis', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 730, ssw: 26, postnatalAge: 4, tfi: 150
+        }));
+        expect(r.warnings.some(w => /Gewichtsverlust bisher nur/.test(w))).toBe(false);
+        expect(r.results.weightChangePercent).toBeCloseTo(-8.8, 1);
+    });
+
+    it('Q10: Verlust über 15 % → Warnung Dehydratation', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 660, ssw: 26, postnatalAge: 5, tfi: 120
+        }));
+        expect(r.warnings.some(w => /übersteigt die physiologische/.test(w))).toBe(true);
+    });
+
+    it('Q11: Geburtsgewicht nach Tag 14 nicht erreicht → Hinweis', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 770, ssw: 26, postnatalAge: 18, tfi: 150
+        }));
+        expect(r.warnings.some(w => /noch nicht wieder erreicht/.test(w))).toBe(true);
+    });
+
+    it('Q12: Ohne Gewichtseingabe keine Falschmeldung', () => {
+        const input = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 4, tfi: 150 });
+        delete input.currentWeight;
+        const r = calc.calculate(input);
+        expect(r.results.weightChangePercent).toBe(null);
+        expect(r.warnings.some(w => /Gewichtsverlust/.test(w))).toBe(false);
+    });
+});
+
+describe('Q-ZUB) Zubereitung aus Zielkonzentration', () => {
+
+    const prep = o => calc.calculate(baseInput({
+        birthWeight: 1500, currentWeight: 1500, ssw: 30, postnatalAge: 20,
+        ventilationStatus: 'spontaneous', tfi: 160, enteralVolume: 150,
+        mealFrequency: 8, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0,
+        sodium: 0, potassium: 0, ...o
+    })).results.preparation;
+
+    it('Q13: Tagesmenge und Mahlzeitenvolumen', () => {
+        const p = prep({});
+        expect(p.dailyVolumeMl).toBe(225);      // 150 ml/kg/d x 1,5 kg
+        expect(p.meals).toBe(8);
+        expect(p.mealVolumeMl).toBeCloseTo(28.1, 1);
+    });
+
+    it('Q14: FM85 1,5 % → 1,5 g je 100 ml, korrekt auf Mahlzeit und Tag verteilt', () => {
+        const p = prep({ fm85Percent: 1.5 });
+        expect(p.fm85GramsPerDay).toBeCloseTo(3.38, 2);     // 225 ml x 1,5 %
+        expect(p.fm85GramsPerMeal).toBeCloseTo(0.42, 2);
+    });
+
+    it('Q15: FM85 akzeptiert halbe Prozentschritte (vorher nur ganzzahlig)', () => {
+        expect(prep({ fm85Percent: 0.5 }).fm85Percent).toBe(0.5);
+        expect(prep({ fm85Percent: 2.5 }).fm85Percent).toBe(2.5);
+    });
+
+    it('Q16: Zielkonzentration 0,5 g Eiweiß/100 ml → Pulvermenge', () => {
+        const p = prep({ proteinAddPer100ml: 0.5 });
+        // 225 ml x 0,5 g/100 ml = 1,125 g Eiweiss; / 0,821 = 1,37 g Pulver
+        expect(p.proteinPowderPerDay).toBeCloseTo(1.37, 2);
+        expect(p.proteinPowderPerMeal).toBeCloseTo(0.17, 2);
+        expect(p.proteinAddPer100ml).toBe(0.5);
+    });
+
+    it('Q17: Die Zielkonzentration kommt im Endprodukt tatsächlich an', () => {
+        const ohne = prep({});
+        const mit  = prep({ proteinAddPer100ml: 0.5 });
+        expect(mit.proteinPer100mlFinal - ohne.proteinPer100mlFinal).toBeCloseTo(0.5, 2);
+    });
+
+    it('Q18: Eingabe in g Pulver/kg/d funktioniert weiterhin und wird zurückgerechnet', () => {
+        const p = prep({ aptamilProteinGKg: 1 });
+        expect(p.proteinPowderPerDay).toBeCloseTo(1.5, 2);   // 1 g/kg x 1,5 kg
+        // Rueckrechnung: 1,5 g Pulver x 0,821 = 1,23 g Eiweiss auf 225 ml
+        expect(p.proteinAddPer100ml).toBeCloseTo(0.55, 2);
+    });
+
+    it('Q19: Zielkonzentration hat Vorrang vor der direkten Pulvereingabe', () => {
+        const p = prep({ proteinAddPer100ml: 0.5, aptamilProteinGKg: 3 });
+        expect(p.proteinAddPer100ml).toBe(0.5);
+        expect(p.proteinPowderPerDay).toBeCloseTo(1.37, 2);
+    });
+
+    it('Q20: Unplausible Zielkonzentration bricht ab', () => {
+        expect(() => calc.calculate(baseInput({ proteinAddPer100ml: 5 }))).toThrow();
+    });
+
+    it('Q21: FM85 und Eiweiß-Zusatz zusammen — Summe stimmt', () => {
+        const p = prep({ fm85Percent: 4, proteinAddPer100ml: 0.5 });
+        // EBM 1,13 + FM85 4 % x 0,4675 = 3,0 ; plus 0,5 Zusatz = 3,5 g/100 ml
+        expect(p.proteinPer100mlFinal).toBeCloseTo(3.5, 1);
+    });
+});
+
+describe('Q-GRENZE) Anreicherung als Treiber der Protein-Überschreitung', () => {
+
+    it('Q22: Über dem Limit nennt die App die noch mögliche Zielkonzentration', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1500, currentWeight: 1500, ssw: 30, postnatalAge: 20,
+            ventilationStatus: 'spontaneous', tfi: 160, enteralVolume: 150,
+            fm85Percent: 4, proteinAddPer100ml: 0.5,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0
+        }));
+        expect(r.safetyChecks.proteinLimit).toBe(false);
+        const hint = r.warnings.find(w => /Treiber ist die Anreicherung/.test(w));
+        expect(hint).toBeTruthy();
+        // Basis mit FM85 4 % = 3,0 g/100 ml; Limit 4,5 g/kg/d bei 150 ml/kg/d
+        // entspricht 3,0 g/100 ml → kein Spielraum mehr fuer Zusatz.
+        expect(hint).toMatch(/höchstens 0 g\/100 ml/);
+    });
+
+    it('Q23: Innerhalb des Limits kein Anreicherungs-Hinweis', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1500, currentWeight: 1500, ssw: 30, postnatalAge: 20,
+            ventilationStatus: 'spontaneous', tfi: 160, enteralVolume: 140,
+            fm85Percent: 2, proteinAddPer100ml: 0.3,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0
+        }));
+        expect(r.safetyChecks.proteinLimit).toBe(true);
+        expect(r.warnings.some(w => /Treiber ist die Anreicherung/.test(w))).toBe(false);
     });
 });
