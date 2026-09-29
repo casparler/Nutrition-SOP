@@ -33,7 +33,7 @@ Die **Quick View** zeigt auf einen Blick den Ernährungs- und Sicherheitsstatus:
 
 | **Indikator** | **Was zeigt er?** | **Warum wichtig?** |
 |--------------|-------------------|-------------------|
-| **Weight Velocity** | Gewichtszunahme in g/kg/d | **Gold-Standard für Wachstum:** Ziel 15–20 g/kg/d (ESPGHAN). Niedriger Wert → Unterernährung. Über 25 g/kg/d → Überfütterung/Ödem. |
+| **Wachstumsrate** | Gewichtszunahme in g/kg/d | **Gold-Standard für Wachstum:** Ziel 15–20 g/kg/d (ESPGHAN). Niedriger Wert → Unterernährung. Über 25 g/kg/d → Überfütterung/Ödem. |
 | **Gesamt-Energie** | Total kcal/kg/d (PN + Enteral) | **Energie-Bilanz:** Zentrale Determinante für Wachstum. Tag 1: 45–60, Tag 4+: 110–135 kcal/kg/d. |
 | **Sicherheitsstatus** | 🟢 Sicher / 🔴 Kritisch | **Ampel-System:** Grün = alle Parameter im sicheren Bereich. Rot = mind. 1 kritischer Grenzwert überschritten (z.B. GIR > 12, Osm > 900). |
 
@@ -417,7 +417,7 @@ in der polyuren Phase regelhaft 200 bis 300 ml/kg/d erhalten. Details in Kapitel
 ### 6.1 Schnellstart (5 Minuten pro Patient)
 
 **1. Patientendaten eingeben**  
-- Geburtsgewicht, aktuelles Gewicht, Gewicht gestern (für Weight Velocity)
+- Geburtsgewicht, aktuelles Gewicht, Gewicht gestern (für Wachstumsrate)
 - Tag (postnatal), SSW, invasive Beatmung (Checkbox)
 
 **2. Volumen & Nahrung**  
@@ -435,7 +435,7 @@ in der polyuren Phase regelhaft 200 bis 300 ml/kg/d erhalten. Details in Kapitel
 **4. Quick View prüfen**  
 - Sicherheit GRÜN? → Gut.
 - Energie im Zielbereich? → Gut.
-- Weight Velocity ≥ 15 g/kg/d? → Gut.
+- Wachstumsrate ≥ 15 g/kg/d? → Gut.
 - Kachel "Enteraler Aufbau": Phase und Abstand zum Tages-Korridor.
 
 **5. Klinisches Fazit lesen**  
@@ -592,7 +592,7 @@ Einheiten: AS/Gluc in g/kg, Na/K in mmol/kg, Ca/P in mmol/kg.
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 📊 QUICK VIEW — Die 3 wichtigsten Indikatoren                       │
 ├─────────────────────────────────────────────────────────────────────┤
-│ 1. Weight Velocity (g/kg/d)  → Ziel 15–20 → Wachstumserfolg        │
+│ 1. Wachstumsrate (g/kg/d)  → Ziel 15–20 → Wachstumserfolg        │
 │ 2. Gesamt-Energie (kcal/kg)  → Tag 4+: 110–135 → Energiebalance    │
 │ 3. Sicherheitsstatus (🟢/🔴) → GRÜN = alle Checks bestanden        │
 └─────────────────────────────────────────────────────────────────────┘
