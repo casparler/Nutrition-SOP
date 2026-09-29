@@ -1467,3 +1467,44 @@ describe('Q-GRENZE) Anreicherung als Treiber der Protein-Überschreitung', () =>
         expect(r.warnings.some(w => /Treiber ist die Anreicherung/.test(w))).toBe(false);
     });
 });
+
+describe('R) Auffindbarkeit der Anreicherungs-Felder', () => {
+    let ui;
+    beforeAll(async () => {
+        const { readFileSync } = await import('node:fs');
+        ui = readFileSync(new URL('../index.html', import.meta.url), 'utf-8');
+    });
+
+    // Bis v3.4 lagen FM85, Eiweiss-Zusatz und Liquigen im zugeklappten
+    // Akkordeon "Enterale Ernährung". Die Zubereitungs-Kachel darunter war
+    // sichtbar, bekam aber nur Nullen, weil die Felder nicht gefunden wurden.
+    it('R1: Die Anreicherungs-Felder liegen in keinem zugeklappten Container', async () => {
+        const { JSDOM } = await import('jsdom');
+        const doc = new JSDOM(ui).window.document;
+        const versteckt = id => {
+            let n = doc.getElementById(id);
+            expect(n, `#${id} existiert nicht`).toBeTruthy();
+            for (; n && n !== doc.body; n = n.parentElement) {
+                const st = (n.getAttribute && n.getAttribute('style')) || '';
+                if (/display:\s*none/.test(st)) return true;
+            }
+            return false;
+        };
+        for (const id of ['input-fm85', 'input-protein-add', 'input-liquigen', 'input-meal-frequency']) {
+            expect(versteckt(id), `${id} steckt in einem zugeklappten Bereich`).toBe(false);
+        }
+    });
+
+    it('R2: Die Zubereitungs-Kachel ist ebenfalls sichtbar', async () => {
+        const { JSDOM } = await import('jsdom');
+        const doc = new JSDOM(ui).window.document;
+        for (const id of ['prep-headline', 'prep-rows', 'prep-result']) {
+            let n = doc.getElementById(id);
+            expect(n, `#${id} existiert nicht`).toBeTruthy();
+            for (; n && n !== doc.body; n = n.parentElement) {
+                const st = (n.getAttribute && n.getAttribute('style')) || '';
+                expect(/display:\s*none/.test(st), `${id} ist verborgen`).toBe(false);
+            }
+        }
+    });
+});
