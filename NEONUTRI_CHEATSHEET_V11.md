@@ -1,6 +1,6 @@
 # NeoNutri V11 — NICU Quick Reference Cheatsheet
 
-**ESPGHAN 2022 | Master Logic V11 | Level-1-NICU**  
+**ESPGHAN 2022 | Master Logic V11 | Stand v3.2 | Level-1-NICU**  
 **Für Station: Ausdrucken auf A4 | Laminieren empfohlen**
 
 ---
@@ -37,6 +37,70 @@
 | Ca+P Löslichkeit | > 72 mmol/l | **Lösung verwerfen!** Ca ODER P reduzieren |
 | SID negativ | < 0 mmol/kg/d | NaCl reduzieren, Na-Acetat erwägen (Azidose!) |
 | TFI bei Beatmung | > 140 ml/kg | TFI auf ≤ 140 ml/kg senken |
+| TFI absolut | > 400 ml/kg/d | Berechnung wird abgewiesen (Tippfehler prüfen) |
+
+---
+
+## ENTERALER AUFBAU (v3.1/3.2)
+
+**Zielvolumen Vollnahrung** (unreifere Einstufung aus Gewicht und SSW gewinnt)
+
+| Klasse | Basisziel |
+|---|---|
+| ELBW / VLBW / < 32 SSW | 160–180 ml/kg/d |
+| 32–36 SSW | 150–170 ml/kg/d |
+| ≥ 37 SSW | 130–160 ml/kg/d |
+
+**Das Ziel sinkt mit steigender Anreicherung** (Proteingrenze 4,5 g/kg/d):
+
+| FM85 | Ziel (ELBW, spontan) | begrenzt durch |
+|---|---|---|
+| 0–1 % | 160–180 | — |
+| 2 % | 150–170 | Energie |
+| 3 % | 145–165 | Energie |
+| 4 % | 130–150 | Protein |
+
+Bei invasiver Beatmung zusätzlich max. 140 ml/kg/d.
+Wer mehr Volumen will, muss die Fortifizierung zurücknehmen. Beides zugleich sprengt die Proteingrenze.
+
+**Aufbau-Korridor**
+
+| Klasse | Tag 1 | Steigerung/Tag |
+|---|---|---|
+| ELBW | 10 ml/kg/d | 15 ml/kg/d |
+| VLBW | 15 ml/kg/d | 20 ml/kg/d |
+| Übrige | 20 ml/kg/d | 25 ml/kg/d |
+
+Rückstand über 10 ml/kg/d führt zu einem Steigerungsvorschlag, immer unter dem Vorbehalt
+guter Toleranz (weiches Abdomen, unauffällige Reste, kein NEC-Verdacht, stabiler Kreislauf).
+
+**Nahrungspause:** Bei bewusst nüchternem Kind das Feld setzen. Sonst meldet der Rechner
+einen Rückstand gegen die klinische Entscheidung.
+
+---
+
+## FLÜSSIGKEIT: GESTUFTE GRENZEN (v3.1)
+
+| Wert | Verhalten |
+|---|---|
+| > 180 ml/kg/d | Hinweis, oberhalb des üblichen Korridors |
+| > 200 ml/kg/d | Warnung, nur bei polyurer Phase plausibel. Bilanz, Serum-Na, Gewicht kontrollieren |
+| > 300 ml/kg/d | Plausibilitätsfenster |
+| > 400 ml/kg/d | Berechnung wird abgewiesen |
+
+200 bis 300 ml/kg/d sind in der polyuren Phase real und werden berechnet, nicht blockiert.
+
+---
+
+## ENTERALE SUPPLEMENTE (v3.1)
+
+| Präparat | Eingabe | Gehalt |
+|---|---|---|
+| Liquigen (MCT 50 %) | ml/kg/d | 4,5 kcal + 0,5 g Fett je ml. Keine essenziellen Fettsäuren |
+| Aptamil Eiweiß+ | g Pulver/kg/d | 0,82 g Protein + 3,4 kcal je g, dazu Na, Ca, P |
+
+Beide werden zugemischt und zählen nicht zusätzlich zur Gesamtflüssigkeit.
+Natrium-Anzeige ist seit v3.2 die Summe aus parenteral und enteral.
 
 ---
 

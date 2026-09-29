@@ -75,8 +75,47 @@
             #cpr-headline { font-size: 1rem; line-height: 1.25; }
             #cpr-bullets { margin-top: 0.4rem; }
             #cpr-bullets li { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-            #quick-view-card { padding: 0.85rem !important; }
-            #quick-view-card .text-3xl, #quick-view-card .text-4xl { font-size: 1.75rem !important; }
+        }
+
+
+        /* ------------------------------------------------------------
+           Quick View: skaliert mit der Kachelbreite statt mit dem
+           Viewport. Die Karte sitzt im 2-Spalten-Cockpit-Raster und ist
+           damit auf dem Tablet nur rund 320 px breit; feste Schriftgrade
+           (text-4xl) liefen dort aus der Kachel heraus.
+           ------------------------------------------------------------ */
+        #quick-view-card { padding: clamp(0.6rem, 2.2cqw, 1rem); container-type: inline-size; }
+        .qv-title {
+            font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;
+            letter-spacing: 0.12em; text-align: center; margin-bottom: 0.5rem;
+        }
+        .qv-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(0.25rem, 1.5cqw, 0.75rem); }
+        .qv-cell { min-width: 0; text-align: center; }
+        .qv-label {
+            font-size: clamp(9px, 2.6cqw, 12px); font-weight: 700; color: #64748b;
+            text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2;
+            margin-bottom: 0.15rem;
+            /* Nicht umbrechen, lieber kürzen: erhält die Zeilenhöhe der Kachel */
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .qv-value {
+            font-size: clamp(1.25rem, 9cqw, 2.25rem); font-weight: 800; line-height: 1.05;
+            white-space: nowrap; overflow: hidden; text-overflow: clip;
+        }
+        .qv-unit {
+            font-size: clamp(9px, 2.4cqw, 12px); color: #94a3b8; margin-top: 0.15rem;
+            line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        /* Fallback fuer Browser ohne Container Queries: an den Viewport koppeln. */
+        @supports not (container-type: inline-size) {
+            .qv-label, .qv-unit { font-size: 10px; }
+            .qv-value { font-size: 1.5rem; }
+            @media (min-width: 1280px) { .qv-value { font-size: 2rem; } }
+        }
+        /* Sehr flache Fenster: Kachel weiter verdichten. */
+        @media (max-height: 820px) {
+            .qv-title { margin-bottom: 0.3rem; }
+            .qv-value { font-size: clamp(1.1rem, 7.5cqw, 1.75rem); }
         }
 
         /* Energy-Gap-Index Kachel */
@@ -102,7 +141,7 @@
 
     <header class="bg-blue-800 text-white p-4 shadow-md no-print">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span class="text-sm font-normal opacity-75">v3.0 | NICU Oberarzt-Edition</span></h1>
+            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span class="text-sm font-normal opacity-75">v3.2</span></h1>
             <div class="flex items-center gap-6">
                 <div id="gv-header-display" class="hidden text-center">
                     <p class="text-[10px] uppercase tracking-wider opacity-75">Growth Velocity</p>
@@ -350,14 +389,9 @@
                             <div class="space-y-4 pt-2">
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700">FM85 (%)</label>
-                                        <select id="input-fm85" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-                                            <option value="0">0%</option>
-                                            <option value="1">1%</option>
-                                            <option value="2">2%</option>
-                                            <option value="3">3%</option>
-                                            <option value="4">4%</option>
-                                        </select>
+                                        <label class="block text-sm font-medium text-gray-700">FM85 <span class="text-gray-400 font-normal">(%)</span></label>
+                                        <input type="number" id="input-fm85" step="0.5" min="0" max="5" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <p class="text-[10px] text-gray-500 mt-1">1 % = 1 g auf 100 ml</p>
                                     </div>
                                     <div id="fm85-disclaimer" class="col-span-2 hidden">
                                         <p class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1">⚠ FM85-Voraussetzung: Stabiles Abdomen, enterale Ernährung &gt; 5–7 Tage toleriert. Start i.d.R. erst ab 100 ml/kg/d enteralem Volumen empfohlen.</p>
@@ -370,8 +404,65 @@
                                             <option value="6">6× (4-stdl.)</option>
                                         </select>
                                     </div>
+                                    <!-- v3.1: Enterale Supplemente -->
+                                    <div class="col-span-2 border-t border-gray-100 pt-3 mt-1">
+                                        <h5 class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-2">Enterale Supplemente</h5>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Liquigen <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
+                                        <input type="number" id="input-liquigen" step="0.5" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <p class="text-[10px] text-gray-500 mt-1">MCT 50 % — 4,5 kcal/ml, 0,5 g Fett/ml</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Eiweiß-Zusatz <span class="text-gray-400 font-normal">(g/100 ml)</span></label>
+                                        <input type="number" id="input-protein-add" step="0.1" min="0" max="3" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <p class="text-[10px] text-gray-500 mt-1">Aptamil Eiweiß+, 82,1 g Eiweiß/100 g Pulver</p>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <p class="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">Supplement-Volumen wird der Nahrung zugemischt und zählt <strong>nicht</strong> zusätzlich zur Gesamtflüssigkeit.</p>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- v3.1/3.2: ENTERALER AUFBAU -->
+                    <div class="pt-2 border-t border-gray-100">
+                        <div class="flex items-center gap-2 mt-2 mb-2">
+                            <input type="checkbox" id="input-feeding-paused" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <label for="input-feeding-paused" class="text-sm font-medium text-gray-700">Nahrungspause (NPO)</label>
+                            <select id="input-feeding-pause-reason" class="ml-auto text-xs rounded-md border-gray-300 border p-1 bg-white" disabled>
+                                <option value="nec">NEC-Verdacht / Abdomen</option>
+                                <option value="unstable">Hämodynamisch instabil</option>
+                                <option value="periop">Peri-operativ</option>
+                                <option value="other">Sonstiger Grund</option>
+                            </select>
+                        </div>
+                        <div id="enteral-advance-box" class="rounded-md border border-green-200 bg-green-50 p-3">
+                            <div class="flex justify-between items-baseline">
+                                <h4 class="text-xs font-bold text-green-700 uppercase tracking-wider">Enteraler Aufbau</h4>
+                                <span id="res-enteral-phase" class="text-[10px] font-bold px-2 py-0.5 rounded bg-green-600 text-white">–</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-sm">
+                                <div class="text-gray-600">Aktuell:</div><div id="res-enteral-current" class="text-right font-bold">– ml/kg/d</div>
+                                <div class="text-gray-600">Ziel (Vollnahrung):</div><div id="res-enteral-goal" class="text-right font-bold">– ml/kg/d</div>
+                                <div class="text-gray-600">Korridor heute:</div><div id="res-enteral-expected" class="text-right font-bold">– ml/kg/d</div>
+                            </div>
+                            <p id="res-enteral-advice" class="text-[11px] text-gray-700 mt-2"></p>
+                            <p id="res-enteral-limit" class="text-[10px] text-amber-800 mt-1"></p>
+                        </div>
+                    </div>
+
+                    <!-- v3.4: ZUBEREITUNG — was am Bett abgewogen wird -->
+                    <div class="pt-2">
+                        <div id="preparation-box" class="rounded-md border border-sky-200 bg-sky-50 p-3">
+                            <h4 class="text-xs font-bold text-sky-700 uppercase tracking-wider mb-2">Zubereitung</h4>
+                            <p id="prep-headline" class="text-sm font-bold text-sky-900">–</p>
+                            <table class="w-full text-sm mt-2">
+                                <tbody id="prep-rows"></tbody>
+                            </table>
+                            <p id="prep-result" class="text-[11px] text-gray-600 mt-2"></p>
+                            <p class="text-[10px] text-gray-500 mt-1">Pulver wird der Nahrung zugemischt, das Volumen ändert sich dadurch nicht relevant.</p>
                         </div>
                     </div>
 
@@ -391,6 +482,8 @@
                                     <div class="border-t border-emerald-200 pt-1">Ca (enteral):</div><div id="res-enteral-ca" class="text-right font-bold border-t border-emerald-200 pt-1">– mg/kg/d</div>
                                     <div>P (enteral):</div><div id="res-enteral-p" class="text-right font-bold">– mg/kg/d</div>
                                     <div>Na (enteral):</div><div id="res-enteral-na" class="text-right font-bold">– mmol/kg/d</div>
+                                    <div class="border-t border-emerald-200 pt-1">davon Liquigen:</div><div id="res-liquigen-detail" class="text-right font-bold border-t border-emerald-200 pt-1">– kcal/kg/d</div>
+                                    <div>davon Eiweiß+:</div><div id="res-aptamil-detail" class="text-right font-bold">– g/kg/d</div>
                                 </div>
                             </div>
                         </div>
@@ -629,7 +722,7 @@
                     <div class="px-4 py-2 flex items-center justify-between border-b border-black/5">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🩺</span>
-                            <span class="text-[11px] font-bold uppercase tracking-widest cpr-headline opacity-75">Chief Physician Review</span>
+                            <span class="text-[11px] font-bold uppercase tracking-widest cpr-headline opacity-75">Klinische Beurteilung</span>
                             <span id="cpr-phase-badge" class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/70 cpr-headline">Phase –</span>
                         </div>
                         <button id="btn-copy-doc"
@@ -647,27 +740,27 @@
                 </div>
 
                 <!-- Quick-View -->
-                <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-4">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">Quick View</p>
-                    <div class="grid grid-cols-3 gap-3 text-center items-center">
-                        <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Weight Velocity
-                                <span class="teach text-slate-400" tabindex="0" role="button" aria-label="Erklärung Weight Velocity" onclick="openEduModal('weightVelocity')" title="Erklärung & Algorithmus">ⓘ</span>
+                <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden">
+                    <p class="qv-title">Quick View</p>
+                    <div class="qv-grid">
+                        <div class="qv-cell">
+                            <p class="qv-label">Wachstum
+                                <span class="teach text-slate-400" tabindex="0" role="button" aria-label="Erklärung Wachstumsrate" onclick="openEduModal('weightVelocity')" title="Erklärung und Algorithmus">ⓘ</span>
                             </p>
-                            <p id="qv-weight-velocity" class="text-3xl md:text-4xl font-extrabold text-emerald-800 tabular-nums">–</p>
-                            <p class="text-xs text-slate-400 mt-1">g/kg/d</p>
+                            <p id="qv-weight-velocity" class="qv-value text-emerald-800 tabular-nums">–</p>
+                            <p class="qv-unit">g/kg/d</p>
                         </div>
-                        <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Gesamt-Energie
-                                <span class="teach text-slate-400" tabindex="0" role="button" aria-label="Erklärung Energie" onclick="openEduModal('energy')" title="Erklärung & Algorithmus">ⓘ</span>
+                        <div class="qv-cell">
+                            <p class="qv-label">Energie
+                                <span class="teach text-slate-400" tabindex="0" role="button" aria-label="Erklärung Energie" onclick="openEduModal('energy')" title="Erklärung und Algorithmus">ⓘ</span>
                             </p>
-                            <p id="qv-kcal" class="text-3xl md:text-4xl font-extrabold text-orange-600 tabular-nums">–</p>
-                            <p class="text-xs text-slate-400 mt-1">kcal/kg/d</p>
+                            <p id="qv-kcal" class="qv-value text-orange-600 tabular-nums">–</p>
+                            <p class="qv-unit">kcal/kg/d</p>
                         </div>
-                        <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Sicherheit</p>
-                            <p id="qv-safety" class="text-3xl md:text-4xl font-extrabold tabular-nums">–</p>
-                            <p id="qv-safety-sub" class="text-xs text-slate-400 mt-1">Status</p>
+                        <div class="qv-cell">
+                            <p class="qv-label">Sicherheit</p>
+                            <p id="qv-safety" class="qv-value tabular-nums">–</p>
+                            <p id="qv-safety-sub" class="qv-unit">Status</p>
                         </div>
                     </div>
                 </div>
@@ -1011,7 +1104,7 @@
 
         <footer class="mt-12 text-center text-gray-400 text-sm no-print border-t pt-6">
             <p>&copy; 2026 Clinical Decision Support System - Nur für autorisiertes medizinisches Personal.</p>
-            <p class="mt-2 text-xs">Berechnungen basieren auf ESPGHAN 2018 & NICU Master Protocol 2026. V11 Master Logic.</p>
+            <p class="mt-2 text-xs">Berechnungen nach ESPGHAN 2018/2022 und hausinternem Standard.</p>
         </footer>
     </main>
 
@@ -1301,7 +1394,7 @@
                 // v2.0 — Educational Layer: ESPGHAN-Begründung pro Hauptparameter
                 set('tip-tfi',
                     `<strong>TFI (Tag ${t.effectiveDay})</strong>: ${t.tfi.min}–${t.tfi.max} ml/kg/d (Cap ${t.tfi.cap})<br>` +
-                    `<span style="font-size:11px">Master-Protokoll: stufenweise Steigerung nach Gewichtsklasse &amp; PNA.<br>` +
+                    `<span style="font-size:11px">Hausinterner Standard: stufenweise Steigerung nach Gewichtsklasse und Lebenstag.<br>` +
                     `Bei invasiver Beatmung Cap auf 140 ml/kg/d (Lungen-Ödem-Risiko).<br>` +
                     `ELBW Tag 1: stark restriktiv (IWL-dominiert, hyperton).</span>`);
                 set('tip-protein',
@@ -1311,7 +1404,7 @@
                     `Hard limit 4,5 g/kg/d: oberhalb metabolische Azidose &amp; Hyperammonämie-Risiko.</span>`);
                 set('tip-lipids',
                     `<strong>Lipide i.v. (Tag ${t.effectiveDay})</strong>: ${t.lipidTarget.min}–${t.lipidTarget.max} g/kg/d<br>` +
-                    `<span style="font-size:11px">Master-Protokoll: Eskalation 1,0 → 4,0 g/kg/d über Tag 1–4.<br>` +
+                    `<span style="font-size:11px">Hausinterner Standard: Steigerung 1,0 auf 4,0 g/kg/d über Tag 1 bis 4.<br>` +
                     `Liefert essentielle FA (LCPUFA) &amp; energetische Dichte (9–10 kcal/g).<br>` +
                     `SMOFlipid 20% (ω-3-haltig) wegen IFALD-Prävention bevorzugt.<br>` +
                     `Bei TG &gt; 250 mg/dl reduzieren (Hypertriglyzeridämie).</span>`);
@@ -1421,8 +1514,8 @@
                 smartDefaults: {
                     title: 'Smart Defaults',
                     intro: 'Tages-basierte Startwert-Vorschläge für Flüssigkeit (TFI), Aminosäuren und Lipide. Der Arzt bestätigt statt frei zu tippen.',
-                    espghan: 'Werte stammen ausschließlich aus den hinterlegten Zielspannen (Master-Protokoll / ESPGHAN 2018). Es werden KEINE eigenen Schwellwerte erfunden.',
-                    algo: 'TFI = untere Zielgrenze (konservativer Aufbau, durch Beatmungs-Cap gedeckelt). Protein & Lipide = Mittelwert der jeweiligen Zielspanne. Quelle: getSmartDefaults() → getTargets().'
+                    espghan: 'Die Werte stammen ausschließlich aus den hinterlegten Zielspannen (hausinterner Standard und ESPGHAN 2018). Es werden keine eigenen Schwellwerte erzeugt.',
+                    algo: 'Flüssigkeit: untere Zielgrenze (konservativer Aufbau, durch den Beatmungs-Cap begrenzt). Protein und Lipide: Mittelwert der jeweiligen Zielspanne.'
                 }
             };
 
@@ -1630,6 +1723,8 @@
             const inputs = [
                 'birth-weight', 'current-weight', 'yesterday-weight', 'input-tfi',
                 'input-enteral', 'input-enteral-product', 'input-fm85', 'input-meal-frequency',
+                'input-liquigen', 'input-aptamil-protein', 'input-protein-add',
+                'input-feeding-paused', 'input-feeding-pause-reason',
                 'input-carrier', 'input-urea', 'input-gir',
                 'input-protein', 'input-lipids', 'input-lipid-infusion',
                 'input-calcium', 'input-phosphate',
@@ -1661,9 +1756,20 @@
                 }
             });
 
+            // v3.2: Pausen-Grund nur aktivierbar, wenn Nahrungspause gesetzt ist
+            (function bindFeedingPause() {
+                const cb = document.getElementById('input-feeding-paused');
+                const sel = document.getElementById('input-feeding-pause-reason');
+                if (!cb || !sel) return;
+                const sync = () => { sel.disabled = !cb.checked; };
+                cb.addEventListener('change', sync);
+                sync();
+            })();
+
             // Bind listeners
-            const selectIds = ['input-invasive-ventilation', 'input-ssw', 'input-ssw-days', 'input-birth-date', 'input-fm85', 'input-enteral-product',
-                               'input-meal-frequency', 'input-lipid-infusion', 'input-access', 'input-solution', 'input-secondary-solution'];
+            const selectIds = ['input-invasive-ventilation', 'input-ssw', 'input-ssw-days', 'input-birth-date', 'input-enteral-product',
+                               'input-meal-frequency', 'input-lipid-infusion', 'input-access', 'input-solution', 'input-secondary-solution',
+                               'input-feeding-paused', 'input-feeding-pause-reason'];
             inputs.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -1809,6 +1915,11 @@
                     tfi: parseFloat(document.getElementById('input-tfi').value) || 0,
                     enteralVolume: document.getElementById('input-enteral').value || 0,
                     fm85Percent: document.getElementById('input-fm85').value || 0,
+                    liquigenMlKg: (document.getElementById('input-liquigen') || {}).value || 0,
+                    aptamilProteinGKg: (document.getElementById('input-aptamil-protein') || {}).value || 0,
+                    proteinAddPer100ml: (document.getElementById('input-protein-add') || {}).value || 0,
+                    feedingPaused: !!(document.getElementById('input-feeding-paused') || {}).checked,
+                    feedingPauseReason: (document.getElementById('input-feeding-pause-reason') || {}).value || 'other',
                     carrierVolume: document.getElementById('input-carrier').value || 0,
                     urea: rawUrea === '' || rawUrea == null ? null : parseFloat(rawUrea),
                     gir: document.getElementById('input-gir').value || 0,
@@ -1921,7 +2032,7 @@
                 setText('res-calcium-mmol', r.calciumMmolKg);
                 setText('res-phosphate-mg', r.phosphateMgKg);
                 setText('res-phosphate-mmol', r.phosphateMmolKg);
-                setText('res-sodium', r.effectiveNa);
+                setText('res-sodium', r.totalNaMmolKg !== undefined ? r.totalNaMmolKg : r.effectiveNa);
                 setText('res-potassium', r.effectiveK);
                 setText('res-chloride', r.effectiveCl);
                 setText('res-sid', r.sidLight);
@@ -1964,6 +2075,102 @@
                     document.getElementById('res-enteral-ca').innerText = `${r.enteralCaMgKg} mg/kg/d`;
                     document.getElementById('res-enteral-p').innerText = `${r.enteralPMgKg} mg/kg/d`;
                     document.getElementById('res-enteral-na').innerText = `${r.enteralNaMmolKg || 0} mmol/kg/d`;
+                    const liqEl = document.getElementById('res-liquigen-detail');
+                    if (liqEl) liqEl.innerText = `${r.liquigenKcalKg || 0} kcal/kg/d`;
+                    const aptEl = document.getElementById('res-aptamil-detail');
+                    if (aptEl) aptEl.innerText = `${r.aptamilProteinNetGKg || 0} g/kg/d`;
+                }
+
+                // --- v3.1: Enteraler Aufbau ---
+                if (r.enteralTarget) {
+                    const phaseLabels = {
+                        none:      { text: 'nicht begonnen', cls: 'bg-gray-400' },
+                        trophic:   { text: 'trophisch',      cls: 'bg-amber-500' },
+                        advancing: { text: 'im Aufbau',      cls: 'bg-blue-600' },
+                        full:      { text: 'Vollnahrung',    cls: 'bg-green-600' },
+                        paused:    { text: 'Nahrungspause',  cls: 'bg-amber-600' }
+                    };
+                    const ph = phaseLabels[r.enteralPhase] || phaseLabels.none;
+                    const phEl = document.getElementById('res-enteral-phase');
+                    if (phEl) {
+                        phEl.innerText = ph.text;
+                        phEl.className = `text-[10px] font-bold px-2 py-0.5 rounded text-white ${ph.cls}`;
+                    }
+                    const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.innerText = txt; };
+                    setTxt('res-enteral-current', `${r.enteralVolKg} ml/kg/d`);
+                    setTxt('res-enteral-goal', `${r.enteralTarget.min}–${r.enteralTarget.max} ml/kg/d`);
+                    setTxt('res-enteral-expected', `~${r.enteralExpectedToday} ml/kg/d`);
+                    const advEl = document.getElementById('res-enteral-advice');
+                    if (advEl) {
+                        if (r.feedingPaused) {
+                            advEl.innerText = `Nahrungspause aktiv (${r.feedingPauseReason}). Aufbau-Empfehlungen sind ausgesetzt.`;
+                        } else if (r.enteralPhase === 'full') {
+                            advEl.innerText = `Vollnahrungs-Ziel erreicht (${r.enteralTarget.label}). Weitere Optimierung über Anreicherung, nicht über Volumen.`;
+                        } else if (r.enteralGap >= 10) {
+                            advEl.innerText = `${r.enteralGap} ml/kg/d unter dem Korridor. Steigerung erwägen — nur bei guter Toleranz (weiches Abdomen, unauffällige Reste, kein NEC-Verdacht).`;
+                        } else {
+                            advEl.innerText = `Im Korridor für Lebenstag. Zielklasse: ${r.enteralTarget.label}.`;
+                        }
+                    }
+                    const limEl = document.getElementById('res-enteral-limit');
+                    if (limEl) {
+                        const t = r.enteralTarget;
+                        const why = {
+                            ventilation: `Beatmungs-Cap ${t.cap} ml/kg/d`,
+                            protein: `Protein-Obergrenze bei ${t.product}`,
+                            energy: `Energie-Tagesziel bei ${t.product}`
+                        }[t.limitedBy];
+                        limEl.innerText = why
+                            ? `Ziel begrenzt (statt ${t.unlimited.min}–${t.unlimited.max}): ${why}.`
+                            : '';
+                    }
+                    // --- v3.4: Zubereitung ---
+                    const prep = r.preparation;
+                    if (prep) {
+                        const hl = document.getElementById('prep-headline');
+                        const rows = document.getElementById('prep-rows');
+                        const resEl = document.getElementById('prep-result');
+                        const nz = v => Number(v) > 0;
+                        if (hl) {
+                            hl.innerText = prep.dailyVolumeMl > 0
+                                ? `${prep.dailyVolumeMl} ml/Tag auf ${prep.meals} Mahlzeiten = ${prep.mealVolumeMl} ml je Mahlzeit`
+                                : 'Keine enterale Nahrung eingestellt';
+                        }
+                        if (rows) {
+                            const line = (was, proMahlzeit, proTag) =>
+                                `<tr><td class="py-0.5 text-gray-600">${was}</td>` +
+                                `<td class="py-0.5 text-right font-bold tabular-nums">${proMahlzeit}</td>` +
+                                `<td class="py-0.5 text-right text-gray-500 tabular-nums">${proTag}</td></tr>`;
+                            let html = '';
+                            if (nz(prep.fm85Percent) || nz(prep.proteinAddPer100ml)) {
+                                html += '<tr><td></td><td class="text-right text-[10px] uppercase tracking-wider text-gray-400">je Mahlzeit</td>' +
+                                        '<td class="text-right text-[10px] uppercase tracking-wider text-gray-400">pro Tag</td></tr>';
+                            }
+                            if (nz(prep.fm85Percent)) {
+                                html += line(`FM85 ${prep.fm85Percent} %`,
+                                             `${prep.fm85GramsPerMeal} g`, `${prep.fm85GramsPerDay} g`);
+                            }
+                            if (nz(prep.proteinAddPer100ml)) {
+                                html += line(`Aptamil Eiweiß+ (${prep.proteinAddPer100ml} g/100 ml)`,
+                                             `${prep.proteinPowderPerMeal} g`, `${prep.proteinPowderPerDay} g`);
+                            }
+                            if (!html) html = '<tr><td class="py-0.5 text-gray-500">Keine Anreicherung eingestellt</td></tr>';
+                            rows.innerHTML = html;
+                        }
+                        if (resEl) {
+                            resEl.innerText = prep.proteinPer100mlFinal > 0
+                                ? `Ergibt ${prep.proteinPer100mlFinal} g Eiweiß je 100 ml, entspricht ${r.proteinTotalGPerKg} g/kg/d gesamt.`
+                                : '';
+                        }
+                    }
+
+                    const boxEl = document.getElementById('enteral-advance-box');
+                    if (boxEl) {
+                        const paused = r.feedingPaused;
+                        boxEl.className = paused
+                            ? 'rounded-md border border-amber-200 bg-amber-50 p-3'
+                            : 'rounded-md border border-green-200 bg-green-50 p-3';
+                    }
                 }
 
                 // Length and Head Z-Scores
@@ -1973,7 +2180,7 @@
                 // FM85 disclaimer visibility
                 const fm85Disc = document.getElementById('fm85-disclaimer');
                 if (fm85Disc) {
-                    const fm85Val = parseInt(document.getElementById('input-fm85').value) || 0;
+                    const fm85Val = parseFloat(document.getElementById('input-fm85').value) || 0;
                     fm85Disc.classList.toggle('hidden', fm85Val === 0);
                 }
 
@@ -1997,7 +2204,10 @@
                 document.getElementById('qv-weight-velocity').innerText = wv === 'Initial' || wv === 0 ? '—' : String(wv);
                 const qvK = document.getElementById('qv-kcal');
                 qvK.innerText = String(r.kcalPerKg);
-                qvK.className = 'text-3xl md:text-4xl font-extrabold tabular-nums ' + (
+                // Nur die Farbklasse tauschen; die Groesse kommt aus .qv-value
+                // (container-basiert). Frueher wurde hier text-4xl gesetzt und
+                // damit das responsive Verhalten der Kachel ueberschrieben.
+                qvK.className = 'qv-value tabular-nums ' + (
                     enSt === 'green' ? 'text-green-700' : enSt === 'yellow' ? 'text-amber-600' : 'text-red-600'
                 );
 
@@ -2005,12 +2215,12 @@
                 const qvSub = document.getElementById('qv-safety-sub');
                 if (res.isSafe) {
                     qvSafe.innerText = 'Sicher';
-                    qvSafe.className = 'text-3xl md:text-4xl font-extrabold text-green-600 tabular-nums';
-                    qvSub.innerText = 'Keine CRITICAL-Flags';
+                    qvSafe.className = 'qv-value text-green-600 tabular-nums';
+                    qvSub.innerText = 'keine kritischen Flags';
                 } else {
                     qvSafe.innerText = 'Kritisch';
-                    qvSafe.className = 'text-3xl md:text-4xl font-extrabold text-red-600 tabular-nums';
-                    qvSub.innerText = 'CRITICAL / Sicherheits-Check';
+                    qvSafe.className = 'qv-value text-red-600 tabular-nums';
+                    qvSub.innerText = 'Sicherheits-Check offen';
                 }
 
                 // Safety Modal
