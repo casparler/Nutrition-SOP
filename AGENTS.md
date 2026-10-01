@@ -20,8 +20,18 @@
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
 
 ```bash
-npm test    # MUSS 152 passed, 0 failed zeigen
+npm run check   # Lint + Tests, MUSS leer bzw. 152 passed, 0 failed zeigen
+npm test        # nur die Test-Suite
+npm run lint    # nur ESLint
 ```
+
+Seit Oktober 2026 gehoert ein Linter dazu (`eslint.config.mjs`, ESLint 9 Flat
+Config). Er prueft bewusst nur Fehlerklassen, die in einer Dosierungsrechnung
+Schaden anrichten: undefinierte Bezeichner, doppelte Objektschluessel, toter
+Code, lose Vergleiche. Stilfragen bleiben aussen vor, damit der Durchlauf leer
+bleibt und nur bei echten Neuzugaengen anschlaegt. Das Inline-JavaScript in
+`index.html` ist nicht erfasst; dort sichern die Tests der Sektionen M, P und R
+die Frontend-Integritaet.
 
 ### 2. ELBW-Klassengrenze bei exakt 1000 g — SAKROSANKT
 
@@ -324,6 +334,9 @@ Zielkonzentration. Tests **Q22, Q23**.
 
 | Datei | Zweck |
 |-------|-------|
+| [CLAUDE.md](./CLAUDE.md) | Einstieg fuer Claude-Sitzungen: Zweck, Stack, Struktur, Befehle, Konventionen. Verweist fuer die klinischen Regeln auf diese Datei |
+| [eslint.config.mjs](./eslint.config.mjs) | Linter-Regeln |
+| [.claude/setup.sh](./.claude/setup.sh) | Setup fuer Cloud-Sitzungen: `npm ci`, dann Lint und Tests |
 | [calculator.js](./calculator.js) | Safety Core Engine — Decimal.js, Validierung, Targets, Warnings |
 | [index.html](./index.html) | UI inkl. try-catch um `calculate()` und Error-Banner |
 | [tests/calculator.test.js](./tests/calculator.test.js) | 152 klinische Vitest-Tests (Sektionen A–R) |
