@@ -1,12 +1,17 @@
 {
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "npm run lint && npm test"
   },
   "dependencies": {
     "decimal.js": "^10.6.0"
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
     "jsdom": "^29.1.1",
     "vitest": "^4.1.7"
   }

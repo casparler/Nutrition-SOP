@@ -905,7 +905,7 @@ class NutritionCalculator {
         if (typeof GrowthCalculator !== 'undefined') {
             try {
                 weightPercentile = GrowthCalculator.getPercentile('WEIGHT', ssw, currentWeightG.toNumber());
-            } catch (e) { /* ignore */ }
+            } catch { /* bewusst ignoriert */ }
         }
 
         let lengthZScore = null;
@@ -922,7 +922,7 @@ class NutritionCalculator {
                     headZScore = GrowthCalculator.calculateZScore('head', 'male', ssw + (postnatalAge / 7), headCm);
                     if (headZScore !== null) headZScore = Math.round(headZScore * 100) / 100;
                 }
-            } catch (e) { /* ignore */ }
+            } catch { /* bewusst ignoriert */ }
         }
 
         // --- Step 0b: Growth Velocity ---
@@ -1001,7 +1001,6 @@ class NutritionCalculator {
         let effectiveK = hasPNVolume ? potassiumMmolKg.plus(kclMl) : kclMl;
         let effectiveCa_mmol = hasPNVolume ? calciumMgKg.div(this.MOLAR_MASS.CALCIUM) : D(0);
         let effectiveP_mmol = hasPNVolume ? phosphateMgKg.div(this.MOLAR_MASS.PHOSPHORUS) : D(0);
-        let effectiveGIR = hasPNVolume ? gir : D(0);
         let solutionMicro = null;
         let useSolution = false;
 
@@ -1036,12 +1035,9 @@ class NutritionCalculator {
         const totalGlucoseGKg = effectiveGlucose.plus(secondaryGlucoseGKg).toDecimalPlaces(2);
 
         // --- Step 5: GIR and Glucose ---
-        if (useSolution) {
-            // Reverse-calc GIR from solution glucose (PN only, not secondary)
-            effectiveGIR = effectiveGlucose.times(1000).div(1440).toDecimalPlaces(2);
-        }
-        // For manual mode, effectiveGIR is already set via hasPNVolume guard above
-        
+        // Die ausgegebene GIR wird aus totalGlucoseGKg abgeleitet (PN-Loesung
+        // plus Sekundaerinfusion). Eine separate Rueckrechnung nur aus der
+        // Loesung stand hier frueher, wurde aber nie gelesen.
         // Recalculate effective GIR including secondary glucose
         const totalGIR = totalGlucoseGKg.times(1000).div(1440).toDecimalPlaces(2);
 
@@ -1078,9 +1074,9 @@ class NutritionCalculator {
             if (enteralProduct && enteralProduct.per100ml) {
                 baseProteinPer100 = D(enteralProduct.per100ml.protein);
                 baseKcalPer100 = D(enteralProduct.per100ml.kcal);
-                const baseFatPer100 = D(enteralProduct.per100ml.fat || 0);
-                const baseCarbsPer100 = D(enteralProduct.per100ml.carbs || 0);
-                const baseNaMgPer100 = D(enteralProduct.per100ml.sodium_mg || 0);
+                // Fett, Kohlenhydrate und Natrium werden hier NICHT uebernommen:
+                // der else-Zweig in Step 7 liest sie ohnehin erneut aus
+                // NeoProducts. Fruehere Konstanten an dieser Stelle waren tot.
             }
         }
 
