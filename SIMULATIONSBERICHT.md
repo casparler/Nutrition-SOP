@@ -1,7 +1,10 @@
 # NeoNutri — Simulationsbericht (01.10.2026)
 
-Stand: Branch `claude/zen-babbage-vjgke2`, Test-Suite vorher und nachher **152/152 grün**.
-An Programmcode und Tests wurde **nichts geändert**. Dies ist ein reiner Befundbericht.
+Stand: Branch `claude/zen-babbage-vjgke2`. Der Bericht entstand bei 152/152 grünen Tests.
+
+**Nachtrag (v3.5):** Behoben und mit Tests S1–S8 abgesichert (jetzt 162/162 grün):
+**A1, A2, A3** (ohne den Ca:P-/P:AA-Widerspruch, der an A4 hängt), **B3, B4, B5**.
+Offen sind alle Punkte, die eine klinische Entscheidung brauchen (A4, B1, B2, B6, B7, C, D).
 
 ## Vorgehen
 

@@ -1508,3 +1508,142 @@ describe('R) Auffindbarkeit der Anreicherungs-Felder', () => {
         }
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION S — Fehlerkorrekturen aus der Patientensimulation (v3.5)
+ * Befunde: SIMULATIONSBERICHT.md, Abschnitte A1–A3, B3–B5.
+ * ────────────────────────────────────────────────────────────────*/
+describe('S) Korrekturen aus der Patientensimulation (v3.5)', () => {
+
+    // S1 — Invariante 2 gilt auch für den Natrium-/IWL-Block
+    it('S1: Exakt 1000 g bekommt die ELBW-Natriumhinweise wie 999 g, 1001 g nicht', () => {
+        const mk = bw => calc.calculate(baseInput({
+            birthWeight: bw, currentWeight: bw - 50, ssw: 28, postnatalAge: 3,
+            tfi: 90, sodium: 6
+        }));
+        const hat = r => ({
+            iwl: r.warnings.some(w => /IWL-bedingte Hypernatriämie/.test(w)),
+            na: r.warnings.some(w => /Na-Zufuhr .* ELBW Tag 1–7/.test(w))
+        });
+        expect(hat(mk(999))).toEqual({ iwl: true, na: true });
+        expect(hat(mk(1000))).toEqual({ iwl: true, na: true });
+        expect(hat(mk(1001))).toEqual({ iwl: false, na: false });
+    });
+
+    // S2–S3 — Glukose fehlt bei laufender PN
+    it('S2: GIR 0 bei laufendem PN-Volumen löst eine Warnung aus', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 2100, currentWeight: 2100, ssw: 34, postnatalAge: 1,
+            tfi: 60, gir: 0, protein: 1.5, lipids: 1.0
+        }));
+        const w = r.warnings.find(x => /Keine Glukosezufuhr/.test(x));
+        expect(w).toBeTruthy();
+        expect(r.fazit.join(' ')).toMatch(/Glukosezufuhr prüfen/);
+        expect(r.fazit.join(' ')).not.toMatch(/keine Korrekturen erforderlich/);
+    });
+
+    it('S3: Kein Alarm bei Vollnahrung mit kleinem PN-Rest ohne Glukose', () => {
+        // 140 ml/kg EBM liefern rechnerisch ~6,8 mg/kg/min Kohlenhydrate.
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 12,
+            tfi: 150, enteralVolume: 140, gir: 0, protein: 0, lipids: 0
+        }));
+        expect(r.warnings.some(x => /Glukosezufuhr|unter Minimum/.test(x))).toBe(false);
+    });
+
+    // S4–S5 — Fazit darf kritische Befunde nicht verschweigen
+    it('S4: GIR über dem Maximum steht im Fazit, nicht „keine Korrekturen“', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 700, currentWeight: 650, ssw: 25, postnatalAge: 2,
+            tfi: 110, gir: 11, secondarySolution: 'glucose10', secondaryRateKg: 20,
+            protein: 2, lipids: 1.5
+        }));
+        expect(r.warnings.some(x => /^CRITICAL: GIR/.test(x))).toBe(true);
+        expect(r.fazit.join(' ')).toMatch(/GIR .* überschreitet Maximum/);
+        expect(r.fazit.join(' ')).not.toMatch(/keine Korrekturen erforderlich/);
+    });
+
+    it('S5: Hypertriglyceridämie steht im Fazit, ohne gegenläufige Energie-Steigerung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, currentWeight: 850, ssw: 27, postnatalAge: 10,
+            tfi: 150, gir: 7, protein: 3.5, lipids: 3.5, triglycerides: 300
+        }));
+        expect(r.fazit.join(' ')).toMatch(/Triglyzeride > 250/);
+        expect(r.fazit.join(' ')).not.toMatch(/Energiezufuhr um/);
+    });
+
+    it('S5b: Ein unauffälliger Plan behält das „keine Korrekturen“-Fazit', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 3,
+            tfi: 120, gir: 6, protein: 3.5, lipids: 3.0, calcium: 60, phosphate: 36
+        }));
+        if (r.warnings.length === 0) {
+            expect(r.fazit).toEqual(['Ernährungsplan im ESPGHAN-Zielbereich – keine Korrekturen erforderlich.']);
+        }
+        expect(r.fazit.join(' ')).not.toMatch(/Glukosezufuhr prüfen/);
+    });
+
+    // S6 — Perzentile nach korrigiertem Alter
+    it('S6: Gewichtsperzentile nutzt das korrigierte Gestationsalter', async () => {
+        const { GrowthCalculator } = await import('../fenton_data.js').then(m => m.default || m);
+        globalThis.GrowthCalculator = GrowthCalculator;
+        try {
+            const r = calc.calculate(baseInput({
+                birthWeight: 880, currentWeight: 1250, ssw: 26, postnatalAge: 28,
+                tfi: 150, enteralVolume: 150
+            }));
+            // Tag 28 = 4 Wochen → 30+0 SSW korrigiert
+            const erwartet = GrowthCalculator.getPercentile('WEIGHT', 26 + 27 / 7, 1250);
+            expect(r.results.weightPercentile).toBe(erwartet);
+            expect(r.results.weightPercentile).not.toBe('> 97.');
+            // Tag 1 bleibt unverändert beim Alter bei Geburt
+            const r1 = calc.calculate(baseInput({
+                birthWeight: 880, currentWeight: 880, ssw: 26, postnatalAge: 1, tfi: 80
+            }));
+            expect(r1.results.weightPercentile).toBe(GrowthCalculator.getPercentile('WEIGHT', 26, 880));
+        } finally {
+            delete globalThis.GrowthCalculator;
+        }
+    });
+
+    // S7 — FM85 nur bei Muttermilch
+    it('S7: FM85-Feld bei Formelnahrung erscheint nicht in der Zubereitung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 2100, currentWeight: 2000, ssw: 34, postnatalAge: 6,
+            tfi: 150, enteralVolume: 150, selectedEnteralProduct: 'aptamilPre',
+            fm85Percent: 4
+        }));
+        expect(r.results.preparation.fm85Percent).toBe(0);
+        expect(r.results.preparation.fm85GramsPerDay).toBe(0);
+        expect(r.results.preparation.fm85GramsPerMeal).toBe(0);
+        expect(r.warnings.some(w => /FM85 4 % wird nur bei Muttermilch/.test(w))).toBe(true);
+        expect(r.reminders.some(m => /FM85/.test(m))).toBe(false);
+    });
+
+    it('S7b: Bei Muttermilch bleibt die FM85-Zubereitung unverändert', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 20,
+            tfi: 160, enteralVolume: 150, fm85Percent: 4
+        }));
+        expect(r.results.preparation.fm85Percent).toBe(4);
+        expect(r.results.preparation.fm85GramsPerDay).toBeGreaterThan(0);
+        expect(r.warnings.some(w => /wird nur bei Muttermilch/.test(w))).toBe(false);
+    });
+
+    // S8 — Hinweis bei FM85 als Treiber der Protein-Überschreitung
+    it('S8: Ist FM85 der Treiber, nennt der Hinweis die noch mögliche FM85-Stufe', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 620, currentWeight: 1050, ssw: 25, postnatalAge: 28,
+            tfi: 160, enteralVolume: 160, fm85Percent: 4
+        }));
+        expect(r.safetyChecks.proteinLimit).toBe(false);
+        const h = r.warnings.find(w => /wäre FM85 höchstens/.test(w));
+        expect(h).toBeTruthy();
+        const stufe = parseFloat(h.match(/höchstens ([\d.]+) %/)[1]);
+        // Gewählte Stufe darf das Limit bei diesem Volumen nicht mehr sprengen
+        const eiweiss = 160 * (1.13 + stufe * 0.4675) / 100;
+        expect(eiweiss).toBeLessThanOrEqual(4.5);
+        // und die nächste halbe Stufe sprengt es
+        expect(160 * (1.13 + (stufe + 0.5) * 0.4675) / 100).toBeGreaterThan(4.5);
+    });
+});

@@ -848,7 +848,12 @@ class NutritionCalculator {
         const tfi = D(sp(input.tfi, 'tfi', { defaultValue: 0 }));
         const enteralVolKg = D(sp(input.enteralVolume, 'enteralVolume', { defaultValue: 0 }));
         // v3.4: nicht mehr ganzzahlig — Anreicherung in 0,5-%-Schritten moeglich
-        const fm85Percent = sp(input.fm85Percent, 'fm85Percent', { defaultValue: 0 });
+        const fm85Eingabe = sp(input.fm85Percent, 'fm85Percent', { defaultValue: 0 });
+        // v3.5: FM85 wird nur der Muttermilch zugesetzt. Bei Formelnahrung blieb
+        // ein vom Vortag stehendes FM85-Feld sonst in der Zubereitungs-Kachel
+        // stehen und wurde am Bett abgewogen, obwohl die Rechnung es ignoriert.
+        const fm85Ignoriert = fm85Eingabe > 0 && (input.selectedEnteralProduct || 'ebm') !== 'ebm';
+        const fm85Percent = fm85Ignoriert ? 0 : fm85Eingabe;
         const carrierVolKg = D(sp(input.carrierVolume, 'carrierVolume', { defaultValue: 0 }));
         const urea = input.urea !== null && input.urea !== undefined && input.urea !== ''
             ? sp(input.urea, 'urea', { defaultValue: null })
@@ -901,10 +906,15 @@ class NutritionCalculator {
             : null;
 
         // --- Step 0: Growth Percentile ---
+        // v3.5: Die Perzentile bezieht sich auf das KORRIGIERTE Gestationsalter
+        // (SSW bei Geburt + vollendete Lebenswochen). Vorher wurde das Alter bei
+        // Geburt genommen: ein 26-Wochen-Kind mit 1250 g an Tag 28 erschien als
+        // „> 97.“, obwohl es bei 30 Wochen im Bereich 10.–50. liegt.
+        const correctedGA = ssw + (postnatalAge - 1) / 7;
         let weightPercentile = 'N/A';
         if (typeof GrowthCalculator !== 'undefined') {
             try {
-                weightPercentile = GrowthCalculator.getPercentile('WEIGHT', ssw, currentWeightG.toNumber());
+                weightPercentile = GrowthCalculator.getPercentile('WEIGHT', correctedGA, currentWeightG.toNumber());
             } catch (e) { /* ignore */ }
         }
 
@@ -915,11 +925,11 @@ class NutritionCalculator {
                 const lengthCm = parseFloat(input.length) || null;
                 const headCm = parseFloat(input.head) || null;
                 if (lengthCm) {
-                    lengthZScore = GrowthCalculator.calculateZScore('length', 'male', ssw + (postnatalAge / 7), lengthCm);
+                    lengthZScore = GrowthCalculator.calculateZScore('length', 'male', correctedGA, lengthCm);
                     if (lengthZScore !== null) lengthZScore = Math.round(lengthZScore * 100) / 100;
                 }
                 if (headCm) {
-                    headZScore = GrowthCalculator.calculateZScore('head', 'male', ssw + (postnatalAge / 7), headCm);
+                    headZScore = GrowthCalculator.calculateZScore('head', 'male', correctedGA, headCm);
                     if (headZScore !== null) headZScore = Math.round(headZScore * 100) / 100;
                 }
             } catch (e) { /* ignore */ }
@@ -1412,6 +1422,17 @@ class NutritionCalculator {
                     `${moeglicherZusatz.toNumber()} g/100 ml Zusatz möglich (aktuell ${n.proteinAddPer100ml}). ` +
                     `Alternativ das enterale Volumen oder die FM85-Stufe senken.`
                 );
+                // v3.5: Ist FM85 der Treiber, nennt der Zusatz allein (0 g/100 ml) keinen
+                // Ausweg. Hier die noch mögliche FM85-Stufe beim aktuellen Volumen.
+                if (fm85Percent > 0) {
+                    const ohneFm85 = D('1.13').plus(n.proteinAddPer100ml);
+                    const maxFm85 = Decimal.max(0, maxGesamtPer100.minus(ohneFm85).div('0.4675'));
+                    const maxFm85Step = maxFm85.div('0.5').floor().times('0.5').toNumber();
+                    warnings.push(
+                        `Hinweis: Bei ${n.enteralVolKg} ml/kg/d und aktuellem Eiweißzusatz wäre FM85 höchstens ` +
+                        `${maxFm85Step} % möglich (aktuell ${fm85Percent} %).`
+                    );
+                }
             }
         }
         if (n.lipidsPNKg > this.LIMITS.LIPIDS.max) {
@@ -1438,8 +1459,22 @@ class NutritionCalculator {
         }
 
         // BLIND-2/5: GIR below minimum — hypoglycemia risk
-        if (hasPNVolume && n.effectiveGIR > 0 && n.effectiveGIR < this.LIMITS.GIR.min) {
-            warnings.push(`Hinweis: GIR ${n.effectiveGIR} mg/kg/min unter Minimum (${this.LIMITS.GIR.min}) – Hypoglykämie-Risiko!`);
+        // v3.5: Auch GIR = 0 bei laufendem PN-Volumen (Flüssigkeit ohne Glukose)
+        // wird gemeldet. Vorher verlangte die Bedingung `GIR > 0`, so dass gerade
+        // der gefährlichste Fall (Glukose vergessen) ohne Warnung blieb. Bewertet
+        // wird die Gesamt-Glukosezufuhr inkl. enteraler Kohlenhydrate, damit ein
+        // Kind auf Vollnahrung mit kleinem PN-Rest nicht fälschlich warnt.
+        const giRGesamt = n.totalGIRIncEnteral;
+        if (hasPNVolume && giRGesamt < this.LIMITS.GIR.min) {
+            if (n.effectiveGIR <= 0 && giRGesamt <= 0) {
+                warnings.push(`Warnung: Keine Glukosezufuhr bei laufendem PN-Volumen (${n.pnDaily} ml/d) – GIR 0 mg/kg/min, Hypoglykämie-Risiko! Glukose-Eingabe prüfen.`);
+            } else {
+                warnings.push(`Hinweis: GIR ${giRGesamt} mg/kg/min unter Minimum (${this.LIMITS.GIR.min}) – Hypoglykämie-Risiko!`);
+            }
+        }
+
+        if (fm85Ignoriert) {
+            warnings.push(`Hinweis: FM85 ${fm85Eingabe} % wird nur bei Muttermilch (EBM) eingerechnet — bei ${this._enteralDensity({ ...input, fm85Percent: 0 }).label} ohne Wirkung. FM85-Feld auf 0 setzen.`);
         }
 
         // BLIND-6: TFI below target minimum
@@ -1612,7 +1647,8 @@ class NutritionCalculator {
         }
 
         // --- AUDIT: IWL / Hypernatriämie-Risiko (Phase A) ---
-        if (birthWeightG.lt(1000) && postnatalAge <= 7) {
+        // Master-Protokoll: ELBW-Klassengrenze inklusiv bei 1000g (v3.5: vorher lt(1000))
+        if (birthWeightG.lte(1000) && postnatalAge <= 7) {
             if (tfi.lt(100) && postnatalAge >= 2) {
                 warnings.push('Hinweis: ELBW Tag 2–7 mit TFI < 100 ml/kg/d — IWL-bedingte Hypernatriämie-Gefahr. Na-Kontrolle empfohlen.');
             }
@@ -1795,13 +1831,28 @@ class NutritionCalculator {
         if (pnVolumeOverflow) {
             fazit.push('Gesamtvolumen übersteigt TFI – Sekundärinfusionen oder enterales Volumen reduzieren.');
         }
+        // v3.5: Übrige kritische Befunde (GIR, Osmolarität, Triglyzeride, Kristallgefahr,
+        // SID, Lipid-Volumen, Beatmungs-TFI) gehören ins Fazit. Vorher stand dort bei
+        // GIR 12,4 „keine Korrekturen erforderlich“ und bei TG 300 „Energie steigern“.
+        // Protein und Volumen-Überlauf sind oben bereits abgedeckt.
+        const bereitsImFazit = /^CRITICAL: (Protein gesamt|TFI überschritten)/;
+        warnings
+            .filter(w => w.startsWith('CRITICAL') && !bereitsImFazit.test(w))
+            .forEach(w => { if (fazit.length < 3) fazit.push(w.replace(/^CRITICAL:\s*/, '')); });
+        const keineGlukose = hasPNVolume && n.totalGIRIncEnteral < this.LIMITS.GIR.min;
+        if (fazit.length < 3 && keineGlukose) {
+            fazit.push(`Glukosezufuhr prüfen: GIR ${n.totalGIRIncEnteral} mg/kg/min liegt unter dem Minimum (${this.LIMITS.GIR.min}).`);
+        }
         if (fazit.length < 3 && n.caPRatio > 0 && (n.caPRatio < 1.5 || n.caPRatio > 2.0)) {
             const action = n.caPRatio < 1.5
                 ? `Phosphat reduzieren oder Calcium um ~${this._round((1.7 * totalPMmolKg.toNumber() - totalCaMmolKg.toNumber()) * this.MOLAR_MASS.CALCIUM, 0)} mg/kg erhöhen`
                 : `Phosphat (z.B. Glycophos) um ~${this._round((totalCaMmolKg.toNumber() / 1.7 - totalPMmolKg.toNumber()) * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen`;
             fazit.push(`Ca:P Ratio ${n.caPRatio}:1 optimieren – ${action}.`);
         }
-        if (fazit.length < 3 && postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
+        // Bei Hypertriglyceridämie ist „Energie steigern“ über Lipide gegenläufig zur
+        // kritischen Empfehlung oben — dann keine zusätzliche Energie-Zeile.
+        const tgKritisch = triglycerides !== null && triglycerides > 250;
+        if (fazit.length < 3 && !tgKritisch && postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
             fazit.push(`Energiezufuhr um ${this._round(targets.energy.min - n.kcalPerKg, 0)} kcal/kg/d steigern (Ziel ${targets.energy.min}–${targets.energy.max}).`);
         }
         if (fazit.length < 3 && postnatalAge >= 4 && n.proteinTotalGKg < targets.protein.min && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
