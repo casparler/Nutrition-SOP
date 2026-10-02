@@ -6,6 +6,8 @@ Stand: Branch `claude/zen-babbage-vjgke2`. Der Bericht entstand bei 152/152 grü
 **A1, A2, A3** (ohne den Ca:P-/P:AA-Widerspruch, der an A4 hängt), **B3, B4, B5**.
 Offen sind alle Punkte, die eine klinische Entscheidung brauchen (A4, B1, B2, B6, B7, C, D).
 
+**Nachtrag 02.10.2026:** Nach den Antworten des Neonatologen zusätzlich umgesetzt: A4 (Ca:P entfällt), B1, B2 (bleibt CRITICAL), B6 (bleibt), C1 (FM85 nur < 1800 g), C3 (Kalium), C6 (nur mit realem Gewicht), SGA, Hypoglykämie CRITICAL. Der aktuelle Stand aller Regeln steht in `REGELWERK.md`.
+
 ## Vorgehen
 
 Ich habe den Rechner (`calculator.js`, `products.js`, `fenton_data.js`) mit virtuellen Kindern

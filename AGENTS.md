@@ -3,7 +3,7 @@
 > **Verbindliche Leitlinien für alle KI-Agenten und Entwickler, die an diesem Projekt arbeiten.**
 > Dies ist eine **klinische Safety-First-Applikation**. Verstöße gegen die folgenden Regeln können zu Patientengefährdung führen.
 >
-> **Aktueller Stand:** v3.5 — Korrekturen aus der Patientensimulation (Glukose-Warnung bei GIR 0, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **162/162 grün** (Sektionen A–S).
+> **Aktueller Stand:** v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **174/174 grün** (Sektionen A–T).
 > CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) führt `npm test` bei jedem Push/PR aus.
 
 ---
@@ -12,7 +12,7 @@
 
 ### 1. Test-Suite (Vitest) — ALLE Tests müssen IMMER zu 100 % grün sein
 
-- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 162 klinische Tests** (Sektionen A–S; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
+- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 174 klinische Tests** (Sektionen A–T; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
 - Die Anzahl darf wachsen, aber **nie schrumpfen**. Neue Tests gerne — alte nur mit klinischer Begründung anpassen.
 - **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — ALLE Tests müssen bestanden sein.**
 - **Nach JEDER Änderung an `calculator.js` muss `npm test` erneut grün sein, bevor die Aufgabe als abgeschlossen gilt.**
@@ -20,7 +20,7 @@
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
 
 ```bash
-npm test    # MUSS 162 passed, 0 failed zeigen
+npm test    # MUSS 174 passed, 0 failed zeigen
 ```
 
 ### 2. ELBW-Klassengrenze bei exakt 1000 g — SAKROSANKT
@@ -332,17 +332,37 @@ deckte Fehler auf, die bei den Einzeltests nicht auffielen. Befundliste:
 - **Protein-Überschreitung durch FM85:** der Hinweis nennt die beim aktuellen Volumen
   noch mögliche FM85-Stufe.
 
-Offene Punkte, die eine klinische Entscheidung brauchen, stehen im Bericht unter A4, B1,
-B2 und C (z. B. Ca:P-Einheit, Tagesstaffelung Protein, Kalium-Obergrenze).
+Entscheidungen des Neonatologen vom **02.10.2026**, umgesetzt mit Tests **T1–T12**:
+
+- **Ca:P entfällt** als Bewertung (Calcium/Phosphat werden dienstags im Urin bestimmt). Wert wird
+  weiter angezeigt. Test C3 prüft jetzt das Gegenteil, mit klinischer Begründung im Test.
+- **Hypoglykämie ist CRITICAL** (GIR unter 3 bei laufender PN, auch GIR 0).
+- **Kalium:** Warnung an Lebenstag 1–2 (kaliumfreie Phase) und über der Obergrenze
+  (< 1500 g: 5, sonst 3 mmol/kg/d, ESPGHAN 2018).
+- **Energiedeckel des enteralen Ziels erst ab Tag 4** (vorher „Ziel 80–80“ an Tag 1).
+- **FM85-Empfehlungen nur bei Geburtsgewicht < 1800 g** (Geltungsbereich ESPGHAN 2022).
+- **Nur mit realem Gewicht rechnen:** leeres Geburtsgewicht, oder ab Tag 2 leeres aktuelles
+  Gewicht, ergibt eine `ValidationError` statt eines stillen Ersatzwerts. Test Q12 mit
+  klinischer Begründung angepasst.
+- **SGA-Erkennung** (Fenton, unter 10. bzw. 3. Perzentile) als Hinweis.
+- Beatmungs-CRITICAL und die absolute 3-ml-Grenze für Vitamin D/Proprems bleiben.
+
+Offene Punkte stehen in [REGELWERK.md](./REGELWERK.md), Abschnitt 17.
+
+### Regelwerk pflegen (verbindlich)
+
+[REGELWERK.md](./REGELWERK.md) ist das Manuskript aller Regeln. **Jede neue, geänderte oder
+gestrichene Regel wird dort im selben Arbeitsschritt eingetragen** (Wert, Status,
+Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende vermerkt.
 
 ---
 
 ## 📋 Standard-Workflow für jede Änderung an `calculator.js`
 
-1. **Vor der Änderung:** `npm test` ausführen → muss 162/162 grün sein. Sonst zuerst Bestand reparieren.
+1. **Vor der Änderung:** `npm test` ausführen → muss 174/174 grün sein. Sonst zuerst Bestand reparieren.
 2. **Während der Änderung:** Keine der drei Invarianten oben antasten.
-3. **Nach der Änderung:** `npm test` erneut ausführen → muss 162/162 grün sein.
-4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 162/162 wieder grün sind.
+3. **Nach der Änderung:** `npm test` erneut ausführen → muss 174/174 grün sein.
+4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 174/174 wieder grün sind.
 
 ---
 
@@ -350,9 +370,10 @@ B2 und C (z. B. Ca:P-Einheit, Tagesstaffelung Protein, Kalium-Obergrenze).
 
 | Datei | Zweck |
 |-------|-------|
+| [REGELWERK.md](./REGELWERK.md) | Manuskript aller Regeln mit Herkunft, Entscheidungsdatum und Tests |
 | [calculator.js](./calculator.js) | Safety Core Engine — Decimal.js, Validierung, Targets, Warnings |
 | [index.html](./index.html) | UI inkl. try-catch um `calculate()` und Error-Banner |
-| [tests/calculator.test.js](./tests/calculator.test.js) | 162 klinische Vitest-Tests (Sektionen A–S) |
+| [tests/calculator.test.js](./tests/calculator.test.js) | 174 klinische Vitest-Tests (Sektionen A–T) |
 | [NICU_NUTRITION_MASTER_PROTOCOL.md](./NICU_NUTRITION_MASTER_PROTOCOL.md) | Klinische Spezifikation (Single Source of Truth) |
 | [NEO_NUTRITION_MASTER_LOGIC.md](./NEO_NUTRITION_MASTER_LOGIC.md) | Logik-Spezifikation V11 |
 
@@ -393,7 +414,7 @@ cp index.html      _Archiv/backups/backup_index_v{X.Y}.html
 cp calculator.js   _Archiv/backups/backup_calculator_v{X.Y}.js
 cp AGENTS.md       _Archiv/backups/backup_AGENTS_v{X.Y}.md
 
-# 2. Tests müssen 162/162 grün sein
+# 2. Tests müssen 174/174 grün sein
 npm test    # im Obsidian-Ordner
 
 # 3. Repo frisch in /tmp klonen (wenn nicht schon vorhanden)
@@ -445,7 +466,7 @@ git push -u origin feature/{name}-v{X.Y}
 
 | v3.4    | `feature/clinical-review-v3.2` | **Flüssigkeitsziele, Gewichtsverlauf, Anreicherung.** (1) VLBW-Zweig war eine Kopie des ELBW-Zweigs, jetzt eigenständig; ELBW und VLBW 10 ml/kg/d unter ESPGHAN als dokumentierte Hausabweichung; Plateau ab Tag 5 statt Rampe gegen den Cap. (2) Protein-Klassengrenze auf `bw <= 1000` angeglichen (Invariante 2). (3) Gewichtsverlauf als Plausibilitätsprüfung. (4) Anreicherung wird als Zielkonzentration eingegeben (g Eiweiß/100 ml, FM85 in 0,5-%-Schritten), `results.preparation` liefert die Pulvermengen je Mahlzeit und pro Tag. → 23 neue Tests Q1–Q23, C1/A1/L1 mit Begründung angepasst. **150 Tests total** | in Arbeit |
 
-| v3.5    | `claude/zen-babbage-vjgke2` | **Korrekturen aus der Patientensimulation.** GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch, FM85-Hinweis bei Protein-Überschreitung. → 10 neue Tests S1–S8. **162 Tests total** | in Arbeit |
+| v3.5    | `claude/zen-babbage-vjgke2` | **Korrekturen aus der Patientensimulation.** GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch, FM85-Hinweis bei Protein-Überschreitung. → Tests S1–S8 und T1–T12, C3 und Q12 mit klinischer Begründung angepasst. **174 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```

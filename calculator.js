@@ -32,6 +32,19 @@ class NutritionCalculator {
             LIPIDS: { max: 4.0, unit: 'g/kg/d' },
             OSM_PERIPHERAL: 900
         };
+        // --- Kalium (v3.5) ---
+        // Hausregel: kaliumfreie Phase an Lebenstag 1–2 (Risiko nicht-oligurische
+        // Hyperkaliämie bei ELBW/VLBW, ESPGHAN 2018 Fluid & Electrolytes: Zufuhr
+        // erst nach gesicherter Diurese). Obergrenzen wachsender Kinder laut
+        // ESPGHAN 2018: < 1500 g 2–5 mmol/kg/d, > 1500 g und Reife 1–3 mmol/kg/d.
+        this.POTASSIUM = { freeUntilDay: 2, maxBelow1500: 5, max: 3 };
+        // --- Anreicherung (v3.5) ---
+        // Die ESPGHAN-Position 2022 zur enteralen Ernährung gilt für Frühgeborene
+        // mit Geburtsgewicht < 1800 g. Nur dort sprechen die Hinweise zur
+        // FM85-Fortifizierung eine Empfehlung aus.
+        this.FORTIFIER = { maxBirthWeight: 1800 };
+        // --- SGA (v3.5): Geburtsgewicht unter der 10. bzw. 3. Perzentile (Fenton) ---
+        this.SGA = { percentile: 10, severePercentile: 3 };
         // --- Enterale Zielvolumina (Vollnahrung) nach Reifegrad, v3.1 ---
         // Quellen: ESPGHAN CoN 2022 (Enteral Nutrition in Preterm Infants) —
         //   stabile wachsende Frühgeborene benötigen 150–180 ml/kg/d;
@@ -226,7 +239,12 @@ class NutritionCalculator {
         const floor5 = v => Math.max(0, Math.floor(v / 5) * 5);
         const volAtProteinMax = dens.proteinPer100 > 0
             ? floor5(this.LIMITS.PROTEIN.max * 100 / dens.proteinPer100) : Infinity;
-        const volAtEnergyMax = dens.kcalPer100 > 0
+        // v3.5: Der Energiedeckel gilt erst ab Tag 4. An Tag 1–3 ist die
+        // Tages-Energieobergrenze (60/80/100 kcal) eine PN-Phasen-Grenze und hat
+        // mit dem Vollnahrungsziel nichts zu tun — sie lieferte „Ziel 80–80“ an
+        // Tag 1 und „110–110“ an Tag 2 und die Meldung „Überernährung“ bei Kindern
+        // mit 10 ml/kg Muttermilch.
+        const volAtEnergyMax = (dens.kcalPer100 > 0 && effectiveDay >= 4)
             ? floor5(energyMax * 100 / dens.kcalPer100) : Infinity;
 
         let entMax = Math.min(entBase.max, tfiCap, volAtProteinMax, volAtEnergyMax);
@@ -508,11 +526,6 @@ class NutritionCalculator {
         targetBullet('energy', 'Energie', 'kcal/kg/d');
         targetBullet('lipids', 'Lipide', 'g/kg/d');
 
-        // 3) Ca:P Ratio (Knochenstoffwechsel)
-        if (r.caPRatio > 0 && (r.caPRatio < 1.5 || r.caPRatio > 2.0)) {
-            push('warning', `Ca:P Ratio ${r.caPRatio}:1 optimierungsbedürftig (Ziel 1.5–2.0).`);
-        }
-
         // 4) Wachstum (Phase B/C)
         if (phase.id !== 'A' && typeof r.weightVelocity === 'number') {
             if (r.weightVelocity < 0) {
@@ -693,6 +706,18 @@ class NutritionCalculator {
         // --- Step 0: Hard Input Validation (Safety-First, vor jeder Berechnung) ---
         // Klinisch/physikalisch unmögliche Werte führen zum sofortigen Abbruch.
         // SIEHE AGENTS.md — dieser Layer ist SAKROSANKT und darf nie entfernt werden.
+
+        // v3.5 (Entscheidung Neonatologe 02.10.2026): Es wird nur mit realem Gewicht
+        // gerechnet. Fehlt das Geburtsgewicht — oder ab Lebenstag 2 das aktuelle
+        // Gewicht — wird nicht still ein Ersatzwert (1000 g) angenommen, sondern
+        // abgebrochen.
+        const fehlt = v => v === '' || v === null || v === undefined;
+        if (fehlt(input.birthWeight)) {
+            throw new ValidationError('Geburtsgewicht fehlt — ohne reales Gewicht wird nicht gerechnet.', 'birthWeight');
+        }
+        if ((parseInt(input.postnatalAge, 10) || 1) >= 2 && fehlt(input.currentWeight)) {
+            throw new ValidationError('Aktuelles Gewicht fehlt — ab Lebenstag 2 wird nur mit gemessenem Gewicht gerechnet.', 'currentWeight');
+        }
         const validate = (raw, field, { min, max, minMsg, maxMsg, allowEmpty = true }) => {
             // Leere Strings/null/undefined als "nicht gesetzt" tolerieren (Default-Werte greifen unten)
             if (allowEmpty && (raw === '' || raw === null || raw === undefined)) return;
@@ -915,6 +940,22 @@ class NutritionCalculator {
         if (typeof GrowthCalculator !== 'undefined') {
             try {
                 weightPercentile = GrowthCalculator.getPercentile('WEIGHT', correctedGA, currentWeightG.toNumber());
+            } catch (e) { /* ignore */ }
+        }
+
+        // v3.5: SGA-Erkennung. Geburtsgewicht gegen die Fenton-Kurve beim Gestationsalter
+        // bei Geburt (Tabelle männlich, wie bei den übrigen Perzentilen; die weibliche
+        // Tabelle liegt rund 5 % niedriger).
+        let birthWeightPercentile = null;
+        let sga = null;
+        if (typeof GrowthCalculator !== 'undefined') {
+            try {
+                const zBirth = GrowthCalculator.calculateZScore('weight', 'male', ssw, birthWeightG.toNumber());
+                if (zBirth !== null && isFinite(zBirth)) {
+                    birthWeightPercentile = Math.round(GrowthCalculator.zToPercentile(zBirth) * 10) / 10;
+                    sga = birthWeightPercentile < this.SGA.severePercentile ? 'severe'
+                        : (birthWeightPercentile < this.SGA.percentile ? 'sga' : 'none');
+                }
             } catch (e) { /* ignore */ }
         }
 
@@ -1267,6 +1308,9 @@ class NutritionCalculator {
             };
         }
 
+        // v3.5: FM85-Empfehlungen nur für die Population der ESPGHAN-Position (< 1800 g)
+        const fortifierIndiziert = birthWeightG.lt(this.FORTIFIER.maxBirthWeight);
+
         // --- Step 11: Meal Portions & Reminders ---
         const singlePortion = mealFrequency > 0
             ? enteralDaily.div(mealFrequency).toDecimalPlaces(1)
@@ -1387,10 +1431,10 @@ class NutritionCalculator {
         if (fm85Percent >= 4 && urea !== null && urea < 3 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             reminders.push('💡 Empfehlung: +0.5 g/kg/d Protein (Aptamil Eiweiß+)');
         }
-        if (n.enteralVolKg >= 50 && n.enteralVolKg < 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+        if (fortifierIndiziert && n.enteralVolKg >= 50 && n.enteralVolKg < 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             reminders.push('💡 Fortifizierung (FM85) empfohlen ab enteralem Volumen von 50 ml/kg/d (ESPGHAN).');
         }
-        if (n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+        if (fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             reminders.push('💡 FM85 Start-Kriterium erfüllt (≥ 100 ml/kg/d enteral)');
         }
         if (fm85Percent > 0 && n.enteralVolKg >= 100) {
@@ -1466,15 +1510,25 @@ class NutritionCalculator {
         // Kind auf Vollnahrung mit kleinem PN-Rest nicht fälschlich warnt.
         const giRGesamt = n.totalGIRIncEnteral;
         if (hasPNVolume && giRGesamt < this.LIMITS.GIR.min) {
+            // v3.5 (Entscheidung Neonatologe 02.10.2026): Hypoglykämie-Risiko ist CRITICAL.
             if (n.effectiveGIR <= 0 && giRGesamt <= 0) {
-                warnings.push(`Warnung: Keine Glukosezufuhr bei laufendem PN-Volumen (${n.pnDaily} ml/d) – GIR 0 mg/kg/min, Hypoglykämie-Risiko! Glukose-Eingabe prüfen.`);
+                warnings.push(`CRITICAL: Keine Glukosezufuhr bei laufendem PN-Volumen (${n.pnDaily} ml/d) – GIR 0 mg/kg/min, Hypoglykämie-Risiko! Glukose-Eingabe prüfen.`);
             } else {
-                warnings.push(`Hinweis: GIR ${giRGesamt} mg/kg/min unter Minimum (${this.LIMITS.GIR.min}) – Hypoglykämie-Risiko!`);
+                warnings.push(`CRITICAL: GIR ${giRGesamt} mg/kg/min unter Minimum (${this.LIMITS.GIR.min}) – Hypoglykämie-Risiko!`);
             }
         }
 
         if (fm85Ignoriert) {
             warnings.push(`Hinweis: FM85 ${fm85Eingabe} % wird nur bei Muttermilch (EBM) eingerechnet — bei ${this._enteralDensity({ ...input, fm85Percent: 0 }).label} ohne Wirkung. FM85-Feld auf 0 setzen.`);
+        }
+
+        if (sga === 'sga' || sga === 'severe') {
+            warnings.push(
+                `Hinweis: SGA — Geburtsgewicht ${birthWeightG.toNumber()} g liegt bei ${ssw} SSW unter der ` +
+                `${sga === 'severe' ? this.SGA.severePercentile : this.SGA.percentile}. Perzentile (${birthWeightPercentile}.). ` +
+                `Erhöhtes Risiko für Hypoglykämie sowie Phosphat- und Kaliumabfall bei hoher Aminosäurezufuhr — ` +
+                `Glukose und Elektrolyte engmaschig kontrollieren.`
+            );
         }
 
         // BLIND-6: TFI below target minimum
@@ -1591,10 +1645,10 @@ class NutritionCalculator {
             warnings.push(`Hinweis: Energie ${n.kcalPerKg} kcal/kg/d über Zielbereich (${targets.energy.min}–${targets.energy.max}) – Überernährung prüfen.`);
         }
 
-        // Warnung (yellow)
-        if (n.caPRatio > 0 && (n.caPRatio < 1.5 || n.caPRatio > 2.0)) {
-            warnings.push(`Warnung: Ca:P Verhältnis (${n.caPRatio}:1) außerhalb Zielbereich (1.5–2.0:1) – Zufuhr von Phosphat (z.B. Glycophos) oder Calcium anpassen.`);
-        }
+        // v3.5 (Entscheidung Neonatologe 02.10.2026): Keine Ca:P-Bewertung mehr.
+        // Calcium und Phosphat werden dienstags im Urin bestimmt und die
+        // Phosphat-Substitution daran angepasst. Das Verhältnis wird weiter
+        // berechnet und angezeigt, löst aber weder Warnung noch Fazit aus.
 
         // CRYSTAL GUARD: Ca-P solubility check in PN solution
         // Reference: Simplified solubility curve for Level-1 NICU
@@ -1646,6 +1700,24 @@ class NutritionCalculator {
             }
         }
 
+        // --- v3.5: Kalium ---
+        // (a) kaliumfreie Phase an Lebenstag 1–2, (b) Obergrenze nach Gewichtsklasse.
+        // Bewertet wird die parenterale Kaliumzufuhr (inkl. KCl-Zusatz).
+        if (postnatalAge <= this.POTASSIUM.freeUntilDay && n.effectiveK > 0) {
+            warnings.push(
+                `Warnung: Kalium ${n.effectiveK} mmol/kg/d an Lebenstag ${postnatalAge} — in den ersten ` +
+                `${this.POTASSIUM.freeUntilDay} Lebenstagen kaliumfrei (Risiko nicht-oligurische Hyperkaliämie, ` +
+                `v. a. ELBW/VLBW). Kalium erst nach gesicherter Diurese und Serum-Kalium.`
+            );
+        }
+        const kMax = birthWeightG.lt(1500) ? this.POTASSIUM.maxBelow1500 : this.POTASSIUM.max;
+        if (n.effectiveK > kMax) {
+            warnings.push(
+                `Warnung: Kalium ${n.effectiveK} mmol/kg/d über der Obergrenze (${kMax} mmol/kg/d, ` +
+                `${birthWeightG.lt(1500) ? '< 1500 g' : '≥ 1500 g'}; ESPGHAN 2018). Serum-Kalium kontrollieren.`
+            );
+        }
+
         // --- AUDIT: IWL / Hypernatriämie-Risiko (Phase A) ---
         // Master-Protokoll: ELBW-Klassengrenze inklusiv bei 1000g (v3.5: vorher lt(1000))
         if (birthWeightG.lte(1000) && postnatalAge <= 7) {
@@ -1666,7 +1738,7 @@ class NutritionCalculator {
         }
 
         // --- AUDIT: Growth Stagnation + Fortifier Logic (Phase C) ---
-        if (postnatalAge >= 28 && n.enteralVolKg >= 140 && fm85Percent < 4 && selectedEnteralProduct === 'ebm') {
+        if (fortifierIndiziert && postnatalAge >= 28 && n.enteralVolKg >= 140 && fm85Percent < 4 && selectedEnteralProduct === 'ebm') {
             warnings.push('Hinweis: Monat 2+ bei >140 ml/kg/d enteral mit FM85 < 4% — Fortifizierung auf 4% empfohlen.');
         }
         if (postnatalAge >= 28 && weightVelocity !== 'Initial' && weightVelocity < 15 && n.enteralVolKg >= 100) {
@@ -1815,7 +1887,7 @@ class NutritionCalculator {
                 ? `Steigerung um bis zu ${Math.min(targets.enteralRamp.step, this._round(targets.enteralRamp.expected - n.enteralVolKg, 0))} ml/kg/d erwägen (Korridor Tag ${postnatalAge}: ~${targets.enteralRamp.expected} ml/kg/d) — nur bei guter Toleranz`
                 : null,
             lipidEscalation,
-            fortification: (n.enteralVolKg >= 100 && fm85Percent < 4 && selectedEnteralProduct === 'ebm')
+            fortification: (fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent < 4 && selectedEnteralProduct === 'ebm')
                 ? 'FM85 Titrationsplan: Steigerung auf 4% empfohlen'
                 : null,
             supplement: (urea !== null && urea < 3 && fm85Percent >= 4 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max)
@@ -1839,16 +1911,6 @@ class NutritionCalculator {
         warnings
             .filter(w => w.startsWith('CRITICAL') && !bereitsImFazit.test(w))
             .forEach(w => { if (fazit.length < 3) fazit.push(w.replace(/^CRITICAL:\s*/, '')); });
-        const keineGlukose = hasPNVolume && n.totalGIRIncEnteral < this.LIMITS.GIR.min;
-        if (fazit.length < 3 && keineGlukose) {
-            fazit.push(`Glukosezufuhr prüfen: GIR ${n.totalGIRIncEnteral} mg/kg/min liegt unter dem Minimum (${this.LIMITS.GIR.min}).`);
-        }
-        if (fazit.length < 3 && n.caPRatio > 0 && (n.caPRatio < 1.5 || n.caPRatio > 2.0)) {
-            const action = n.caPRatio < 1.5
-                ? `Phosphat reduzieren oder Calcium um ~${this._round((1.7 * totalPMmolKg.toNumber() - totalCaMmolKg.toNumber()) * this.MOLAR_MASS.CALCIUM, 0)} mg/kg erhöhen`
-                : `Phosphat (z.B. Glycophos) um ~${this._round((totalCaMmolKg.toNumber() / 1.7 - totalPMmolKg.toNumber()) * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen`;
-            fazit.push(`Ca:P Ratio ${n.caPRatio}:1 optimieren – ${action}.`);
-        }
         // Bei Hypertriglyceridämie ist „Energie steigern“ über Lipide gegenläufig zur
         // kritischen Empfehlung oben — dann keine zusätzliche Energie-Zeile.
         const tgKritisch = triglycerides !== null && triglycerides > 250;
@@ -1864,7 +1926,7 @@ class NutritionCalculator {
         if (fazit.length < 3 && n.paaRatio > 0 && n.paaRatio < 1.0 && n.proteinTotalGKg > 0) {
             fazit.push(`Phosphat um ~${this._round((1.0 - n.paaRatio) * n.proteinTotalGKg * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen (P:AA Ratio ${n.paaRatio} → Ziel ≥ 1.0).`);
         }
-        if (fazit.length < 3 && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+        if (fazit.length < 3 && fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             fazit.push('FM85-Fortifizierung starten – enterales Volumen ≥ 100 ml/kg/d erreicht.');
         }
         if (fazit.length === 0) {
@@ -1900,6 +1962,8 @@ class NutritionCalculator {
                 effectiveNa: n.effectiveNa,
                 totalNaMmolKg: n.totalNaMmolKg,
                 weightChangePercent,
+                birthWeightPercentile,
+                sga,
                 effectiveK: n.effectiveK,
                 effectiveCl: n.effectiveCl,
                 secondaryDaily: n.secondaryDaily,

@@ -1318,13 +1318,6 @@
                     max: res.targets.energy.max
                 },
                 {
-                    name: 'Ca:P Ratio (molar)',
-                    value: r.caPRatio,
-                    unit: ':1',
-                    min: 1.5,
-                    max: 1.7
-                },
-                {
                     name: 'GIR',
                     value: r.effectiveGIR,
                     unit: 'mg/kg/min',
@@ -1428,10 +1421,9 @@
                 // v2.0 — Educational Layer: ESPGHAN-Begründung + Physiologie
                 set('tip-cap',
                     `<strong>Ca:P (molar)</strong>: ${res.results.caPRatio || '–'}:1<br>` +
-                    `<span style="font-size:11px">Ziel <strong>1,5–1,7:1</strong> (ESPGHAN 2018).<br>` +
-                    `Spiegelt die Hydroxyapatit-Stöchiometrie im Knochen wider.<br>` +
-                    `&lt; 1,5: Hyperkalzämie- &amp; PIFS-Risiko (Phosphat-Defizit).<br>` +
-                    `&gt; 2,0: Mineralisationsdefekt durch Ca-Überangebot.</span>`);
+                    `<span style="font-size:11px">Wird nur angezeigt, nicht bewertet.<br>` +
+                    `Calcium und Phosphat werden dienstags im Urin bestimmt, die ` +
+                    `Phosphat-Substitution folgt den Laborwerten.</span>`);
                 set('tip-npc',
                     '<strong>NPC Lipid-Anteil</strong><br>' +
                     '<span style="font-size:11px">ESPGHAN 2018: <strong>25–50%</strong> der Nicht-Protein-Kalorien aus Lipiden.<br>' +
@@ -1857,7 +1849,9 @@
 
             window.updateCalculations = function updateCalculations() {
                 const day = parseInt(document.getElementById('input-day').value) || 1;
-                const currentWeight = parseFloat(document.getElementById('current-weight').value) || 1000;
+                // v3.5: nur mit realem Gewicht rechnen — kein stiller Ersatzwert (vorher 1000 g).
+                // Leere Felder gehen unverändert an calculate(), das dann abbricht.
+                const currentWeight = document.getElementById('current-weight').value;
 
                 const prevDayData = history[String(day - 1)];
                 const yesterdayWeightRaw = document.getElementById('yesterday-weight').value;
@@ -1924,7 +1918,7 @@
                     length: document.getElementById('input-length').value || null,
                     head: document.getElementById('input-head').value || null,
                     triglycerides: rawTg === '' || rawTg == null ? null : parseFloat(rawTg),
-                    birthWeight: document.getElementById('birth-weight').value || 1000,
+                    birthWeight: document.getElementById('birth-weight').value,
                     ssw: document.getElementById('input-ssw').value || 28,
                     postnatalAge: document.getElementById('input-day').value || 1,
                     correctedGA: document.getElementById('computed-corrected-ga').value || null,
@@ -1959,7 +1953,11 @@
                         if (errField) errField.textContent = err.field ? `Betroffenes Feld: ${err.field}` : '';
                         if (errBanner) {
                             errBanner.classList.remove('hidden');
-                            errBanner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            // Fehlende Gewichte sind der Normalzustand beim Seitenstart — Banner
+                            // zeigen, aber nicht dorthin scrollen.
+                            if (err.field !== 'birthWeight' && err.field !== 'currentWeight') {
+                                errBanner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
                         }
                         console.warn('[ValidationError]', err.field, err.message);
                         return; // displayResults überspringen — alte Werte bleiben unverändert

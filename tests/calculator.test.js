@@ -309,11 +309,17 @@ describe('C) ESPGHAN Targets & Tiered Alerts', () => {
         expect(r.protein.max).toBe(3.0);
     });
 
-    it('C3: Ca:P Ratio außerhalb 1.5–2.0 → Warnung', () => {
+    // v3.5 — klinisch begründete Anpassung (Neonatologe, 02.10.2026): Calcium und
+    // Phosphat werden dienstags im Urin bestimmt und die Phosphat-Substitution daran
+    // angepasst; eine Ca:P-Bewertung der Zufuhr hat auf Station keine Funktion. Vorher
+    // prüfte dieser Test die Warnung. Das Verhältnis wird weiter berechnet.
+    it('C3: Ca:P Ratio außerhalb 1.5–2.0 löst keine Warnung mehr aus (Wert bleibt sichtbar)', () => {
         const r = calc.calculate(baseInput({
-            calcium: 30, phosphate: 80 // Ratio ≈ 0.29 → out of range
+            calcium: 30, phosphate: 80 // Ratio ≈ 0.29
         }));
-        expect(r.warnings.some(w => w.includes('Ca:P'))).toBe(true);
+        expect(r.warnings.some(w => w.includes('Ca:P'))).toBe(false);
+        expect(r.fazit.join(' ')).not.toMatch(/Ca:P/);
+        expect(r.results.caPRatio).toBeGreaterThan(0);
     });
 
     it('C4: P:AA Ratio < 1.0 → Warnung', () => {
@@ -1365,12 +1371,21 @@ describe('Q-GEW) Gewichtsverlauf als Kontrollgröße', () => {
         expect(r.warnings.some(w => /noch nicht wieder erreicht/.test(w))).toBe(true);
     });
 
+    // v3.5 — klinisch begründete Anpassung (Neonatologe, 02.10.2026): Es wird nur mit
+    // realem Gewicht gerechnet. Ab Lebenstag 2 bricht die App ohne aktuelles Gewicht
+    // ab, statt es auf das Geburtsgewicht zu setzen. Das Ziel des Tests (keine
+    // Falschmeldung „0 % Verlust“) bleibt erhalten: an Tag 1 gilt das Geburtsgewicht,
+    // danach gibt es gar kein Ergebnis mehr.
     it('Q12: Ohne Gewichtseingabe keine Falschmeldung', () => {
-        const input = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 4, tfi: 150 });
-        delete input.currentWeight;
-        const r = calc.calculate(input);
+        const tag1 = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 1, tfi: 80 });
+        delete tag1.currentWeight;
+        const r = calc.calculate(tag1);
         expect(r.results.weightChangePercent).toBe(null);
         expect(r.warnings.some(w => /Gewichtsverlust/.test(w))).toBe(false);
+
+        const tag4 = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 4, tfi: 150 });
+        delete tag4.currentWeight;
+        expect(() => calc.calculate(tag4)).toThrow(/Aktuelles Gewicht fehlt/);
     });
 });
 
@@ -1531,14 +1546,16 @@ describe('S) Korrekturen aus der Patientensimulation (v3.5)', () => {
     });
 
     // S2–S3 — Glukose fehlt bei laufender PN
-    it('S2: GIR 0 bei laufendem PN-Volumen löst eine Warnung aus', () => {
+    it('S2: GIR 0 bei laufendem PN-Volumen ist CRITICAL und steht im Fazit', () => {
         const r = calc.calculate(baseInput({
             birthWeight: 2100, currentWeight: 2100, ssw: 34, postnatalAge: 1,
             tfi: 60, gir: 0, protein: 1.5, lipids: 1.0
         }));
         const w = r.warnings.find(x => /Keine Glukosezufuhr/.test(x));
         expect(w).toBeTruthy();
-        expect(r.fazit.join(' ')).toMatch(/Glukosezufuhr prüfen/);
+        expect(w.startsWith('CRITICAL')).toBe(true);
+        expect(r.isSafe).toBe(false);
+        expect(r.fazit.join(' ')).toMatch(/Keine Glukosezufuhr/);
         expect(r.fazit.join(' ')).not.toMatch(/keine Korrekturen erforderlich/);
     });
 
@@ -1645,5 +1662,142 @@ describe('S) Korrekturen aus der Patientensimulation (v3.5)', () => {
         expect(eiweiss).toBeLessThanOrEqual(4.5);
         // und die nächste halbe Stufe sprengt es
         expect(160 * (1.13 + (stufe + 0.5) * 0.4675) / 100).toBeGreaterThan(4.5);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION T — Entscheidungen des Neonatologen vom 02.10.2026 (v3.5)
+ * Jede Regel steht zusätzlich im REGELWERK.md.
+ * ────────────────────────────────────────────────────────────────*/
+describe('T) Entscheidungen 02.10.2026 (v3.5)', () => {
+
+    it('T1: GIR unter Minimum bei laufender PN ist CRITICAL', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 3,
+            tfi: 120, gir: 2, protein: 2, lipids: 2
+        }));
+        const w = r.warnings.find(x => /unter Minimum/.test(x));
+        expect(w).toBeTruthy();
+        expect(w.startsWith('CRITICAL')).toBe(true);
+        expect(r.isSafe).toBe(false);
+    });
+
+    // --- Kalium ---
+    it('T2: Kalium an Lebenstag 1 und 2 löst die Warnung „kaliumfreie Phase“ aus, ab Tag 3 nicht', () => {
+        const mk = d => calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 780, ssw: 26, postnatalAge: d,
+            tfi: 100, gir: 6, protein: 2, lipids: 1.5, potassium: 1
+        }));
+        const frei = r => r.warnings.some(w => /kaliumfrei/.test(w));
+        expect(frei(mk(1))).toBe(true);
+        expect(frei(mk(2))).toBe(true);
+        expect(frei(mk(3))).toBe(false);
+    });
+
+    it('T3: Kein Kalium an Tag 1–2 → keine Kalium-Warnung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 800, ssw: 26, postnatalAge: 1,
+            tfi: 80, gir: 5, protein: 2, lipids: 1, potassium: 0
+        }));
+        expect(r.warnings.some(w => /Kalium/.test(w))).toBe(false);
+    });
+
+    it('T4: Kalium-Obergrenze: < 1500 g über 5, ab 1500 g über 3 mmol/kg/d', () => {
+        const mk = (bw, k) => calc.calculate(baseInput({
+            birthWeight: bw, currentWeight: bw, ssw: 30, postnatalAge: 6,
+            tfi: 140, gir: 6, protein: 3, lipids: 2, potassium: k
+        }));
+        const hoch = r => r.warnings.some(w => /Kalium .* über der Obergrenze/.test(w));
+        expect(hoch(mk(1200, 5))).toBe(false);
+        expect(hoch(mk(1200, 5.5))).toBe(true);
+        expect(hoch(mk(1800, 3))).toBe(false);
+        expect(hoch(mk(1800, 3.5))).toBe(true);
+    });
+
+    // --- Energiedeckel erst ab Tag 4 ---
+    it('T5: Enterales Ziel an Tag 1–3 wird nicht durch die Tages-Energie gedeckelt', () => {
+        for (const d of [1, 2, 3]) {
+            const t = calc.getTargets({ birthWeight: 700, ssw: 25, postnatalAge: d, selectedEnteralProduct: 'ebm' });
+            expect(t.enteralTarget.min, `Tag ${d}`).toBe(160);
+            expect(t.enteralTarget.max, `Tag ${d}`).toBe(180);
+            expect(t.enteralTarget.limitedBy).toBe(null);
+        }
+        const r = calc.calculate(baseInput({
+            birthWeight: 700, currentWeight: 700, ssw: 25, postnatalAge: 1,
+            tfi: 80, enteralVolume: 10, gir: 5, protein: 2, lipids: 1
+        }));
+        expect(r.reminders.some(m => /Überernährung/.test(m))).toBe(false);
+    });
+
+    it('T6: Ab Tag 4 greift der Energiedeckel weiter (Absicherung O3 bleibt wirksam)', () => {
+        const t = calc.getTargets({ birthWeight: 700, ssw: 25, postnatalAge: 5, selectedEnteralProduct: 'ebm', fm85Percent: 2 });
+        expect(t.enteralTarget.limitedBy).toBe('energy');
+    });
+
+    // --- Anreicherung nur für < 1800 g (Geltungsbereich ESPGHAN 2022) ---
+    it('T7: Reifgeborenes mit EBM bekommt keine FM85-Empfehlung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 3400, currentWeight: 3250, ssw: 39, postnatalAge: 5,
+            tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0
+        }));
+        expect(r.reminders.some(m => /FM85/.test(m))).toBe(false);
+        expect(r.recommendations.fortification).toBe(null);
+        expect(r.fazit.join(' ')).not.toMatch(/FM85/);
+    });
+
+    it('T8: Frühgeborenes unter 1800 g behält die FM85-Empfehlung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1700, currentWeight: 1650, ssw: 32, postnatalAge: 10,
+            tfi: 150, enteralVolume: 120, gir: 0, protein: 0, lipids: 0
+        }));
+        expect(r.reminders.some(m => /FM85 Start-Kriterium/.test(m))).toBe(true);
+        expect(r.recommendations.fortification).toBeTruthy();
+    });
+
+    // --- Fehlendes Gewicht ---
+    it('T9: Ohne Geburtsgewicht wird nicht gerechnet', () => {
+        for (const leer of ['', null, undefined]) {
+            expect(() => calc.calculate(baseInput({ birthWeight: leer })), String(leer))
+                .toThrow(/Geburtsgewicht fehlt/);
+        }
+        try { calc.calculate(baseInput({ birthWeight: '' })); } catch (e) {
+            expect(e.name).toBe('ValidationError');
+            expect(e.field).toBe('birthWeight');
+        }
+    });
+
+    it('T10: Ab Tag 2 ohne aktuelles Gewicht wird nicht gerechnet, an Tag 1 genügt das Geburtsgewicht', () => {
+        expect(() => calc.calculate(baseInput({ postnatalAge: 2, currentWeight: '' })))
+            .toThrow(/Aktuelles Gewicht fehlt/);
+        expect(() => calc.calculate(baseInput({ postnatalAge: 1, currentWeight: '' }))).not.toThrow();
+    });
+
+    // --- SGA ---
+    it('T11: SGA wird über die Geburtsgewichts-Perzentile erkannt', async () => {
+        const { GrowthCalculator } = await import('../fenton_data.js').then(m => m.default || m);
+        globalThis.GrowthCalculator = GrowthCalculator;
+        try {
+            const sga = calc.calculate(baseInput({
+                birthWeight: 1450, currentWeight: 1450, ssw: 38, postnatalAge: 1, tfi: 60
+            }));
+            expect(['sga', 'severe']).toContain(sga.results.sga);
+            expect(sga.warnings.some(w => /SGA/.test(w))).toBe(true);
+
+            const aga = calc.calculate(baseInput({
+                birthWeight: 3300, currentWeight: 3300, ssw: 39, postnatalAge: 1, tfi: 60
+            }));
+            expect(aga.results.sga).toBe('none');
+            expect(aga.warnings.some(w => /SGA/.test(w))).toBe(false);
+        } finally {
+            delete globalThis.GrowthCalculator;
+        }
+    });
+
+    it('T12: Ohne Fenton-Modul bleibt die SGA-Erkennung still (null, kein Fehler)', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1450, currentWeight: 1450, ssw: 38, postnatalAge: 1, tfi: 60
+        }));
+        expect(r.results.sga).toBe(null);
+        expect(r.results.birthWeightPercentile).toBe(null);
     });
 });
