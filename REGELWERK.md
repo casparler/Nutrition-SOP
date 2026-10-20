@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.5.1, 184 Tests.
+Stand: 20.10.2026, Version v3.6.0, 198 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -258,6 +258,26 @@ Phase A Tag 1–7 (Übergang), Phase B Tag 8–28 (Aufbau), Phase C ab Tag 29 (K
 
 ---
 
+## 16a. Darstellung und Priorisierung von Meldungen (v3.6)
+
+Ziel: wenige, eindeutige Signale statt vieler gleichfarbiger Zeilen (Alarmmüdigkeit). Alle Meldungen
+bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
+
+| ID | Regel | Status | Code | Test |
+|---|---|---|---|---|
+| 16a.1 | **Vier Stufen:** kritisch (`CRITICAL:`), Warnung (`Warnung:`), Hinweis (`Hinweis:` und alles Übrige), Erinnerung (💡). Die Stufe ergibt sich aus dem **Präfix des Meldungstextes**; neue Meldungen müssen mit einem dieser Präfixe beginnen | Entscheidung 20.10.2026 | `_buildAlerts` | Y2 |
+| 16a.2 | **Kritisch ist immer vollständig sichtbar**, nie eingeklappt, mit `role="alert"` | Entscheidung 20.10.2026 | `renderFindings` | Z1 |
+| 16a.3 | **Warnungen:** die ersten 3 sichtbar, weitere unter „n weitere Warnungen“. Hinweise und Erinnerungen eingeklappt, je Zeile aufklappbar | Entscheidung 20.10.2026 | `renderFindings` | Z2, Z3 |
+| 16a.4 | Reihenfolge: Stufe, dann Bereich (Wachstum, Glukose & PN, Elektrolyte, Enteral, Flüssigkeit, Eiweiß & Energie) | Haus | `_buildAlerts` | Y2 |
+| 16a.5 | Eine Stufe ist immer an **Symbol, Text und Farbe** erkennbar (⛔ kritisch, ⚠ Warnung, ℹ Hinweis), nie nur an der Farbe | Entscheidung 20.10.2026 | CSS `.f-*` | Z6 |
+| 16a.6 | Zähler oben nennen die Anzahl je Stufe; gibt es keine Befunde, steht „✓ Keine Befunde“ | Entscheidung 20.10.2026 | `renderFindings` | Z2 |
+| 16a.7 | **Nächste Schritte** (bisher „Klinisches Fazit“): höchstens 3 Handlungen, ohne Wiederholung der kritischen Meldungen | Entscheidung 20.10.2026 | `renderFindings` | Z4 |
+| 16a.8 | Ein Satz wird in Titel (bis zum ersten Gedankenstrich oder Satzende) und Detail zerlegt; der Bereich folgt dem **Titel**, eindeutige Leitbegriffe (z. B. Hypernatriämie) gelten über den ganzen Text | Entscheidung 20.10.2026 | `_buildAlerts` | Y4–Y6 |
+| 16a.9 | Der Toleranz-Vorbehalt beim Steigerungshinweis bleibt im vollen Wortlaut erhalten, auch wenn die Zeile eingeklappt ist | Entscheidung (v3.1) | `_buildAlerts` | Y7, N7 |
+| 16a.10 | Entfallen sind die getrennten Listen (Warnliste, Erinnerungsbox, Empfehlungsbox, Fazit-Karte) und die Bullets der Beurteilung. Alles steht in einem Bereich der Beurteilungskarte | Entscheidung 20.10.2026 | `index.html` | Z5 |
+| 16a.11 | „Im Ziel“-Zeile ersetzt die einzelnen grünen Positiv-Meldungen | Entscheidung 20.10.2026 | `renderFindings` | – |
+| 16a.12 | Nur in der Oberfläche berechnet: Wachstumsrate > 30 g/kg/d → kritisch (Ödem, Plausibilität). Beeinflusst `isSafe` nicht | Haus | `renderFindings` | – |
+
 ## 17. Offene Punkte (brauchen eine Entscheidung)
 
 | Nr. | Punkt | Stand |
@@ -293,6 +313,7 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 20.10.2026 | Meldungen gestaffelt: eine Hierarchie, kritisch immer sichtbar, Warnungen begrenzt, Hinweise und Erinnerungen eingeklappt; Fazit-Karte und Einzellisten entfallen |
 | 20.10.2026 | Versionswächter gegen veralteten Rechenkern (Anlass: neue Oberfläche mit alter `calculator.js` zeigte „undefined“ und ignorierte g/kg/d stumm) |
 | 20.10.2026 | Eiweiß-Zusatz wahlweise in g/100 ml (Hauptform) oder g/kg/d |
 | 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |

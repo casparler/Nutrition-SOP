@@ -50,6 +50,34 @@
         .cpr-bullet-warning  { background:#fef3c7; border-left:3px solid #f59e0b; color:#78350f; }
         .cpr-bullet-positive { background:#d1fae5; border-left:3px solid #10b981; color:#065f46; }
 
+        /* v3.6 — Befunde: eine Alarm-Hierarchie, Stufe immer an Symbol + Text + Farbe erkennbar
+           (nie nur Farbe), kritisch immer sichtbar, Rest gestaffelt. */
+        .f-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.4rem; }
+        .f-chip { display:inline-flex; align-items:center; gap:.3rem; font-size:.78rem; font-weight:700; padding:.15rem .65rem; border-radius:9999px; border:1px solid; }
+        .f-chip.critical { background:#b91c1c; color:#fff; border-color:#7f1d1d; }
+        .f-chip.warning  { background:#fef3c7; color:#78350f; border-color:#f59e0b; }
+        .f-chip.info     { background:#f1f5f9; color:#334155; border-color:#94a3b8; }
+        .f-chip.ok       { background:#d1fae5; color:#065f46; border-color:#10b981; }
+        .f-item { display:flex; gap:.5rem; align-items:flex-start; padding:.4rem .6rem; border-radius:.375rem; border-left:5px solid; font-size:.875rem; margin-top:.35rem; }
+        .f-item.critical { background:#fee2e2; border-color:#b91c1c; color:#7f1d1d; }
+        .f-item.warning  { background:#fffbeb; border-color:#f59e0b; color:#78350f; }
+        .f-icon { flex:none; line-height:1.25; }
+        .f-title { font-weight:700; }
+        .f-detail { display:block; font-weight:400; font-size:.8rem; opacity:.92; }
+        .f-tag { margin-left:auto; flex:none; padding-left:.5rem; font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; opacity:.65; white-space:nowrap; }
+        .f-fold { margin-top:.4rem; border:1px solid #cbd5e1; border-radius:.375rem; background:rgba(255,255,255,.65); }
+        .f-fold > summary { cursor:pointer; padding:.35rem .6rem; font-size:.8rem; font-weight:700; color:#334155; }
+        .f-fold-body { padding:0 .6rem .45rem; }
+        .f-row { font-size:.8rem; padding:.3rem 0; border-top:1px dashed #cbd5e1; color:#334155; }
+        .f-row:first-child { border-top:0; }
+        .f-row > summary { cursor:pointer; }
+        .f-row .f-detail { margin:.2rem 0 0 1.2rem; }
+        .f-next { margin-top:.5rem; padding:.4rem .6rem; border-radius:.375rem; background:rgba(255,255,255,.7); border:1px solid #cbd5e1; }
+        .f-next-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
+        .f-next ol { margin:.2rem 0 0 1.1rem; padding:0; list-style:decimal; font-size:.85rem; color:#1e293b; }
+        .f-ok { margin-top:.5rem; font-size:.8rem; color:#065f46; }
+        @media print { .f-fold:not([open]) > .f-fold-body { display:block; } }
+
         /* v2.0 — Copy-for-Documentation Feedback-Animation */
         @keyframes flashGreen { 0%{background:#10b981;color:#fff} 100%{background:#1f2937;color:#fff} }
         .btn-copied { animation: flashGreen 1.2s ease-out; }
@@ -73,8 +101,6 @@
         @media (max-height: 820px) {
             #cpr-card .px-4.py-3 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
             #cpr-headline { font-size: 1rem; line-height: 1.25; }
-            #cpr-bullets { margin-top: 0.4rem; }
-            #cpr-bullets li { padding-top: 0.25rem; padding-bottom: 0.25rem; }
         }
 
 
@@ -102,6 +128,8 @@
             font-size: clamp(1.25rem, 9cqw, 2.25rem); font-weight: 800; line-height: 1.05;
             white-space: nowrap; overflow: hidden; text-overflow: clip;
         }
+        /* Textwerte („Sicher“, „Kritisch“) kleiner als Zahlen, damit nichts abgeschnitten wird */
+        .qv-value.qv-word { font-size: clamp(1rem, 6.2cqw, 1.5rem); }
         .qv-unit {
             font-size: clamp(9px, 2.4cqw, 12px); color: #94a3b8; margin-top: 0.15rem;
             line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -141,7 +169,7 @@
 
     <header class="bg-blue-800 text-white p-4 shadow-md no-print">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span class="text-sm font-normal opacity-75">v3.2</span></h1>
+            <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span id="app-version" class="text-sm font-normal opacity-75"></span></h1>
             <div class="flex items-center gap-6">
                 <div id="gv-header-display" class="hidden text-center">
                     <p class="text-[10px] uppercase tracking-wider opacity-75">Growth Velocity</p>
@@ -731,7 +759,18 @@
                     <div class="px-4 py-3">
                         <p id="cpr-headline" class="cpr-headline font-bold text-lg leading-tight">Berechnung ausstehend…</p>
                         <p id="cpr-summary" class="text-sm text-gray-700 mt-1 italic opacity-90">–</p>
-                        <ul id="cpr-bullets" class="mt-3 space-y-1.5 text-sm"></ul>
+                        <div id="findings" class="mt-2">
+                            <div id="findings-chips" class="f-chips"></div>
+                            <div id="findings-critical" role="alert" aria-live="assertive"></div>
+                            <div id="findings-next" class="f-next hidden">
+                                <p class="f-next-label">Nächste Schritte</p>
+                                <ol id="findings-next-list"></ol>
+                            </div>
+                            <div id="findings-warning"></div>
+                            <details id="findings-info" class="f-fold hidden"><summary></summary><div class="f-fold-body"></div></details>
+                            <details id="findings-reminders" class="f-fold hidden"><summary></summary><div class="f-fold-body"></div></details>
+                            <p id="findings-ok" class="f-ok hidden"></p>
+                        </div>
                     </div>
                 </div>
 
@@ -821,9 +860,6 @@
                         <span class="font-bold text-lg">Ergebnis-Zusammenfassung</span>
                         <span id="safety-badge" onclick="openSafetyModal()" class="bg-green-500 text-white text-xs px-2 py-1 rounded-full uppercase font-bold cursor-pointer hover:scale-105 transition-transform" title="Klicken für Sicherheits-Details">Sicher</span>
                     </div>
-                    <div id="warning-container" class="hidden p-3 text-sm font-bold"></div>
-                    <div id="reminders-container" class="hidden p-3 bg-teal-50 border-b border-teal-200 text-sm text-teal-900"></div>
-                    <div id="fortification-info" class="hidden p-3 bg-blue-50 text-sm font-bold text-blue-800 border-b border-blue-200"></div>
 
                     <!-- Micronutrient Info -->
                     <div id="micronutrient-info" class="hidden p-3 bg-purple-50 border-b border-purple-200 text-xs text-purple-800"></div>
@@ -1074,17 +1110,6 @@
                     <div id="validation-kpis" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"></div>
                 </div>
 
-                <!-- Klinisches Fazit -->
-                <div id="clinical-fazit" class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg border-2 border-emerald-200 overflow-hidden">
-                    <div class="bg-emerald-700 text-white px-4 py-3 flex justify-between items-center">
-                        <span class="font-bold text-sm uppercase tracking-wider">📋 Klinisches Fazit</span>
-                        <span class="text-[10px] opacity-75">Optimierungsvorschläge</span>
-                    </div>
-                    <div id="fazit-content" class="p-4 space-y-2 text-sm text-emerald-900">
-                        <p class="text-gray-400 italic">Berechnung ausstehend…</p>
-                    </div>
-                </div>
-
                 <!-- Action Buttons -->
                 <div class="flex gap-4 no-print">
                     <button id="btn-export" class="flex-1 bg-gray-800 hover:bg-black text-white font-bold py-3 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
@@ -1108,9 +1133,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.5.1"></script>
-    <script src="fenton_data.js?v=3.5.1"></script>
-    <script src="calculator.js?v=3.5.1"></script>
+    <script src="products.js?v=3.6.0"></script>
+    <script src="fenton_data.js?v=3.6.0"></script>
+    <script src="calculator.js?v=3.6.0"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1369,7 +1394,8 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.5.1';
+            const EXPECTED_CALC_VERSION = '3.6.0';
+            { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
             const tipInstances = {};
@@ -1459,23 +1485,98 @@
                     ? a.phaseLabel.split(' (')[0]
                     : `Phase ${a.phase || '–'}`;
 
-                const ul = document.getElementById('cpr-bullets');
-                ul.innerHTML = '';
-                (a.bullets || []).forEach(b => {
-                    const icon = b.kind === 'critical' ? '⛔' : b.kind === 'warning' ? '⚠️' : '✅';
-                    const li = document.createElement('li');
-                    li.className = `cpr-bullet-${b.kind} px-3 py-1.5 rounded text-sm flex gap-2 items-start`;
-                    li.innerHTML = `<span class="leading-none mt-0.5">${icon}</span><span>${b.text}</span>`;
-                    ul.appendChild(li);
+                renderFindings(res);
+            }
+
+            // v3.6 — Befunde. Eine Stelle, eine Hierarchie:
+            //   Kritisch  → immer vollständig sichtbar (rot, ⛔)
+            //   Warnung   → die ersten 3 sichtbar, Rest eingeklappt (gelb, ⚠)
+            //   Hinweis   → eingeklappt, je Zeile aufklappbar (grau, ℹ)
+            //   Erinnerung/Empfehlung → eingeklappt (💡)
+            // Zahlen stehen immer in den Zählern; es wird nichts weggelassen, nur gestaffelt.
+            function renderFindings(res) {
+                const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+                const $ = id => document.getElementById(id);
+                const al = res.alerts || { items: [], reminders: [], counts: {} };
+                const items = al.items.slice();
+
+                // Nur in der Oberfläche berechnet: Wachstumsrate > 30 g/kg/d (Ödem-/Plausibilitätsprüfung)
+                const gv = res.results.weightVelocity;
+                if (gv !== 'Initial' && typeof gv === 'number' && gv > 30) {
+                    items.unshift({ level: 'critical', domainLabel: 'Wachstum', title: `Wachstumsrate ${gv} g/kg/d über 30 g/kg/d`,
+                                    detail: 'Ödem-Risiko, Plausibilität der Gewichte prüfen.', text: '' });
+                }
+                // Vorhersagehinweise (Modell B) gehören in die Hinweise
+                ((res.assessment && res.assessment.predictiveHints) || []).forEach(h => {
+                    items.push({ level: 'info', domainLabel: 'Prädiktiv', title: h.text, detail: '', text: h.text });
                 });
 
-                // v2.1 — Predictive Hints (Modell B: diagnostische Hinweise, kein Stop)
-                (a.predictiveHints || []).forEach(h => {
-                    const li = document.createElement('li');
-                    li.className = 'cpr-bullet-hint px-3 py-1.5 rounded text-sm flex gap-2 items-start border border-dashed border-amber-300 bg-amber-50 text-amber-800';
-                    li.innerHTML = `<span class="leading-none mt-0.5">🔮</span><span><strong>Prädiktiver Hinweis:</strong> ${h.text}</span>`;
-                    ul.appendChild(li);
-                });
+                const crit = items.filter(i => i.level === 'critical');
+                const warn = items.filter(i => i.level === 'warning');
+                const info = items.filter(i => i.level === 'info');
+
+                // Zähler
+                const chips = [];
+                if (crit.length) chips.push(`<span class="f-chip critical">⛔ ${crit.length} kritisch</span>`);
+                if (warn.length) chips.push(`<span class="f-chip warning">⚠ ${warn.length} ${warn.length === 1 ? 'Warnung' : 'Warnungen'}</span>`);
+                if (info.length) chips.push(`<span class="f-chip info">ℹ ${info.length} ${info.length === 1 ? 'Hinweis' : 'Hinweise'}</span>`);
+                if (!chips.length) chips.push('<span class="f-chip ok">✓ Keine Befunde</span>');
+                $('findings-chips').innerHTML = chips.join('');
+
+                const itemHtml = i => `<div class="f-item ${i.level}"><span class="f-icon">${i.level === 'critical' ? '⛔' : '⚠'}</span>` +
+                    `<span><span class="f-title">${esc(i.title)}</span>${i.detail ? `<span class="f-detail">${esc(i.detail)}</span>` : ''}</span>` +
+                    `<span class="f-tag">${esc(i.domainLabel)}</span></div>`;
+                const rowHtml = (i, icon) => `<details class="f-row"><summary>${icon} <strong>${esc(i.title)}</strong> <span class="f-tag">${esc(i.domainLabel)}</span></summary>` +
+                    (i.detail ? `<span class="f-detail">${esc(i.detail)}</span>` : '') + '</details>';
+
+                // Kritisch: immer alle, immer sichtbar
+                $('findings-critical').innerHTML = crit.map(itemHtml).join('');
+
+                // Nächste Schritte: das Fazit ohne die Zeilen, die oben schon als kritisch stehen
+                const kritTexte = new Set(crit.map(c => c.text).filter(Boolean));
+                const fazit = (res.fazit || []).filter(f => !kritTexte.has(f));
+                const keineKorrektur = fazit.length === 1 && /keine Korrekturen erforderlich/.test(fazit[0]);
+                const next = $('findings-next');
+                if (fazit.length && !keineKorrektur) {
+                    $('findings-next-list').innerHTML = fazit.slice(0, 3).map(f => `<li>${esc(f)}</li>`).join('');
+                    next.classList.remove('hidden');
+                } else {
+                    next.classList.add('hidden');
+                }
+
+                // Warnungen: erste 3 sichtbar, Rest eingeklappt
+                const shown = warn.slice(0, 3), rest = warn.slice(3);
+                $('findings-warning').innerHTML = shown.map(itemHtml).join('') + (rest.length
+                    ? `<details class="f-fold"><summary>${rest.length} weitere ${rest.length === 1 ? 'Warnung' : 'Warnungen'}</summary><div class="f-fold-body">${rest.map(i => rowHtml(i, '⚠')).join('')}</div></details>`
+                    : '');
+
+                // Hinweise: eingeklappt
+                const infoEl = $('findings-info');
+                if (info.length) {
+                    infoEl.querySelector('summary').textContent = `${info.length} ${info.length === 1 ? 'Hinweis' : 'Hinweise'} anzeigen`;
+                    infoEl.querySelector('.f-fold-body').innerHTML = info.map(i => rowHtml(i, 'ℹ')).join('');
+                    infoEl.classList.remove('hidden');
+                } else { infoEl.classList.add('hidden'); }
+
+                // Erinnerungen und Empfehlungen: eingeklappt
+                const rec = res.recommendations || {};
+                const remItems = al.reminders.map(r => ({ title: r.title, detail: r.detail, domainLabel: r.domainLabel }));
+                if (rec.fortification) remItems.push({ title: rec.fortification, detail: '', domainLabel: 'Empfehlung' });
+                if (rec.supplement) remItems.push({ title: rec.supplement, detail: '', domainLabel: 'Empfehlung' });
+                const remEl = $('findings-reminders');
+                if (remItems.length) {
+                    remEl.querySelector('summary').textContent = `💡 ${remItems.length} ${remItems.length === 1 ? 'Erinnerung' : 'Erinnerungen'} anzeigen`;
+                    remEl.querySelector('.f-fold-body').innerHTML = remItems.map(i => rowHtml(i, '💡')).join('');
+                    remEl.classList.remove('hidden');
+                } else { remEl.classList.add('hidden'); }
+
+                // Positiv: was im Ziel liegt (eine Zeile statt vieler grüner Kästen)
+                const c = res.comparisons || {};
+                const okNames = [['tfi', 'Flüssigkeit'], ['protein', 'Eiweiß'], ['energy', 'Energie'], ['lipids', 'Lipide'], ['enteral', 'Enteral']]
+                    .filter(([k]) => c[k] && c[k].status === 'green').map(([, n]) => n);
+                const okEl = $('findings-ok');
+                if (okNames.length) { okEl.textContent = `✓ Im Ziel: ${okNames.join(' · ')}`; okEl.classList.remove('hidden'); }
+                else { okEl.classList.add('hidden'); }
             }
 
             // ============================================================
@@ -2232,11 +2333,11 @@
                 const qvSub = document.getElementById('qv-safety-sub');
                 if (res.isSafe) {
                     qvSafe.innerText = 'Sicher';
-                    qvSafe.className = 'qv-value text-green-600 tabular-nums';
+                    qvSafe.className = 'qv-value qv-word text-green-600 tabular-nums';
                     qvSub.innerText = 'keine kritischen Flags';
                 } else {
                     qvSafe.innerText = 'Kritisch';
-                    qvSafe.className = 'qv-value text-red-600 tabular-nums';
+                    qvSafe.className = 'qv-value qv-word text-red-600 tabular-nums';
                     qvSub.innerText = 'Sicherheits-Check offen';
                 }
 
@@ -2259,50 +2360,6 @@
                         </div>
                     </div>
                 `).join('');
-
-                // Warnings (tiered styling)
-                const warningCont = document.getElementById('warning-container');
-                warningCont.innerHTML = '';
-                if (res.warnings.length > 0) {
-                    warningCont.classList.remove('hidden');
-                    res.warnings.forEach(w => {
-                        const div = document.createElement('div');
-                        if (w.startsWith('CRITICAL')) {
-                            div.className = 'p-2 mb-1 last:mb-0 rounded critical-warning text-sm font-bold';
-                        } else if (w.startsWith('Hinweis')) {
-                            div.className = 'p-2 mb-1 last:mb-0 rounded bg-amber-50 text-amber-900 border border-amber-300 text-sm font-bold';
-                        } else if (w.startsWith('Warnung')) {
-                            div.className = 'p-2 mb-1 last:mb-0 rounded bg-yellow-50 text-yellow-900 border border-yellow-200 text-sm font-bold';
-                        } else {
-                            div.className = 'p-2 mb-1 last:mb-0 rounded bg-blue-50 text-blue-900 border border-blue-200 text-sm font-bold';
-                        }
-                        div.innerText = w;
-                        warningCont.appendChild(div);
-                    });
-                } else {
-                    warningCont.classList.add('hidden');
-                }
-
-                // Reminders (teal)
-                const remindersCont = document.getElementById('reminders-container');
-                if (res.reminders && res.reminders.length > 0) {
-                    remindersCont.classList.remove('hidden');
-                    remindersCont.innerHTML = res.reminders.map(r => `<div class="py-1">${r}</div>`).join('');
-                } else {
-                    remindersCont.classList.add('hidden');
-                }
-
-                // Fortification info
-                const fortInfo = document.getElementById('fortification-info');
-                if (res.recommendations.fortification || res.recommendations.supplement) {
-                    fortInfo.classList.remove('hidden');
-                    let html = '';
-                    if (res.recommendations.fortification) html += `<div>• ${res.recommendations.fortification}</div>`;
-                    if (res.recommendations.supplement) html += `<div>• ${res.recommendations.supplement}</div>`;
-                    fortInfo.innerHTML = html;
-                } else {
-                    fortInfo.classList.add('hidden');
-                }
 
                 // Micronutrient info
                 const microInfo = document.getElementById('micronutrient-info');
@@ -2345,31 +2402,6 @@
                     }
                 } else {
                     gvDisplay.classList.add('hidden');
-                }
-
-                // GV > 30 warning
-                if (r.weightVelocity !== 'Initial' && r.weightVelocity > 30) {
-                    const warnDiv = document.createElement('div');
-                    warnDiv.className = 'p-2 mb-1 last:mb-0 rounded critical-warning text-sm font-bold';
-                    warnDiv.innerText = `CRITICAL: Growth Velocity ${r.weightVelocity} g/kg/d > 30 g/kg/d — Ödem-Risiko / Plausibilitäts-Check!`;
-                    const warningCont = document.getElementById('warning-container');
-                    warningCont.classList.remove('hidden');
-                    warningCont.prepend(warnDiv);
-                }
-
-                // Klinisches Fazit
-                const fazitEl = document.getElementById('fazit-content');
-                if (fazitEl) {
-                    if (res.fazit && res.fazit.length > 0) {
-                        fazitEl.innerHTML = res.fazit.map((f, i) => 
-                            `<div class="flex gap-2 items-start p-2 rounded ${i === 0 ? 'bg-emerald-100 font-bold' : 'bg-white/50 shadow-sm'} border border-emerald-100/50">
-                                <span class="text-emerald-600 font-bold">${i + 1}.</span>
-                                <span>${f}</span>
-                            </div>`
-                        ).join('');
-                    } else {
-                        fazitEl.innerHTML = '<p class="text-emerald-600 font-medium italic">✓ Ernährungsplan im ESPGHAN-Zielbereich – keine Korrekturen erforderlich.</p>';
-                    }
                 }
 
                 // NPC/Protein Ratio

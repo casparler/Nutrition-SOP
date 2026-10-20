@@ -1914,3 +1914,173 @@ describe('W) Versionsstand von Oberfläche und Rechenkern (v3.5.1)', () => {
         expect(guard).toBeLessThan(aufruf);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION Y — Strukturierte Meldungen (v3.6)
+ * Ziel: weniger gleichfarbige Meldungen, nichts geht verloren.
+ * ────────────────────────────────────────────────────────────────*/
+describe('Y) Strukturierte Meldungen (v3.6)', () => {
+    const busy = () => calc.calculate(baseInput({
+        birthWeight: 700, currentWeight: 660, ssw: 28, postnatalAge: 6,
+        ventilationStatus: 'invasive', tfi: 150, enteralVolume: 30,
+        gir: 2, protein: 2, lipids: 1, calcium: 60, phosphate: 30, sodium: 6, potassium: 2
+    }));
+
+    it('Y1: Jede Warnung und jede Erinnerung erscheint genau einmal, im vollen Wortlaut', () => {
+        const r = busy();
+        const strip = t => t.replace(/^(CRITICAL|Warnung|Hinweis):\s*/, '');
+        expect(r.alerts.items.length).toBe(r.warnings.length);
+        expect(r.alerts.items.map(i => i.text).sort()).toEqual(r.warnings.map(strip).sort());
+        expect(r.alerts.reminders.length).toBe(r.reminders.length);
+    });
+
+    it('Y2: Stufen folgen dem Präfix, kritisch steht immer vor Warnung vor Hinweis', () => {
+        const r = busy();
+        const rank = { critical: 0, warning: 1, info: 2 };
+        const levels = r.alerts.items.map(i => i.level);
+        expect(levels).toEqual([...levels].sort((a, b) => rank[a] - rank[b]));
+        expect(r.alerts.items.filter(i => i.level === 'critical').length)
+            .toBe(r.warnings.filter(w => w.startsWith('CRITICAL')).length);
+        expect(r.alerts.items.filter(i => i.level === 'warning').length)
+            .toBe(r.warnings.filter(w => w.startsWith('Warnung')).length);
+    });
+
+    it('Y3: Zähler stimmen mit den Listen überein', () => {
+        const r = busy();
+        const c = r.alerts.counts;
+        expect(c.critical + c.warning + c.info).toBe(r.alerts.items.length);
+        expect(c.reminder).toBe(r.alerts.reminders.length);
+    });
+
+    it('Y4: Bereichszuordnung nach Titel — Detailwörter ziehen nicht in den falschen Bereich', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 600, currentWeight: 560, ssw: 25, postnatalAge: 2,
+            ventilationStatus: 'invasive', tfi: 220, enteralVolume: 0, gir: 13, protein: 3, lipids: 4.5,
+            potassium: 4, sodium: 1
+        }));
+        const dom = re => r.alerts.items.find(i => re.test(i.title)).domainLabel;
+        expect(dom(/^TFI 220/)).toBe('Flüssigkeit');          // Detail nennt „Serum-Natrium“
+        expect(dom(/^GIR 13/)).toBe('Glukose & PN');
+        expect(dom(/^Lipide 4/)).toBe('Eiweiß & Energie');
+        expect(dom(/^Kalium/)).toBe('Elektrolyte');
+    });
+
+    it('Y5: Hypernatriämie-Hinweis gehört zu den Elektrolyten, auch wenn der Titel „TFI“ nennt', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, currentWeight: 850, ssw: 27, postnatalAge: 4, tfi: 90, gir: 6, protein: 3, lipids: 2
+        }));
+        const h = r.alerts.items.find(i => /IWL-bedingte Hypernatriämie/.test(i.text));
+        expect(h.domainLabel).toBe('Elektrolyte');
+    });
+
+    it('Y6: Titel und Detail zerlegen den Satz, ohne Wortlaut zu verlieren', () => {
+        const r = busy();
+        const p = r.alerts.items.find(i => /^Protein .* unter Zielbereich/.test(i.title));
+        expect(p.title).toMatch(/^Protein 2\.34 g\/kg\/d unter Zielbereich \(3\.5–4\)$/);
+        expect(p.detail).toMatch(/Steigerung prüfen/);
+        r.alerts.items.forEach(i => {
+            const ohneTrenner = i.text.replace(/ [—–] /, ' ');
+            expect(ohneTrenner).toContain(i.title.replace(/ [—–] /, ' '));
+        });
+    });
+
+    it('Y7: Der Toleranz-Vorbehalt des Steigerungshinweises bleibt im vollen Wortlaut erhalten (N7)', () => {
+        const r = busy();
+        const h = r.alerts.items.find(i => /Aufbau-Korridor/.test(i.text));
+        expect(h.level).toBe('info');
+        expect(h.text).toMatch(/nur bei guter Toleranz/);
+        expect(h.title + ' ' + h.detail).toMatch(/nur bei guter Toleranz/);
+    });
+
+    it('Y8: Erinnerungen tragen kein führendes Symbol und die Stufe „reminder“', () => {
+        const r = busy();
+        expect(r.alerts.reminders.length).toBeGreaterThan(0);
+        r.alerts.reminders.forEach(i => {
+            expect(i.level).toBe('reminder');
+            expect(/^[\p{L}\p{N}]/u.test(i.text)).toBe(true);
+        });
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION Z — Darstellung der Befunde in der Oberfläche (v3.6)
+ * Die Seite wird mit ihren eigenen Skripten ausgeführt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('Z) Darstellung der Befunde (v3.6)', () => {
+    async function bootUI(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        w.updateCalculations();
+        return w.document;
+    }
+    const heavy = {
+        'birth-weight': 600, 'current-weight': 560, 'input-day': 2, 'input-tfi': 220, 'input-enteral': 0,
+        'input-gir': 13, 'input-protein': 3.5, 'input-lipids': 4.5, 'input-calcium': 120, 'input-phosphate': 20,
+        'input-sodium': 7, 'input-potassium': 4, 'input-invasive-ventilation': true
+    };
+
+    it('Z1: Kritische Befunde stehen vollständig sichtbar, nicht in einem zugeklappten Bereich', async () => {
+        const doc = await bootUI(heavy);
+        const kritisch = [...doc.querySelectorAll('#findings-critical .f-item.critical')];
+        expect(kritisch.length).toBeGreaterThanOrEqual(2);
+        kritisch.forEach(el => expect(el.closest('details'), el.textContent).toBeNull());
+        expect(doc.getElementById('findings-critical').getAttribute('role')).toBe('alert');
+    });
+
+    it('Z2: Hinweise und Erinnerungen sind eingeklappt, die Zähler nennen ihre Anzahl', async () => {
+        const doc = await bootUI(heavy);
+        for (const id of ['findings-info', 'findings-reminders']) {
+            const d = doc.getElementById(id);
+            if (d.classList.contains('hidden')) continue;
+            expect(d.hasAttribute('open'), id).toBe(false);
+        }
+        const chips = doc.getElementById('findings-chips').textContent;
+        expect(chips).toMatch(/\d+ kritisch/);
+        expect(chips).toMatch(/\d+ Warnung/);
+    });
+
+    it('Z3: Höchstens 3 Warnungen sind offen sichtbar, der Rest steckt in einem eingeklappten Bereich', async () => {
+        const doc = await bootUI(heavy);
+        const offen = doc.querySelectorAll('#findings-warning > .f-item.warning');
+        expect(offen.length).toBeLessThanOrEqual(3);
+        const gesamt = doc.querySelectorAll('#findings-warning .f-item.warning, #findings-warning details .f-row').length;
+        const chip = parseInt((doc.getElementById('findings-chips').textContent.match(/(\d+) Warnung/) || [0, 0])[1], 10);
+        expect(gesamt).toBe(chip);
+    });
+
+    it('Z4: Die kritische Meldung steht nicht doppelt in „Nächste Schritte“', async () => {
+        const doc = await bootUI(heavy);
+        const kritTitel = [...doc.querySelectorAll('#findings-critical .f-title')].map(e => e.textContent);
+        const naechste = [...doc.querySelectorAll('#findings-next-list li')].map(e => e.textContent);
+        kritTitel.forEach(t => naechste.forEach(n => expect(n.startsWith(t), `${t} | ${n}`).toBe(false)));
+    });
+
+    it('Z5: Die alten, einzeln gefärbten Listen sind entfallen', async () => {
+        const doc = await bootUI(heavy);
+        for (const id of ['warning-container', 'reminders-container', 'fortification-info', 'clinical-fazit']) {
+            expect(doc.getElementById(id), id).toBeNull();
+        }
+    });
+
+    it('Z6: Jede Stufe hat Symbol und Text, nie nur eine Farbe', async () => {
+        const doc = await bootUI(heavy);
+        const chips = [...doc.querySelectorAll('#findings-chips .f-chip')].map(e => e.textContent);
+        chips.forEach(t => expect(/^[⛔⚠ℹ✓]/.test(t.trim()), t).toBe(true));
+        doc.querySelectorAll('.f-item').forEach(el => {
+            expect(el.querySelector('.f-icon').textContent.trim().length).toBeGreaterThan(0);
+        });
+    });
+});

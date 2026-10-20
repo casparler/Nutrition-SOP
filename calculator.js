@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.5.1';
+        this.VERSION = '3.6.0';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -582,7 +582,7 @@ class NutritionCalculator {
             summary = `${phase.label}: ${criticals.length} kritische(r) Befund(e). Plan vor nächster Infusionsbestellung überarbeiten.`;
         } else if (status === 'attention') {
             const drift = bullets.filter(b => b.kind === 'warning').length;
-            summary = `${phase.label}: ${drift} Optimierungspunkt${drift === 1 ? '' : 'e'} identifiziert — siehe Bullets.`;
+            summary = `${phase.label}: ${drift} Optimierungspunkt${drift === 1 ? '' : 'e'} identifiziert — siehe Befunde.`;
         } else {
             summary = `${phase.label}: Stabile Zufuhr, Plan kann fortgeführt werden.`;
         }
@@ -706,6 +706,77 @@ class NutritionCalculator {
         const curr = this._d(currentWeightG);
         const prev = this._d(previousWeightG);
         return curr.minus(prev).div(curr).times(1000).toDecimalPlaces(1).toNumber();
+    }
+
+    /**
+     * v3.6 — Meldungen strukturiert für die Oberfläche.
+     * Aus den Warn-/Erinnerungstexten werden Stufe, Bereich, kurzer Titel und Detail
+     * abgeleitet. Die Texte selbst bleiben unverändert in `warnings` und `reminders`
+     * (Tests, EPR-Doku); hier wird nur sortiert und gegliedert. Es geht nichts verloren:
+     * `text` enthält immer den vollständigen Wortlaut.
+     *
+     * Stufen (Alarm-Hierarchie, höchste zuerst):
+     *   critical  — „CRITICAL:“   sofort handeln, nie eingeklappt
+     *   warning   — „Warnung:“    zeitnah prüfen
+     *   info      — „Hinweis:“ und alles Übrige; Orientierung, eingeklappt
+     *   reminder  — „💡“         Erinnerungen, eingeklappt
+     */
+    _buildAlerts(warnings, reminders) {
+        const DOMAINS = [
+            { id: 'growth',      label: 'Wachstum',          re: /SGA|Gewichtsverlust|Geburtsgewicht|Growth Velocity|Perzentile|Wachstum/ },
+            { id: 'pn',          label: 'Glukose & PN',      re: /GIR|Glukose|Hypoglyk|Osmolarit|Ausfällung|Lipid-Volumen|Ca\+P/ },
+            { id: 'electrolytes',label: 'Elektrolyte',       re: /Natrium|Na-Zufuhr|Na-Kontrolle|Kalium|Na:Cl|SID|Hypernatri|Calcium|Phosphat|P:AA|Osteopenie/ },
+            { id: 'enteral',     label: 'Enteral',           re: /Enteral|enteral|Nahrungspause|Aufbau-Korridor|FM85|Anreicherung|Eiweiß-Zusatz|Zielkorridor/ },
+            { id: 'fluid',       label: 'Flüssigkeit',       re: /TFI|Flüssigkeit|Beatmung|Sekundärinfusion|Gesamtvolumen/ },
+            { id: 'macro',       label: 'Eiweiß & Energie',  re: /Protein|Eiweiß|Energie|NPC|Lipid|Triglyz|Harnstoff|Verfettung/ }
+        ];
+        const LEVEL_RANK = { critical: 0, warning: 1, info: 2, reminder: 3 };
+        // Eindeutige Leitbegriffe im gesamten Text gewinnen (z. B. Hypernatriämie →
+        // Elektrolyte, auch wenn der Titel „TFI < 100“ lautet). Sonst entscheidet der
+        // Titel; erst dann der Volltext. Ohne diese Reihenfolge landete „TFI 220 ist
+        // sehr hoch“ wegen des Wortes „Serum-Natrium“ im Detail bei den Elektrolyten.
+        const STRONG = [{ id: 'electrolytes', re: /Hypernatri|Hyperkali|Hypokali/ }];
+        const domainOf = (text, title) => {
+            const strong = STRONG.find(x => x.re.test(text));
+            if (strong) return DOMAINS.find(d => d.id === strong.id);
+            return DOMAINS.find(d => d.re.test(title)) || DOMAINS.find(d => d.re.test(text)) || { id: 'other', label: 'Sonstiges' };
+        };
+        const domainRank = id => { const i = DOMAINS.findIndex(d => d.id === id); return i < 0 ? DOMAINS.length : i; };
+
+        // Titel = Text bis zum ersten Gedankenstrich oder Satzende; Rest = Detail.
+        const split = text => {
+            const cuts = [];
+            const dash = text.search(/ [—–] /);
+            if (dash > 0) cuts.push({ at: dash, skip: 3 });
+            const sent = text.search(/[.!?](\s+(?=[A-ZÄÖÜ(])|$)/);
+            if (sent > 0) cuts.push({ at: sent + 1, skip: 1 });
+            if (!cuts.length) return { title: text, detail: '' };
+            const c = cuts.reduce((a, b) => (a.at <= b.at ? a : b));
+            return {
+                title: text.slice(0, c.at).replace(/[.!]$/, '').trim(),
+                detail: text.slice(c.at + (c.skip === 3 ? 3 : 0)).trim()
+            };
+        };
+
+        const items = (warnings || []).map(w => {
+            const level = w.startsWith('CRITICAL') ? 'critical' : (w.startsWith('Warnung') ? 'warning' : 'info');
+            const text = w.replace(/^(CRITICAL|Warnung|Hinweis):\s*/, '');
+            const sp = split(text);
+            const d = domainOf(text, sp.title);
+            return { level, domain: d.id, domainLabel: d.label, ...sp, text };
+        });
+        const rem = (reminders || []).map(r => {
+            const text = r.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+            const sp = split(text);
+            const d = domainOf(text, sp.title);
+            return { level: 'reminder', domain: d.id, domainLabel: d.label, ...sp, text };
+        });
+        const byPriority = (a, b) => (LEVEL_RANK[a.level] - LEVEL_RANK[b.level]) || (domainRank(a.domain) - domainRank(b.domain));
+        items.sort(byPriority);
+        rem.sort(byPriority);
+        const counts = { critical: 0, warning: 0, info: 0, reminder: rem.length };
+        items.forEach(i => { counts[i.level]++; });
+        return { items, reminders: rem, counts };
     }
 
     calculate(input) {
@@ -2083,6 +2154,9 @@ class NutritionCalculator {
             energyGapIndex: this.calculateEnergyGapIndex(input.history),
             sodiumTrend: this._analyzeSodiumTrend(input.history, postnatalAge, n.totalNaMmolKg)
         };
+
+        // --- v3.6: strukturierte Meldungen für die Oberfläche ---
+        finalResult.alerts = this._buildAlerts(warnings, reminders);
 
         // --- v3.0: Smart Defaults (Tages-basierte Startwert-Vorschläge) ---
         finalResult.smartDefaults = this.getSmartDefaults(input);
