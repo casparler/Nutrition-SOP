@@ -1841,3 +1841,51 @@ describe('U) Eiweißlösung 1 ml = 1 g (v3.5)', () => {
         expect(r.results.preparation.proteinAddGramsPerDay / 1.2).toBeCloseTo(r.results.aptamilProteinNetGKg, 2);
     });
 });
+
+describe('V) Eiweiß-Zusatz in g/kg/d als zweite Eingabeform (v3.5)', () => {
+    const base = o => baseInput({
+        birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 20,
+        tfi: 150, enteralVolume: 150, mealFrequency: 8, gir: 0, protein: 0, lipids: 0, ...o
+    });
+
+    it('V1: 1,5 g/kg/d bei 150 ml/kg/d entspricht 1 g/100 ml', () => {
+        const a = calc.calculate(base({ proteinAddGKg: 1.5 })).results;
+        const b = calc.calculate(base({ proteinAddPer100ml: 1 })).results;
+        expect(a.aptamilProteinNetGKg).toBeCloseTo(1.5, 2);
+        expect(a.preparation.proteinAddPer100ml).toBeCloseTo(1, 2);
+        expect(a.preparation.proteinSolutionMlPerDay).toBeCloseTo(b.preparation.proteinSolutionMlPerDay, 2);
+        expect(a.preparation.proteinPowderPerDay).toBeCloseTo(b.preparation.proteinPowderPerDay, 2);
+        expect(a.proteinTotalGPerKg).toBeCloseTo(b.proteinTotalGPerKg, 2);
+    });
+
+    it('V2: Vorrang g/100 ml vor g/kg/d vor Pulvereingabe', () => {
+        const x = calc.calculate(base({ proteinAddPer100ml: 1, proteinAddGKg: 3, aptamilProteinGKg: 4 })).results;
+        expect(x.aptamilProteinNetGKg).toBeCloseTo(1.5, 2);
+        const y = calc.calculate(base({ proteinAddGKg: 1, aptamilProteinGKg: 4 })).results;
+        expect(y.aptamilProteinNetGKg).toBeCloseTo(1, 2);
+        const z = calc.calculate(base({ aptamilProteinGKg: 1 })).results;
+        expect(z.aptamilProteinNetGKg).toBeCloseTo(0.821, 2);
+    });
+
+    it('V3: Unplausibler Wert (> 5 g/kg/d) bricht ab', () => {
+        expect(() => calc.calculate(base({ proteinAddGKg: 6 }))).toThrow(/proteinAddGKg|Eiweiß-Zusatz/);
+    });
+
+    it('V4: Zusatz ohne enterale Nahrung wird gemeldet', () => {
+        const r = calc.calculate(base({ enteralVolume: 0, tfi: 100, proteinAddGKg: 1 }));
+        expect(r.warnings.some(w => /Eiweiß-Zusatz eingestellt, aber keine enterale Nahrung/.test(w))).toBe(true);
+    });
+
+    it('V5: Die Einheiten-Auswahl existiert in der Oberfläche und liegt im sichtbaren Bereich', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = await import('node:fs');
+        const doc = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8')).window.document;
+        const sel = doc.getElementById('input-protein-add-unit');
+        expect(sel).toBeTruthy();
+        expect([...sel.options].map(o => o.value)).toEqual(['per100', 'gkg']);
+        expect(sel.value).toBe('per100');
+        for (let n = sel; n && n !== doc.body; n = n.parentElement) {
+            expect(/display:\s*none/.test((n.getAttribute && n.getAttribute('style')) || '')).toBe(false);
+        }
+    });
+});

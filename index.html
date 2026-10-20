@@ -399,9 +399,14 @@
                                 <p class="text-[10px] text-gray-500 mt-1">1 % = 1 g auf 100 ml</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Eiweiß-Zusatz <span class="text-gray-400 font-normal">(g/100 ml)</span></label>
-                                <input type="number" id="input-protein-add" step="0.1" min="0" max="3" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
-                                <p class="text-[10px] text-gray-500 mt-1">Aptamil Eiweiß+, 82,1 g Eiweiß/100 g</p>
+                                <label class="block text-sm font-medium text-gray-700">Eiweiß-Zusatz
+                                    <select id="input-protein-add-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Eiweiß-Zusatz">
+                                        <option value="per100" selected>g/100 ml</option>
+                                        <option value="gkg">g/kg/d</option>
+                                    </select>
+                                </label>
+                                <input type="number" id="input-protein-add" step="0.1" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                <p class="text-[10px] text-gray-500 mt-1">Eiweißlösung 1 ml = 1 g Eiweiß; Pulver Aptamil Eiweiß+ 82,1 g/100 g</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Liquigen <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
@@ -1706,7 +1711,7 @@
             const inputs = [
                 'birth-weight', 'current-weight', 'yesterday-weight', 'input-tfi',
                 'input-enteral', 'input-enteral-product', 'input-fm85', 'input-meal-frequency',
-                'input-liquigen', 'input-aptamil-protein', 'input-protein-add',
+                'input-liquigen', 'input-aptamil-protein', 'input-protein-add', 'input-protein-add-unit',
                 'input-feeding-paused', 'input-feeding-pause-reason',
                 'input-carrier', 'input-urea', 'input-gir',
                 'input-protein', 'input-lipids', 'input-lipid-infusion',
@@ -1902,7 +1907,11 @@
                     fm85Percent: document.getElementById('input-fm85').value || 0,
                     liquigenMlKg: (document.getElementById('input-liquigen') || {}).value || 0,
                     aptamilProteinGKg: (document.getElementById('input-aptamil-protein') || {}).value || 0,
-                    proteinAddPer100ml: (document.getElementById('input-protein-add') || {}).value || 0,
+                    // v3.5: Eine Eingabe, Einheit per Auswahl: g/100 ml (Hauptform) oder g/kg/d
+                    proteinAddPer100ml: ((document.getElementById('input-protein-add-unit') || {}).value === 'gkg')
+                        ? 0 : ((document.getElementById('input-protein-add') || {}).value || 0),
+                    proteinAddGKg: ((document.getElementById('input-protein-add-unit') || {}).value === 'gkg')
+                        ? ((document.getElementById('input-protein-add') || {}).value || 0) : 0,
                     feedingPaused: !!(document.getElementById('input-feeding-paused') || {}).checked,
                     feedingPauseReason: (document.getElementById('input-feeding-pause-reason') || {}).value || 'other',
                     carrierVolume: document.getElementById('input-carrier').value || 0,

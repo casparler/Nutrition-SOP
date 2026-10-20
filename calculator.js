@@ -817,6 +817,10 @@ class NutritionCalculator {
             min: 0, max: 3,
             maxMsg: `Eiweiss-Zusatz ${input.proteinAddPer100ml} g/100 ml überschreitet realistisches Maximum (3) — Tippfehler?`
         });
+        validate(input.proteinAddGKg, 'proteinAddGKg', {
+            min: 0, max: 5,
+            maxMsg: `Eiweiß-Zusatz ${input.proteinAddGKg} g/kg/d überschreitet realistisches Maximum (5) — Tippfehler?`
+        });
         validate(input.aptamilProteinGKg, 'aptamilProteinGKg', {
             min: 0, max: 5,
             maxMsg: `Aptamil Eiweiß+ ${input.aptamilProteinGKg} g/kg/d überschreitet realistisches Maximum (5) — Tippfehler?`
@@ -914,9 +918,15 @@ class NutritionCalculator {
         const proteinAddPer100ml = D(sp(input.proteinAddPer100ml, 'proteinAddPer100ml', { defaultValue: 0 }));
         const APTAMIL_PROTEIN_FRACTION = D('0.821');   // 82,1 g Eiweiss je 100 g Pulver
         let aptamilProteinGKg = D(sp(input.aptamilProteinGKg, 'aptamilProteinGKg', { defaultValue: 0 }));
+        // v3.5: Zweite Eingabeform — g Eiweiß je kg und Tag. Vorrang: g/100 ml,
+        // dann g/kg/d, dann die direkte Pulvereingabe. Die Station steigert in der
+        // Regel bis 2 g/100 ml, deshalb bleibt g/100 ml die Hauptform.
+        const proteinAddGKg = D(sp(input.proteinAddGKg, 'proteinAddGKg', { defaultValue: 0 }));
         if (proteinAddPer100ml.gt(0)) {
             aptamilProteinGKg = enteralVolKg.times(proteinAddPer100ml).div(100)
                                             .div(APTAMIL_PROTEIN_FRACTION).toDecimalPlaces(3);
+        } else if (proteinAddGKg.gt(0)) {
+            aptamilProteinGKg = proteinAddGKg.div(APTAMIL_PROTEIN_FRACTION).toDecimalPlaces(3);
         }
         // v3.2: Bewusste Nahrungspause (NPO). Unterdrückt den Steigerungs-Hinweis
         // und die Ziel-Ampel — der Rechner darf ein bewusst nüchternes Kind
@@ -1532,6 +1542,9 @@ class NutritionCalculator {
             }
         }
 
+        if (aptamilProteinGKg.gt(0) && enteralVolKg.lte(0)) {
+            warnings.push('Hinweis: Eiweiß-Zusatz eingestellt, aber keine enterale Nahrung — der Zusatz wird der Nahrung zugemischt und hat ohne Nahrung keine Wirkung auf die Zubereitung.');
+        }
         if (fm85Ignoriert) {
             warnings.push(`Hinweis: FM85 ${fm85Eingabe} % wird nur bei Muttermilch (EBM) eingerechnet — bei ${this._enteralDensity({ ...input, fm85Percent: 0 }).label} ohne Wirkung. FM85-Feld auf 0 setzen.`);
         }
