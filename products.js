@@ -179,7 +179,9 @@ const NeoProducts = {
         fm85: {
             name: 'FM85 (Nestlé)',
             description: '4% = 1g auf 25ml MM',
-            fortifiedEBM: { kcal: 85, protein: 3.0, carbs: 8.6 }
+            // Packungsangabe je 100 g Pulver (übermittelt vom Neonatologen, 20.10.2026).
+            // Muss mit NutritionCalculator.FM85_PER_PERCENT übereinstimmen (Test AB3).
+            per100gPowder: { kcal: 435, protein: 35.5, fat: 18.1, carbs: 32.4, sodium_mg: 918, calcium_mg: 1890, phosphorus_mg: 1095 }
         },
         aptamilProtein: {
             id: 'aptamilProtein',

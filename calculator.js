@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.1';
+        this.VERSION = '3.6.2';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -38,6 +38,16 @@ class NutritionCalculator {
             LIPIDS: { max: 4.0, unit: 'g/kg/d' },
             OSM_PERIPHERAL: 900
         };
+        // --- FM85 (Nestlé) — Zusammensetzung je 1 % (= 1 g Pulver auf 100 ml Muttermilch) ---
+        // Quelle: Packungsangabe je 100 g Pulver, vom Neonatologen übermittelt am 20.10.2026:
+        //   Energie 435 kcal, Eiweiß 35,5 g, Fett 18,1 g, Kohlenhydrate 32,4 g,
+        //   Natrium 918 mg, Calcium 1890 mg, Phosphor 1095 mg.
+        // Je 1 % ist das der Wert durch 100. Vorher stand hier ein auf die Herstellertabelle
+        // „4 g auf 100 ml = 3,0 g Eiweiß, 85 kcal“ kalibriertes Modell (0,4675 g Eiweiß,
+        // 3,5 kcal je 1 %). Das nahm aber eine eiweißärmere Muttermilch (1,13 g) als der
+        // Hersteller an und rechnete das Eiweiß um rund 30 % zu hoch — EBM + FM85 4 % bei
+        // 160 ml/kg/d erschien mit 4,8 g/kg dauerhaft kritisch, richtig sind 4,1 g/kg.
+        this.FM85_PER_PERCENT = { kcal: 4.35, protein: 0.355, fat: 0.181, carbs: 0.324, naMg: 9.18, caMg: 18.9, pMg: 10.95 };
         // --- Kalium (v3.5) ---
         // Hausregel: kaliumfreie Phase an Lebenstag 1–2 (Risiko nicht-oligurische
         // Hyperkaliämie bei ELBW/VLBW, ESPGHAN 2018 Fluid & Electrolytes: Zufuhr
@@ -170,12 +180,12 @@ class NutritionCalculator {
             const p = window.NeoProducts.enteralProducts.find(x => x.id === id);
             if (p && p.per100ml) base = { protein: p.per100ml.protein, kcal: p.per100ml.kcal, name: p.name };
         }
-        // FM85 wird nur der Muttermilch zugesetzt (100er-Regel: 1 % ≙ 0,4675 g Protein
+        // FM85 wird nur der Muttermilch zugesetzt (1 % ≙ 0,355 g Eiweiß, siehe FM85_PER_PERCENT
         // und 3,5 kcal pro 100 ml — identisch zur Fortifizierungslogik in Step 7).
         const fortified = (id === 'ebm' && fm85 > 0);
         return {
-            proteinPer100: fortified ? base.protein + fm85 * 0.4675 : base.protein,
-            kcalPer100:    fortified ? base.kcal + fm85 * 3.5 : base.kcal,
+            proteinPer100: fortified ? base.protein + fm85 * this.FM85_PER_PERCENT.protein : base.protein,
+            kcalPer100:    fortified ? base.kcal + fm85 * this.FM85_PER_PERCENT.kcal : base.kcal,
             label:         fortified ? `${base.name} + FM85 ${fm85} %` : base.name
         };
     }
@@ -1226,15 +1236,16 @@ class NutritionCalculator {
 
         if (selectedEnteralProduct === 'ebm' && enteralVolKg.gt(0) && fm85Percent > 0) {
             // FM85 fortification — full nutrient model
-            const fortifiedProtein = D('1.13').plus(D(fm85Percent).times('0.4675'));
+            const F = this.FM85_PER_PERCENT;
+            const fortifiedProtein = D('1.13').plus(D(fm85Percent).times(F.protein));
             enteralProteinGKg = enteralVolKg.times(fortifiedProtein).div(100).toDecimalPlaces(3);
-            const fortifiedKcal = D(71).plus(D(fm85Percent).times('3.5'));
+            const fortifiedKcal = D(71).plus(D(fm85Percent).times(F.kcal));
             enteralKcalKg = enteralVolKg.times(fortifiedKcal).div(100).toDecimalPlaces(2);
-            const fortifiedFat = D('4.03').plus(D(fm85Percent).times('0.05'));
+            const fortifiedFat = D('4.03').plus(D(fm85Percent).times(F.fat));
             enteralFatGKg = enteralVolKg.times(fortifiedFat).div(100).toDecimalPlaces(3);
-            const fortifiedCarbs = D('7.0').plus(D(fm85Percent).times('0.6'));
+            const fortifiedCarbs = D('7.0').plus(D(fm85Percent).times(F.carbs));
             enteralCarbsGKg = enteralVolKg.times(fortifiedCarbs).div(100).toDecimalPlaces(3);
-            const fortifiedNaMg = D(7).plus(D(fm85Percent).times(3));
+            const fortifiedNaMg = D(7).plus(D(fm85Percent).times(F.naMg));
             enteralNaMmolKg = enteralVolKg.times(fortifiedNaMg).div(100).div(23).toDecimalPlaces(3);
         } else {
             enteralProteinGKg = enteralVolKg.times(baseProteinPer100).div(100).toDecimalPlaces(3);
@@ -1259,8 +1270,8 @@ class NutritionCalculator {
                 let basePMg = D(ep.per100ml.phosphorus_mg || 0);
                 let baseCaMg = D(ep.per100ml.calcium_mg || (selectedEnteralProduct === 'ebm' ? 28 : 0));
                 if (selectedEnteralProduct === 'ebm' && fm85Percent > 0) {
-                    baseCaMg = baseCaMg.plus(D(fm85Percent).times(40));
-                    basePMg = basePMg.plus(D(fm85Percent).times(22));
+                    baseCaMg = baseCaMg.plus(D(fm85Percent).times(this.FM85_PER_PERCENT.caMg));
+                    basePMg = basePMg.plus(D(fm85Percent).times(this.FM85_PER_PERCENT.pMg));
                 }
                 enteralPMgKg = enteralVolKg.times(basePMg).div(100).toDecimalPlaces(2);
                 enteralCaMgKg = enteralVolKg.times(baseCaMg).div(100).toDecimalPlaces(2);
@@ -1571,7 +1582,7 @@ class NutritionCalculator {
                 // Ausweg. Hier die noch mögliche FM85-Stufe beim aktuellen Volumen.
                 if (fm85Percent > 0) {
                     const ohneFm85 = D('1.13').plus(n.proteinAddPer100ml);
-                    const maxFm85 = Decimal.max(0, maxGesamtPer100.minus(ohneFm85).div('0.4675'));
+                    const maxFm85 = Decimal.max(0, maxGesamtPer100.minus(ohneFm85).div(this.FM85_PER_PERCENT.protein));
                     const maxFm85Step = maxFm85.div('0.5').floor().times('0.5').toNumber();
                     warnings.push(
                         `Hinweis: Bei ${n.enteralVolKg} ml/kg/d und aktuellem Eiweißzusatz wäre FM85 höchstens ` +

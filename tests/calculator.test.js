@@ -1035,14 +1035,27 @@ describe('O) Zielkonflikt Enteral-Ziel ↔ Nährstoffgrenzen', () => {
         expect(t.enteralTarget.limitedBy).toBe(null);
     });
 
-    it('O2: EBM + FM85 4 % → Ziel wird durch die Protein-Obergrenze gedeckelt', () => {
+    // v3.6.2 — klinisch begründete Anpassung (Packungsangabe FM85, 20.10.2026): Je 100 g Pulver
+    // 35,5 g Eiweiß und 435 kcal. EBM + 4 % ergibt damit 2,55 g Eiweiß und 88,4 kcal je 100 ml
+    // (vorher 3,0 g und 85 kcal). Bei 4 % begrenzt jetzt die Energie (135 kcal/kg/d) das Volumen
+    // auf 150 ml/kg/d, nicht mehr das Eiweiß. Die Begrenzung durch Eiweiß prüft O2b.
+    it('O2: EBM + FM85 4 % → Ziel wird durch die Energie-Obergrenze gedeckelt', () => {
         const t = calc.getTargets(baseInput({
             birthWeight: 900, ssw: 26, postnatalAge: 25, fm85Percent: 4
         }));
-        // Fortifiziert: 1,13 + 4×0,4675 = 3,0 g/100 ml → 4,5 g/kg/d bei 150 ml/kg/d
+        // 71 + 4×4,35 = 88,4 kcal/100 ml → 135 kcal/kg/d bei höchstens 150 ml/kg/d
         expect(t.enteralTarget.max).toBe(150);
-        expect(t.enteralTarget.limitedBy).toBe('protein');
+        expect(t.enteralTarget.limitedBy).toBe('energy');
         expect(t.enteralTarget.unlimited.max).toBe(180);
+    });
+
+    it('O2b: Eine eiweißreiche Nahrung wird weiterhin durch die Protein-Obergrenze gedeckelt', () => {
+        const t = calc.getTargets(baseInput({
+            birthWeight: 900, ssw: 26, postnatalAge: 25, selectedEnteralProduct: 'bebaFG1'
+        }));
+        // Beba FG 1: 2,9 g/100 ml → 4,5 g/kg/d bei 155 ml/kg/d; Energie (80 kcal) erlaubt 165
+        expect(t.enteralTarget.max).toBe(155);
+        expect(t.enteralTarget.limitedBy).toBe('protein');
     });
 
     it('O3: KERNTEST — am Ziel-Maximum wird KEIN Limit mehr gesprengt', () => {
@@ -1454,8 +1467,8 @@ describe('Q-ZUB) Zubereitung aus Zielkonzentration', () => {
 
     it('Q21: FM85 und Eiweiß-Zusatz zusammen — Summe stimmt', () => {
         const p = prep({ fm85Percent: 4, proteinAddPer100ml: 0.5 });
-        // EBM 1,13 + FM85 4 % x 0,4675 = 3,0 ; plus 0,5 Zusatz = 3,5 g/100 ml
-        expect(p.proteinPer100mlFinal).toBeCloseTo(3.5, 1);
+        // EBM 1,13 + FM85 4 % x 0,355 (Packung) = 2,55 ; plus 0,5 Zusatz = 3,05 g/100 ml
+        expect(p.proteinPer100mlFinal).toBeCloseTo(3.05, 2);
     });
 });
 
@@ -1471,9 +1484,9 @@ describe('Q-GRENZE) Anreicherung als Treiber der Protein-Überschreitung', () =>
         expect(r.safetyChecks.proteinLimit).toBe(false);
         const hint = r.warnings.find(w => /Treiber ist die Anreicherung/.test(w));
         expect(hint).toBeTruthy();
-        // Basis mit FM85 4 % = 3,0 g/100 ml; Limit 4,5 g/kg/d bei 150 ml/kg/d
-        // entspricht 3,0 g/100 ml → kein Spielraum mehr fuer Zusatz.
-        expect(hint).toMatch(/höchstens 0 g\/100 ml/);
+        // Basis mit FM85 4 % = 2,55 g/100 ml; Limit 4,5 g/kg/d bei 150 ml/kg/d entspricht
+        // 3,0 g/100 ml → noch 0,45 g/100 ml Zusatz möglich (Packungswerte, v3.6.2).
+        expect(hint).toMatch(/höchstens 0\.45 g\/100 ml/);
     });
 
     it('Q23: Innerhalb des Limits kein Anreicherungs-Hinweis', () => {
@@ -1656,17 +1669,19 @@ describe('S) Korrekturen aus der Patientensimulation (v3.5)', () => {
     it('S8: Ist FM85 der Treiber, nennt der Hinweis die noch mögliche FM85-Stufe', () => {
         const r = calc.calculate(baseInput({
             birthWeight: 620, currentWeight: 1050, ssw: 25, postnatalAge: 28,
-            tfi: 160, enteralVolume: 160, fm85Percent: 4
+            tfi: 160, enteralVolume: 160, fm85Percent: 5
         }));
+        // v3.6.2: mit den Packungswerten (0,355 g Eiweiß je 1 %) wird die Obergrenze erst
+        // bei 5 % und 160 ml/kg/d überschritten (4 % ergeben 4,1 g/kg).
         expect(r.safetyChecks.proteinLimit).toBe(false);
         const h = r.warnings.find(w => /wäre FM85 höchstens/.test(w));
         expect(h).toBeTruthy();
         const stufe = parseFloat(h.match(/höchstens ([\d.]+) %/)[1]);
         // Gewählte Stufe darf das Limit bei diesem Volumen nicht mehr sprengen
-        const eiweiss = 160 * (1.13 + stufe * 0.4675) / 100;
+        const eiweiss = 160 * (1.13 + stufe * 0.355) / 100;
         expect(eiweiss).toBeLessThanOrEqual(4.5);
         // und die nächste halbe Stufe sprengt es
-        expect(160 * (1.13 + (stufe + 0.5) * 0.4675) / 100).toBeGreaterThan(4.5);
+        expect(160 * (1.13 + (stufe + 0.5) * 0.355) / 100).toBeGreaterThan(4.5);
     });
 });
 
@@ -2114,5 +2129,58 @@ describe('AA) Deutsche Beschriftungen (v3.6.1)', () => {
         const alle = [...r.warnings, ...r.reminders, r.documentation].join(' ');
         expect(alle).not.toMatch(/Growth Velocity/);
         expect(r.documentation).toMatch(/Wachstumsrate/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AB — FM85 nach Packungsangabe (v3.6.2)
+ * Je 100 g Pulver: 435 kcal, 35,5 g Eiweiß, 18,1 g Fett, 32,4 g Kohlenhydrate,
+ * 918 mg Natrium, 1890 mg Calcium, 1095 mg Phosphor (Neonatologe, 20.10.2026).
+ * ────────────────────────────────────────────────────────────────*/
+describe('AB) FM85 nach Packungsangabe (v3.6.2)', () => {
+    const kind = o => baseInput({
+        birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 20,
+        tfi: 160, mealFrequency: 8, gir: 0, protein: 0, lipids: 0, ...o
+    });
+
+    it('AB1: 4 g FM85 auf 100 ml Muttermilch liefern 1,42 g Eiweiß, 17,4 kcal, 0,72 g Fett, 1,3 g Kohlenhydrate', () => {
+        const mit = calc.calculate(kind({ enteralVolume: 100, fm85Percent: 4 })).results;
+        const ohne = calc.calculate(kind({ enteralVolume: 100, fm85Percent: 0 })).results;
+        // je 100 ml und kg: Werte entsprechen g bzw. kcal je 100 ml
+        expect(mit.enteralProteinGKg - ohne.enteralProteinGKg).toBeCloseTo(1.42, 1);
+        expect(mit.kcalEnteralKg - ohne.kcalEnteralKg).toBeCloseTo(17.4, 0);
+        expect(mit.enteralFatGKg - ohne.enteralFatGKg).toBeCloseTo(0.72, 1);
+        expect(mit.enteralCarbsGKg - ohne.enteralCarbsGKg).toBeCloseTo(1.3, 1);
+    });
+
+    it('AB2: Der Standardverlauf EBM + FM85 4 % bei 150 und 160 ml/kg/d ist nicht kritisch', () => {
+        for (const vol of [150, 160]) {
+            const r = calc.calculate(kind({ enteralVolume: vol, fm85Percent: 4 }));
+            const eiweiss = r.results.proteinTotalGPerKg;
+            expect(eiweiss, `${vol} ml/kg`).toBeLessThanOrEqual(4.5);
+            expect(r.safetyChecks.proteinLimit, `${vol} ml/kg`).toBe(true);
+            expect(r.warnings.some(w => /^CRITICAL: Protein/.test(w)), `${vol} ml/kg`).toBe(false);
+        }
+        // 160 ml/kg: 1,13 + 4 × 0,355 = 2,55 g/100 ml → 4,08 g/kg
+        expect(calc.calculate(kind({ enteralVolume: 160, fm85Percent: 4 })).results.proteinTotalGPerKg).toBeCloseTo(4.08, 1);
+    });
+
+    it('AB3: Die Konstanten im Rechner entsprechen den Packungswerten in products.js', () => {
+        const pk = window.NeoProducts.supplements.fm85.per100gPowder;
+        const k = calc.FM85_PER_PERCENT;
+        expect(k.kcal).toBeCloseTo(pk.kcal / 100, 3);
+        expect(k.protein).toBeCloseTo(pk.protein / 100, 4);
+        expect(k.fat).toBeCloseTo(pk.fat / 100, 4);
+        expect(k.carbs).toBeCloseTo(pk.carbs / 100, 4);
+        expect(k.naMg).toBeCloseTo(pk.sodium_mg / 100, 3);
+        expect(k.caMg).toBeCloseTo(pk.calcium_mg / 100, 3);
+        expect(k.pMg).toBeCloseTo(pk.phosphorus_mg / 100, 3);
+    });
+
+    it('AB4: Calcium und Phosphat aus FM85 folgen der Packung (je 1 % 18,9 mg Ca und 10,95 mg P je 100 ml)', () => {
+        const mit = calc.calculate(kind({ enteralVolume: 100, fm85Percent: 4 })).results;
+        const ohne = calc.calculate(kind({ enteralVolume: 100, fm85Percent: 0 })).results;
+        expect(mit.enteralCaMgKg - ohne.enteralCaMgKg).toBeCloseTo(4 * 18.9, 0);
+        expect(mit.enteralPMgKg - ohne.enteralPMgKg).toBeCloseTo(4 * 10.95, 0);
     });
 });

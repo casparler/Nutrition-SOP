@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.6.1, 200 Tests.
+Stand: 20.10.2026, Version v3.6.2, 205 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -109,8 +109,8 @@ Zielspannen in ml/kg/d (`TFI_TARGETS`). ELBW und VLBW liegen **bewusst 10 ml unt
 | 6.5 | Überschreitung durch Anreicherung: Hinweis nennt noch mögliche Zielkonzentration und FM85-Stufe | Entscheidung 01.10.2026 | `calculate` Step 12 | Q22, Q23, S8 |
 
 *Leitlinie (ESPGHAN 2022, < 1800 g):* mindestens 3,5–4,0 g/kg/d, bis 4,5 nur bei langsamem Wachstum,
-guter Proteinqualität und ausreichender Energie. Für die Gesamtzufuhr 4,8 g/kg (EBM + FM85 4 % bei
-160 ml/kg) ist die Warnung damit leitlinienkonform. *Parenteral:* 2,5–3,5 g/kg/d ab Tag 2,
+guter Proteinqualität und ausreichender Energie. Mit den Packungswerten ergibt EBM + FM85 4 % bei 150 ml/kg 3,8 g/kg und bei
+160 ml/kg 4,1 g/kg (vorher fälschlich 4,5 bzw. 4,8); die Obergrenze 4,5 wird erst bei höherem Volumen oder zusätzlichem Eiweißzusatz erreicht. *Parenteral:* 2,5–3,5 g/kg/d ab Tag 2,
 darüber nur in Studien (ESPGHAN 2018).
 
 ## 7. Lipide
@@ -199,7 +199,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
-| 11.9 | FM85 wirkt nur auf Muttermilch: je 1 % +0,4675 g Protein, +3,5 kcal, +0,05 g Fett, +0,6 g Kohlenhydrate, +3 mg Na, +40 mg Ca, +22 mg P je 100 ml; 1 % = 1 g auf 100 ml (4 % = 1 g auf 25 ml) | Haus | `calculate` Step 7 | Q14–Q21 |
+| 11.9 | **FM85 wirkt nur auf Muttermilch, Zusammensetzung nach Packung** (je 100 g Pulver: 435 kcal, 35,5 g Eiweiß, 18,1 g Fett, 32,4 g Kohlenhydrate, 918 mg Natrium, 1890 mg Calcium, 1095 mg Phosphor). Je 1 % (= 1 g auf 100 ml; 4 % = 1 g auf 25 ml): +0,355 g Eiweiß, +4,35 kcal, +0,181 g Fett, +0,324 g Kohlenhydrate, +9,18 mg Na, +18,9 mg Ca, +10,95 mg P je 100 ml. Vorher 0,4675 g Eiweiß und 3,5 kcal je 1 %, was das Eiweiß um rund 30 % zu hoch und die Energie zu niedrig rechnete | Entscheidung 20.10.2026 (Packungsangabe) | `FM85_PER_PERCENT`, `products.js` | AB1–AB4, Q14–Q21 |
 | 11.10 | Basis EBM je 100 ml: 71 kcal, 1,13 g Protein, 4,03 g Fett, 7,0 g KH, 7 mg Na, 28 mg Ca, 32 mg P | Haus | `calculate`, `products.js` | – |
 | 11.11 | **Bei Formelnahrung wird ein stehendes FM85-Feld ignoriert**, die Zubereitung zeigt 0 g, ein Hinweis erscheint | Entscheidung 01.10.2026 | `fm85Ignoriert` | S7, S7b |
 | 11.12 | **FM85-Empfehlungen** (Erinnerung ab 50 ml/kg/d, Start-Kriterium ab 100 ml/kg/d, Titrationsplan auf 4 %, Fazit-Zeile, Hinweis ab Tag 28) nur bei **Geburtsgewicht < 1800 g** | Entscheidung 02.10.2026, Geltungsbereich ESPGHAN 2022 | `FORTIFIER.maxBirthWeight` | T7, T8 |
@@ -291,7 +291,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.7 | **Geschlecht (13.6)** für Perzentile und SGA | zurückgestellt |
 | 17.8 | **Protein-Obergrenze 4,5 g/kg/d für Reife** (6.2): in ESPGHAN 2022 nicht geregelt (nur < 1800 g) | Quelle fehlt |
 | 17.9 | **Energie- und Protein-Ziele für Reife** (5.1, 6.1): Leitlinienwerte für Reife nicht belegt | Quelle fehlt |
-| 17.10 | **FM85-Zusammensetzung (11.9)**: Die App rechnet je 1 g FM85 auf 100 ml mit 0,4675 g Eiweiß und 3,5 kcal. Händlerangaben zur Packung nennen **35,5 g Eiweiß und 435 kcal je 100 g** (= 0,355 g und 4,35 kcal je 1 %). Bitte mit der Packung abgleichen. Folge der jetzigen Werte: EBM + FM85 4 % ergibt 3,0 g Eiweiß/100 ml, bei 160 ml/kg/d 4,8 g/kg und damit dauerhaft kritisch | Packungswerte nötig |
+| 17.10 | ~~FM85-Zusammensetzung~~ | **entschieden 20.10.2026:** Packungswerte übernommen (siehe 11.9). Folge: Der Standardverlauf EBM + FM85 4 % ist nicht mehr dauerhaft kritisch; die Energie begrenzt das Volumen bei 4 % auf 150 ml/kg/d |
 
 ---
 
@@ -314,6 +314,7 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 20.10.2026 | FM85 nach Packungsangabe gerechnet (35,5 g Eiweiß und 435 kcal je 100 g); damit entfällt die dauerhaft kritische Eiweißmeldung im Standardverlauf |
 | 20.10.2026 | P:AA-Warnung entfällt (Wert bleibt sichtbar). Alle sichtbaren Beschriftungen auf Deutsch: „In Akte kopieren“, „Auf einen Blick“, „Startwerte“, „Energiedefizit-Index“, „Wachstumsrate“, „PDF-Export“, „Zurücksetzen“ |
 | 20.10.2026 | Meldungen gestaffelt: eine Hierarchie, kritisch immer sichtbar, Warnungen begrenzt, Hinweise und Erinnerungen eingeklappt; Fazit-Karte und Einzellisten entfallen |
 | 20.10.2026 | Versionswächter gegen veralteten Rechenkern (Anlass: neue Oberfläche mit alter `calculator.js` zeigte „undefined“ und ignorierte g/kg/d stumm) |
