@@ -19,6 +19,12 @@ class ValidationError extends Error {
 
 class NutritionCalculator {
     constructor() {
+        // v3.5.1: Build-Kennung. index.html prüft sie gegen ihre eigene Erwartung, damit
+        // eine neue Oberfläche nie stumm mit einem alten Rechenkern läuft (Symptom:
+        // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
+        // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
+        // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
+        this.VERSION = '3.6.2';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -32,6 +38,16 @@ class NutritionCalculator {
             LIPIDS: { max: 4.0, unit: 'g/kg/d' },
             OSM_PERIPHERAL: 900
         };
+        // --- FM85 (Nestlé) — Zusammensetzung je 1 % (= 1 g Pulver auf 100 ml Muttermilch) ---
+        // Quelle: Packungsangabe je 100 g Pulver, vom Neonatologen übermittelt am 20.10.2026:
+        //   Energie 435 kcal, Eiweiß 35,5 g, Fett 18,1 g, Kohlenhydrate 32,4 g,
+        //   Natrium 918 mg, Calcium 1890 mg, Phosphor 1095 mg.
+        // Je 1 % ist das der Wert durch 100. Vorher stand hier ein auf die Herstellertabelle
+        // „4 g auf 100 ml = 3,0 g Eiweiß, 85 kcal“ kalibriertes Modell (0,4675 g Eiweiß,
+        // 3,5 kcal je 1 %). Das nahm aber eine eiweißärmere Muttermilch (1,13 g) als der
+        // Hersteller an und rechnete das Eiweiß um rund 30 % zu hoch — EBM + FM85 4 % bei
+        // 160 ml/kg/d erschien mit 4,8 g/kg dauerhaft kritisch, richtig sind 4,1 g/kg.
+        this.FM85_PER_PERCENT = { kcal: 4.35, protein: 0.355, fat: 0.181, carbs: 0.324, naMg: 9.18, caMg: 18.9, pMg: 10.95 };
         // --- Kalium (v3.5) ---
         // Hausregel: kaliumfreie Phase an Lebenstag 1–2 (Risiko nicht-oligurische
         // Hyperkaliämie bei ELBW/VLBW, ESPGHAN 2018 Fluid & Electrolytes: Zufuhr
@@ -164,12 +180,12 @@ class NutritionCalculator {
             const p = window.NeoProducts.enteralProducts.find(x => x.id === id);
             if (p && p.per100ml) base = { protein: p.per100ml.protein, kcal: p.per100ml.kcal, name: p.name };
         }
-        // FM85 wird nur der Muttermilch zugesetzt (100er-Regel: 1 % ≙ 0,4675 g Protein
+        // FM85 wird nur der Muttermilch zugesetzt (1 % ≙ 0,355 g Eiweiß, siehe FM85_PER_PERCENT
         // und 3,5 kcal pro 100 ml — identisch zur Fortifizierungslogik in Step 7).
         const fortified = (id === 'ebm' && fm85 > 0);
         return {
-            proteinPer100: fortified ? base.protein + fm85 * 0.4675 : base.protein,
-            kcalPer100:    fortified ? base.kcal + fm85 * 3.5 : base.kcal,
+            proteinPer100: fortified ? base.protein + fm85 * this.FM85_PER_PERCENT.protein : base.protein,
+            kcalPer100:    fortified ? base.kcal + fm85 * this.FM85_PER_PERCENT.kcal : base.kcal,
             label:         fortified ? `${base.name} + FM85 ${fm85} %` : base.name
         };
     }
@@ -533,7 +549,7 @@ class NutritionCalculator {
             if (r.weightVelocity < 0) {
                 push('warning', `Gewichtsverlust ${r.weightVelocity} g/kg/d — Trend evaluieren.`);
             } else if (r.weightVelocity >= 15 && r.weightVelocity <= 25) {
-                push('positive', `Growth Velocity ${r.weightVelocity} g/kg/d → physiologisch.`);
+                push('positive', `Wachstumsrate ${r.weightVelocity} g/kg/d → physiologisch.`);
             } else if (r.weightVelocity < 15 && phase.id === 'C') {
                 push('warning', `Wachstumsstagnation (${r.weightVelocity} g/kg/d) — Fortifizierung prüfen.`);
             }
@@ -576,7 +592,7 @@ class NutritionCalculator {
             summary = `${phase.label}: ${criticals.length} kritische(r) Befund(e). Plan vor nächster Infusionsbestellung überarbeiten.`;
         } else if (status === 'attention') {
             const drift = bullets.filter(b => b.kind === 'warning').length;
-            summary = `${phase.label}: ${drift} Optimierungspunkt${drift === 1 ? '' : 'e'} identifiziert — siehe Bullets.`;
+            summary = `${phase.label}: ${drift} Optimierungspunkt${drift === 1 ? '' : 'e'} identifiziert — siehe Befunde.`;
         } else {
             summary = `${phase.label}: Stabile Zufuhr, Plan kann fortgeführt werden.`;
         }
@@ -673,7 +689,7 @@ class NutritionCalculator {
         }
 
         if (typeof r.weightVelocity === 'number') {
-            lines.push(`- Growth Velocity ${num(r.weightVelocity, 1)} g/kg/d${bw && cw ? ` (BW ${bw} g → akt. ${cw} g)` : ''}`);
+            lines.push(`- Wachstumsrate ${num(r.weightVelocity, 1)} g/kg/d${bw && cw ? ` (BW ${bw} g → akt. ${cw} g)` : ''}`);
         }
 
         // Beurteilung — narrative Synthese
@@ -700,6 +716,77 @@ class NutritionCalculator {
         const curr = this._d(currentWeightG);
         const prev = this._d(previousWeightG);
         return curr.minus(prev).div(curr).times(1000).toDecimalPlaces(1).toNumber();
+    }
+
+    /**
+     * v3.6 — Meldungen strukturiert für die Oberfläche.
+     * Aus den Warn-/Erinnerungstexten werden Stufe, Bereich, kurzer Titel und Detail
+     * abgeleitet. Die Texte selbst bleiben unverändert in `warnings` und `reminders`
+     * (Tests, EPR-Doku); hier wird nur sortiert und gegliedert. Es geht nichts verloren:
+     * `text` enthält immer den vollständigen Wortlaut.
+     *
+     * Stufen (Alarm-Hierarchie, höchste zuerst):
+     *   critical  — „CRITICAL:“   sofort handeln, nie eingeklappt
+     *   warning   — „Warnung:“    zeitnah prüfen
+     *   info      — „Hinweis:“ und alles Übrige; Orientierung, eingeklappt
+     *   reminder  — „💡“         Erinnerungen, eingeklappt
+     */
+    _buildAlerts(warnings, reminders) {
+        const DOMAINS = [
+            { id: 'growth',      label: 'Wachstum',          re: /SGA|Gewichtsverlust|Geburtsgewicht|Wachstumsrate|Perzentile|Wachstum/ },
+            { id: 'pn',          label: 'Glukose & PN',      re: /GIR|Glukose|Hypoglyk|Osmolarit|Ausfällung|Lipid-Volumen|Ca\+P/ },
+            { id: 'electrolytes',label: 'Elektrolyte',       re: /Natrium|Na-Zufuhr|Na-Kontrolle|Kalium|Na:Cl|SID|Hypernatri|Calcium|Phosphat|P:AA|Osteopenie/ },
+            { id: 'enteral',     label: 'Enteral',           re: /Enteral|enteral|Nahrungspause|Aufbau-Korridor|FM85|Anreicherung|Eiweiß-Zusatz|Zielkorridor/ },
+            { id: 'fluid',       label: 'Flüssigkeit',       re: /TFI|Flüssigkeit|Beatmung|Sekundärinfusion|Gesamtvolumen/ },
+            { id: 'macro',       label: 'Eiweiß & Energie',  re: /Protein|Eiweiß|Energie|NPC|Lipid|Triglyz|Harnstoff|Verfettung/ }
+        ];
+        const LEVEL_RANK = { critical: 0, warning: 1, info: 2, reminder: 3 };
+        // Eindeutige Leitbegriffe im gesamten Text gewinnen (z. B. Hypernatriämie →
+        // Elektrolyte, auch wenn der Titel „TFI < 100“ lautet). Sonst entscheidet der
+        // Titel; erst dann der Volltext. Ohne diese Reihenfolge landete „TFI 220 ist
+        // sehr hoch“ wegen des Wortes „Serum-Natrium“ im Detail bei den Elektrolyten.
+        const STRONG = [{ id: 'electrolytes', re: /Hypernatri|Hyperkali|Hypokali/ }];
+        const domainOf = (text, title) => {
+            const strong = STRONG.find(x => x.re.test(text));
+            if (strong) return DOMAINS.find(d => d.id === strong.id);
+            return DOMAINS.find(d => d.re.test(title)) || DOMAINS.find(d => d.re.test(text)) || { id: 'other', label: 'Sonstiges' };
+        };
+        const domainRank = id => { const i = DOMAINS.findIndex(d => d.id === id); return i < 0 ? DOMAINS.length : i; };
+
+        // Titel = Text bis zum ersten Gedankenstrich oder Satzende; Rest = Detail.
+        const split = text => {
+            const cuts = [];
+            const dash = text.search(/ [—–] /);
+            if (dash > 0) cuts.push({ at: dash, skip: 3 });
+            const sent = text.search(/[.!?](\s+(?=[A-ZÄÖÜ(])|$)/);
+            if (sent > 0) cuts.push({ at: sent + 1, skip: 1 });
+            if (!cuts.length) return { title: text, detail: '' };
+            const c = cuts.reduce((a, b) => (a.at <= b.at ? a : b));
+            return {
+                title: text.slice(0, c.at).replace(/[.!]$/, '').trim(),
+                detail: text.slice(c.at + (c.skip === 3 ? 3 : 0)).trim()
+            };
+        };
+
+        const items = (warnings || []).map(w => {
+            const level = w.startsWith('CRITICAL') ? 'critical' : (w.startsWith('Warnung') ? 'warning' : 'info');
+            const text = w.replace(/^(CRITICAL|Warnung|Hinweis):\s*/, '');
+            const sp = split(text);
+            const d = domainOf(text, sp.title);
+            return { level, domain: d.id, domainLabel: d.label, ...sp, text };
+        });
+        const rem = (reminders || []).map(r => {
+            const text = r.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+            const sp = split(text);
+            const d = domainOf(text, sp.title);
+            return { level: 'reminder', domain: d.id, domainLabel: d.label, ...sp, text };
+        });
+        const byPriority = (a, b) => (LEVEL_RANK[a.level] - LEVEL_RANK[b.level]) || (domainRank(a.domain) - domainRank(b.domain));
+        items.sort(byPriority);
+        rem.sort(byPriority);
+        const counts = { critical: 0, warning: 0, info: 0, reminder: rem.length };
+        items.forEach(i => { counts[i.level]++; });
+        return { items, reminders: rem, counts };
     }
 
     calculate(input) {
@@ -1149,15 +1236,16 @@ class NutritionCalculator {
 
         if (selectedEnteralProduct === 'ebm' && enteralVolKg.gt(0) && fm85Percent > 0) {
             // FM85 fortification — full nutrient model
-            const fortifiedProtein = D('1.13').plus(D(fm85Percent).times('0.4675'));
+            const F = this.FM85_PER_PERCENT;
+            const fortifiedProtein = D('1.13').plus(D(fm85Percent).times(F.protein));
             enteralProteinGKg = enteralVolKg.times(fortifiedProtein).div(100).toDecimalPlaces(3);
-            const fortifiedKcal = D(71).plus(D(fm85Percent).times('3.5'));
+            const fortifiedKcal = D(71).plus(D(fm85Percent).times(F.kcal));
             enteralKcalKg = enteralVolKg.times(fortifiedKcal).div(100).toDecimalPlaces(2);
-            const fortifiedFat = D('4.03').plus(D(fm85Percent).times('0.05'));
+            const fortifiedFat = D('4.03').plus(D(fm85Percent).times(F.fat));
             enteralFatGKg = enteralVolKg.times(fortifiedFat).div(100).toDecimalPlaces(3);
-            const fortifiedCarbs = D('7.0').plus(D(fm85Percent).times('0.6'));
+            const fortifiedCarbs = D('7.0').plus(D(fm85Percent).times(F.carbs));
             enteralCarbsGKg = enteralVolKg.times(fortifiedCarbs).div(100).toDecimalPlaces(3);
-            const fortifiedNaMg = D(7).plus(D(fm85Percent).times(3));
+            const fortifiedNaMg = D(7).plus(D(fm85Percent).times(F.naMg));
             enteralNaMmolKg = enteralVolKg.times(fortifiedNaMg).div(100).div(23).toDecimalPlaces(3);
         } else {
             enteralProteinGKg = enteralVolKg.times(baseProteinPer100).div(100).toDecimalPlaces(3);
@@ -1182,8 +1270,8 @@ class NutritionCalculator {
                 let basePMg = D(ep.per100ml.phosphorus_mg || 0);
                 let baseCaMg = D(ep.per100ml.calcium_mg || (selectedEnteralProduct === 'ebm' ? 28 : 0));
                 if (selectedEnteralProduct === 'ebm' && fm85Percent > 0) {
-                    baseCaMg = baseCaMg.plus(D(fm85Percent).times(40));
-                    basePMg = basePMg.plus(D(fm85Percent).times(22));
+                    baseCaMg = baseCaMg.plus(D(fm85Percent).times(this.FM85_PER_PERCENT.caMg));
+                    basePMg = basePMg.plus(D(fm85Percent).times(this.FM85_PER_PERCENT.pMg));
                 }
                 enteralPMgKg = enteralVolKg.times(basePMg).div(100).toDecimalPlaces(2);
                 enteralCaMgKg = enteralVolKg.times(baseCaMg).div(100).toDecimalPlaces(2);
@@ -1494,7 +1582,7 @@ class NutritionCalculator {
                 // Ausweg. Hier die noch mögliche FM85-Stufe beim aktuellen Volumen.
                 if (fm85Percent > 0) {
                     const ohneFm85 = D('1.13').plus(n.proteinAddPer100ml);
-                    const maxFm85 = Decimal.max(0, maxGesamtPer100.minus(ohneFm85).div('0.4675'));
+                    const maxFm85 = Decimal.max(0, maxGesamtPer100.minus(ohneFm85).div(this.FM85_PER_PERCENT.protein));
                     const maxFm85Step = maxFm85.div('0.5').floor().times('0.5').toNumber();
                     warnings.push(
                         `Hinweis: Bei ${n.enteralVolKg} ml/kg/d und aktuellem Eiweißzusatz wäre FM85 höchstens ` +
@@ -1713,10 +1801,10 @@ class NutritionCalculator {
             }
         }
 
-        // P:AA Rule (ESPGHAN): ≥ 1 mmol P per 1 g Protein
-        if (n.paaRatio > 0 && n.paaRatio < 1.0 && n.proteinTotalGKg > 0) {
-            warnings.push(`Warnung: P:AA Ratio ${n.paaRatio} mmol/g – Risiko für PIFS/Elektrolytshift: Phosphat im Verhältnis zum Protein zu niedrig (Ziel ≥ 1.0).`);
-        }
+        // v3.5 (Entscheidung Neonatologe 20.10.2026): Keine P:AA-Bewertung mehr.
+        // Phosphat wird über Urin und Labor gesteuert; alle Hauslösungen liegen bei
+        // 0,5–0,77 mmol/g und lösten die Warnung ständig aus. Der Wert wird weiter
+        // berechnet und angezeigt, löst aber weder Warnung noch Fazit aus.
 
         // --- AUDIT: SID-light warning (metabolic acidosis proxy) ---
         if (n.sidLight !== undefined && (n.effectiveNa > 0 || n.effectiveK > 0)) {
@@ -1769,7 +1857,7 @@ class NutritionCalculator {
             warnings.push('Hinweis: Monat 2+ bei >140 ml/kg/d enteral mit FM85 < 4% — Fortifizierung auf 4% empfohlen.');
         }
         if (postnatalAge >= 28 && weightVelocity !== 'Initial' && weightVelocity < 15 && n.enteralVolKg >= 100) {
-            warnings.push(`Hinweis: Growth Velocity ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation. Fortifizierung prüfen.`);
+            warnings.push(`Hinweis: Wachstumsrate ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation. Fortifizierung prüfen.`);
         }
         if (postnatalAge >= 28 && urea !== null && urea < 3 && n.enteralVolKg >= 100 && fm85Percent >= 4 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             warnings.push('Hinweis: BUN < 3 mmol/l trotz FM85 4% in Phase C — Aptamil Eiweiß+ Supplementierung prüfen.');
@@ -1950,9 +2038,6 @@ class NutritionCalculator {
         if (fazit.length < 3 && n.npcPerProtein > 0 && n.npcPerProtein < 20) {
             fazit.push(`NPC/Protein-Ratio zu niedrig (${n.npcPerProtein}) – Glukose- oder Lipidzufuhr steigern für optimale Proteinverwertung.`);
         }
-        if (fazit.length < 3 && n.paaRatio > 0 && n.paaRatio < 1.0 && n.proteinTotalGKg > 0) {
-            fazit.push(`Phosphat um ~${this._round((1.0 - n.paaRatio) * n.proteinTotalGKg * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen (P:AA Ratio ${n.paaRatio} → Ziel ≥ 1.0).`);
-        }
         if (fazit.length < 3 && fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             fazit.push('FM85-Fortifizierung starten – enterales Volumen ≥ 100 ml/kg/d erreicht.');
         }
@@ -2077,6 +2162,9 @@ class NutritionCalculator {
             energyGapIndex: this.calculateEnergyGapIndex(input.history),
             sodiumTrend: this._analyzeSodiumTrend(input.history, postnatalAge, n.totalNaMmolKg)
         };
+
+        // --- v3.6: strukturierte Meldungen für die Oberfläche ---
+        finalResult.alerts = this._buildAlerts(warnings, reminders);
 
         // --- v3.0: Smart Defaults (Tages-basierte Startwert-Vorschläge) ---
         finalResult.smartDefaults = this.getSmartDefaults(input);

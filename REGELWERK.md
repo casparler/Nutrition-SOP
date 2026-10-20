@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.5, 182 Tests.
+Stand: 20.10.2026, Version v3.6.2, 205 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -32,6 +32,7 @@ Spalte *Code*: Funktion bzw. Konstante in `calculator.js`. Spalte *Test*: ID in
 | 1.2 | ELBW-Grenze **inklusiv bei 1000 g** (`bw <= 1000`), überall im Code (seit v3.5 auch im Natrium-Block) | Entscheidung | `getTargets`, `calculate` (IWL-Block) | C1, Q7, S1 |
 | 1.3 | Eingabeprüfung am Anfang von `calculate()` darf nie entfernt oder gelockert werden | Entscheidung | `calculate` Step 0 | A3a–c, A4*, A5* |
 | 1.4 | In der Oberfläche läuft `calculate()` nur innerhalb von try-catch | Entscheidung | `index.html` | J1 |
+| 1.5 | **Versionswächter:** Die Oberfläche rechnet nur, wenn `calculator.VERSION` zu `EXPECTED_CALC_VERSION` in `index.html` passt, sonst Banner „Rechenkern veraltet“ und keine Berechnung. Die Skript-Tags tragen `?v=` gegen den Browser-Cache. Bei jeder Änderung an `calculator.js` oder `index.html` die Version an **drei Stellen** hochzählen | Entscheidung 20.10.2026 | `VERSION`, `index.html` | W1, W2 |
 
 ## 2. Eingaben und Plausibilitätsgrenzen
 
@@ -108,8 +109,8 @@ Zielspannen in ml/kg/d (`TFI_TARGETS`). ELBW und VLBW liegen **bewusst 10 ml unt
 | 6.5 | Überschreitung durch Anreicherung: Hinweis nennt noch mögliche Zielkonzentration und FM85-Stufe | Entscheidung 01.10.2026 | `calculate` Step 12 | Q22, Q23, S8 |
 
 *Leitlinie (ESPGHAN 2022, < 1800 g):* mindestens 3,5–4,0 g/kg/d, bis 4,5 nur bei langsamem Wachstum,
-guter Proteinqualität und ausreichender Energie. Für die Gesamtzufuhr 4,8 g/kg (EBM + FM85 4 % bei
-160 ml/kg) ist die Warnung damit leitlinienkonform. *Parenteral:* 2,5–3,5 g/kg/d ab Tag 2,
+guter Proteinqualität und ausreichender Energie. Mit den Packungswerten ergibt EBM + FM85 4 % bei 150 ml/kg 3,8 g/kg und bei
+160 ml/kg 4,1 g/kg (vorher fälschlich 4,5 bzw. 4,8); die Obergrenze 4,5 wird erst bei höherem Volumen oder zusätzlichem Eiweißzusatz erreicht. *Parenteral:* 2,5–3,5 g/kg/d ab Tag 2,
 darüber nur in Studien (ESPGHAN 2018).
 
 ## 7. Lipide
@@ -167,7 +168,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
 | 10.1 | **Ca:P-Verhältnis wird nicht mehr bewertet** — keine Warnung, kein Fazit, kein Zielbereich. Der Wert wird weiter berechnet und angezeigt. Grund: Calcium und Phosphat werden dienstags im Urin bestimmt und die Phosphat-Substitution daran angepasst | Entscheidung 02.10.2026 | `calculate` Step 9 | C3 |
-| 10.2 | P:AA-Verhältnis (mmol Phosphat je g Protein) unter 1,0 → Warnung | Haus, **Offen** (17.1) | `calculate` | C4 |
+| 10.2 | **P:AA-Verhältnis wird nicht mehr bewertet** — keine Warnung, kein Fazit. Der Wert wird weiter berechnet und angezeigt. Grund: Phosphat wird über Urin und Labor gesteuert, alle Hauslösungen liegen bei 0,5–0,77 mmol/g und lösten die Warnung ständig aus | Entscheidung 20.10.2026 | `calculate` | C4 |
 | 10.3 | Energie je g Protein (NPC/P) unter 20 → Warnung „Protein wird energetisch verwertet“; über 40 → „Verfettungsrisiko“ | Leitlinie | `calculate` | – |
 | 10.4 | Ausfällung in der PN: Ca + P > 72 mmol/l → CRITICAL; > 55 → Warnung | Haus | `calculate` | – |
 | 10.5 | Ab Tag 14 bei enteral ≥ 100 ml/kg/d: Calcium gesamt < 120 oder Phosphat gesamt < 60 mg/kg/d → Hinweis (Osteopenie) | Leitlinie, **Offen** (17.2) | `calculate` | – |
@@ -198,7 +199,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
-| 11.9 | FM85 wirkt nur auf Muttermilch: je 1 % +0,4675 g Protein, +3,5 kcal, +0,05 g Fett, +0,6 g Kohlenhydrate, +3 mg Na, +40 mg Ca, +22 mg P je 100 ml; 1 % = 1 g auf 100 ml (4 % = 1 g auf 25 ml) | Haus | `calculate` Step 7 | Q14–Q21 |
+| 11.9 | **FM85 wirkt nur auf Muttermilch, Zusammensetzung nach Packung** (je 100 g Pulver: 435 kcal, 35,5 g Eiweiß, 18,1 g Fett, 32,4 g Kohlenhydrate, 918 mg Natrium, 1890 mg Calcium, 1095 mg Phosphor). Je 1 % (= 1 g auf 100 ml; 4 % = 1 g auf 25 ml): +0,355 g Eiweiß, +4,35 kcal, +0,181 g Fett, +0,324 g Kohlenhydrate, +9,18 mg Na, +18,9 mg Ca, +10,95 mg P je 100 ml. Vorher 0,4675 g Eiweiß und 3,5 kcal je 1 %, was das Eiweiß um rund 30 % zu hoch und die Energie zu niedrig rechnete | Entscheidung 20.10.2026 (Packungsangabe) | `FM85_PER_PERCENT`, `products.js` | AB1–AB4, Q14–Q21 |
 | 11.10 | Basis EBM je 100 ml: 71 kcal, 1,13 g Protein, 4,03 g Fett, 7,0 g KH, 7 mg Na, 28 mg Ca, 32 mg P | Haus | `calculate`, `products.js` | – |
 | 11.11 | **Bei Formelnahrung wird ein stehendes FM85-Feld ignoriert**, die Zubereitung zeigt 0 g, ein Hinweis erscheint | Entscheidung 01.10.2026 | `fm85Ignoriert` | S7, S7b |
 | 11.12 | **FM85-Empfehlungen** (Erinnerung ab 50 ml/kg/d, Start-Kriterium ab 100 ml/kg/d, Titrationsplan auf 4 %, Fazit-Zeile, Hinweis ab Tag 28) nur bei **Geburtsgewicht < 1800 g** | Entscheidung 02.10.2026, Geltungsbereich ESPGHAN 2022 | `FORTIFIER.maxBirthWeight` | T7, T8 |
@@ -208,7 +209,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 | 11.14b | **Eiweiß-Zusatz in zwei Einheiten** über eine Auswahl am Eingabefeld: **g/100 ml** (Hauptform, die Station steigert in der Regel bis 2 g/100 ml) oder **g Eiweiß/kg/d**. Vorrang: g/100 ml, dann g/kg/d, dann direkte Pulvereingabe. Grenzen: g/100 ml 0–3, g/kg/d 0–5. Zusatz ohne enterale Nahrung → Hinweis | Entscheidung 20.10.2026 | `proteinAddGKg`, `proteinAddPer100ml` | V1–V5, Q16–Q19 |
 | 11.15 | Liquigen: 4,5 kcal/ml, 0,5 g Fett/ml. Supplement-Volumen erhöht die Gesamtflüssigkeit **nicht** | Haus | `calculate` Step 7b | N15–N20 |
 | 11.16 | Harnstoff < 3 mmol/l bei enteral ≥ 100 → Hinweis (Eiweißmangel); > 8 mmol/l → Hinweis (Eiweiß prüfen) | Haus, **Offen** (17.4) | `calculate` | – |
-| 11.17 | Wachstum: Growth Velocity = (Gewicht − Vortag) / Gewicht × 1000 g/kg/d; ab Tag 28 unter 15 → Hinweis | Leitlinie | `calculateGrowthVelocity` | E1 |
+| 11.17 | Wachstumsrate = (Gewicht − Vortag) / Gewicht × 1000 g/kg/d; ab Tag 28 unter 15 → Hinweis (Bezeichnung „Wachstumsrate“) | Leitlinie | `calculateGrowthVelocity` | E1 |
 
 *Leitlinie (ESPGHAN 2022, < 1800 g):* Energie 115–140 kcal/kg/d, darüber nur bei zu geringem Wachstum
 und höchstens 160. Multikomponenten-Fortifier ab 40–100 ml/kg/d enteral. Harnstoff > 5,7 mmol/l ohne
@@ -257,11 +258,31 @@ Phase A Tag 1–7 (Übergang), Phase B Tag 8–28 (Aufbau), Phase C ab Tag 29 (K
 
 ---
 
+## 16a. Darstellung und Priorisierung von Meldungen (v3.6)
+
+Ziel: wenige, eindeutige Signale statt vieler gleichfarbiger Zeilen (Alarmmüdigkeit). Alle Meldungen
+bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
+
+| ID | Regel | Status | Code | Test |
+|---|---|---|---|---|
+| 16a.1 | **Vier Stufen:** kritisch (`CRITICAL:`), Warnung (`Warnung:`), Hinweis (`Hinweis:` und alles Übrige), Erinnerung (💡). Die Stufe ergibt sich aus dem **Präfix des Meldungstextes**; neue Meldungen müssen mit einem dieser Präfixe beginnen | Entscheidung 20.10.2026 | `_buildAlerts` | Y2 |
+| 16a.2 | **Kritisch ist immer vollständig sichtbar**, nie eingeklappt, mit `role="alert"` | Entscheidung 20.10.2026 | `renderFindings` | Z1 |
+| 16a.3 | **Warnungen:** die ersten 3 sichtbar, weitere unter „n weitere Warnungen“. Hinweise und Erinnerungen eingeklappt, je Zeile aufklappbar | Entscheidung 20.10.2026 | `renderFindings` | Z2, Z3 |
+| 16a.4 | Reihenfolge: Stufe, dann Bereich (Wachstum, Glukose & PN, Elektrolyte, Enteral, Flüssigkeit, Eiweiß & Energie) | Haus | `_buildAlerts` | Y2 |
+| 16a.5 | Eine Stufe ist immer an **Symbol, Text und Farbe** erkennbar (⛔ kritisch, ⚠ Warnung, ℹ Hinweis), nie nur an der Farbe | Entscheidung 20.10.2026 | CSS `.f-*` | Z6 |
+| 16a.6 | Zähler oben nennen die Anzahl je Stufe; gibt es keine Befunde, steht „✓ Keine Befunde“ | Entscheidung 20.10.2026 | `renderFindings` | Z2 |
+| 16a.7 | **Nächste Schritte** (bisher „Klinisches Fazit“): höchstens 3 Handlungen, ohne Wiederholung der kritischen Meldungen | Entscheidung 20.10.2026 | `renderFindings` | Z4 |
+| 16a.8 | Ein Satz wird in Titel (bis zum ersten Gedankenstrich oder Satzende) und Detail zerlegt; der Bereich folgt dem **Titel**, eindeutige Leitbegriffe (z. B. Hypernatriämie) gelten über den ganzen Text | Entscheidung 20.10.2026 | `_buildAlerts` | Y4–Y6 |
+| 16a.9 | Der Toleranz-Vorbehalt beim Steigerungshinweis bleibt im vollen Wortlaut erhalten, auch wenn die Zeile eingeklappt ist | Entscheidung (v3.1) | `_buildAlerts` | Y7, N7 |
+| 16a.10 | Entfallen sind die getrennten Listen (Warnliste, Erinnerungsbox, Empfehlungsbox, Fazit-Karte) und die Bullets der Beurteilung. Alles steht in einem Bereich der Beurteilungskarte | Entscheidung 20.10.2026 | `index.html` | Z5 |
+| 16a.11 | „Im Ziel“-Zeile ersetzt die einzelnen grünen Positiv-Meldungen | Entscheidung 20.10.2026 | `renderFindings` | – |
+| 16a.12 | Nur in der Oberfläche berechnet: Wachstumsrate > 30 g/kg/d → kritisch (Ödem, Plausibilität). Beeinflusst `isSafe` nicht | Haus | `renderFindings` | – |
+
 ## 17. Offene Punkte (brauchen eine Entscheidung)
 
 | Nr. | Punkt | Stand |
 |---|---|---|
-| 17.1 | **P:AA-Warnung (10.2)**: soll sie bleiben oder entfallen? Alle Hauslösungen liegen bei 0,5–0,77 mmol/g und lösen sie immer aus | zur Erklärung vorgelegt |
+| 17.1 | ~~P:AA-Warnung~~ | **entschieden 20.10.2026: entfällt** (siehe 10.2) |
 | 17.2 | **Osteopenie-Hinweise (10.5)**: Calcium und Phosphat steuern Sie über den Urin am Dienstag. Sollen die Zufuhr-Hinweise entfallen? | offen |
 | 17.3 | **Rechengewicht (3.1)**: Tag-10-Sprung. Immer aktuelles Gewicht, oder Geburtsgewicht bis es wieder erreicht ist? | offen |
 | 17.4 | **Harnstoff (11.16)**: Haus-Grenze > 8 mmol/l, ESPGHAN 2022 nennt > 5,7 mmol/l als Anlass, die Proteinzufuhr zu senken | offen |
@@ -270,6 +291,7 @@ Phase A Tag 1–7 (Übergang), Phase B Tag 8–28 (Aufbau), Phase C ab Tag 29 (K
 | 17.7 | **Geschlecht (13.6)** für Perzentile und SGA | zurückgestellt |
 | 17.8 | **Protein-Obergrenze 4,5 g/kg/d für Reife** (6.2): in ESPGHAN 2022 nicht geregelt (nur < 1800 g) | Quelle fehlt |
 | 17.9 | **Energie- und Protein-Ziele für Reife** (5.1, 6.1): Leitlinienwerte für Reife nicht belegt | Quelle fehlt |
+| 17.10 | ~~FM85-Zusammensetzung~~ | **entschieden 20.10.2026:** Packungswerte übernommen (siehe 11.9). Folge: Der Standardverlauf EBM + FM85 4 % ist nicht mehr dauerhaft kritisch; die Energie begrenzt das Volumen bei 4 % auf 150 ml/kg/d |
 
 ---
 
@@ -292,6 +314,10 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 20.10.2026 | FM85 nach Packungsangabe gerechnet (35,5 g Eiweiß und 435 kcal je 100 g); damit entfällt die dauerhaft kritische Eiweißmeldung im Standardverlauf |
+| 20.10.2026 | P:AA-Warnung entfällt (Wert bleibt sichtbar). Alle sichtbaren Beschriftungen auf Deutsch: „In Akte kopieren“, „Auf einen Blick“, „Startwerte“, „Energiedefizit-Index“, „Wachstumsrate“, „PDF-Export“, „Zurücksetzen“ |
+| 20.10.2026 | Meldungen gestaffelt: eine Hierarchie, kritisch immer sichtbar, Warnungen begrenzt, Hinweise und Erinnerungen eingeklappt; Fazit-Karte und Einzellisten entfallen |
+| 20.10.2026 | Versionswächter gegen veralteten Rechenkern (Anlass: neue Oberfläche mit alter `calculator.js` zeigte „undefined“ und ignorierte g/kg/d stumm) |
 | 20.10.2026 | Eiweiß-Zusatz wahlweise in g/100 ml (Hauptform) oder g/kg/d |
 | 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |
 | 02.10.2026 | Ca:P entfällt. Beatmungs-CRITICAL bleibt. Kalium: Warnung bei hoher Zufuhr, kaliumfreie Tage 1–2. Vitamin-D-/Proprems-Grenze (3 ml absolut) bleibt. Nur mit realem Gewicht rechnen. Hypoglykämie ist CRITICAL. SGA-Erkennung ja, Phototherapie nein. Geschlecht zurückgestellt. FM85-Empfehlungen nur bei < 1800 g. Energie-Obergrenze des enteralen Ziels erst ab Tag 4 |

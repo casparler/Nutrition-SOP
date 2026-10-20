@@ -207,3 +207,5 @@ Nach dem Durchspielen fehlen für den Stationsalltag am meisten:
 
 Hinweis zu den Regeln im Projekt: A2 berührt Invariante 2 und stärkt sie (gleiche Richtung wie v3.4).
 A4 würde Testwerte ändern (Ca:P) und bräuchte laut `AGENTS.md` eine klinische Begründung.
+
+**Nachtrag 20.10.2026:** Der in C4 beschriebene Dauerzustand „EBM + FM85 4 % bei 160 ml/kg kritisch“ war ein Rechenfehler der FM85-Zusammensetzung (Eiweiß um rund 30 % zu hoch). Mit den Packungswerten ergeben sich 4,1 g Eiweiß/kg. Stand aller Regeln: `REGELWERK.md`.
