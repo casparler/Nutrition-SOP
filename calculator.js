@@ -45,6 +45,8 @@ class NutritionCalculator {
         this.FORTIFIER = { maxBirthWeight: 1800 };
         // --- SGA (v3.5): Geburtsgewicht unter der 10. bzw. 3. Perzentile (Fenton) ---
         this.SGA = { percentile: 10, severePercentile: 3 };
+        // --- Eiweißlösung (v3.5): Hausstandard 1 g Eiweiß = 1 ml Lösung ---
+        this.PROTEIN_SOLUTION = { gPerMl: 1 };
         // --- Enterale Zielvolumina (Vollnahrung) nach Reifegrad, v3.1 ---
         // Quellen: ESPGHAN CoN 2022 (Enteral Nutrition in Preterm Infants) —
         //   stabile wachsende Frühgeborene benötigen 150–180 ml/kg/d;
@@ -1326,6 +1328,14 @@ class NutritionCalculator {
         const proteinPowderPerMeal = mealFrequency > 0
             ? proteinPowderPerDay.div(mealFrequency).toDecimalPlaces(2)
             : D(0);
+        // v3.5: Eiweißzusatz zusätzlich als Menge Eiweiß und als Volumen der
+        // Hauslösung (1 g Eiweiß = 1 ml). Das ist die Menge, die tatsächlich
+        // aufgezogen wird — nicht zu verwechseln mit dem Nahrungsvolumen je Mahlzeit.
+        const proteinAddGramsPerDay = weightKg.times(aptamilProteinNetGKg).toDecimalPlaces(3);
+        const proteinAddGramsPerMeal = mealFrequency > 0
+            ? proteinAddGramsPerDay.div(mealFrequency).toDecimalPlaces(3) : D(0);
+        const proteinSolutionMlPerDay = proteinAddGramsPerDay.div(this.PROTEIN_SOLUTION.gPerMl).toDecimalPlaces(2);
+        const proteinSolutionMlPerMeal = proteinAddGramsPerMeal.div(this.PROTEIN_SOLUTION.gPerMl).toDecimalPlaces(3);
         // Tatsaechliche Zielkonzentration, auch wenn direkt in g Pulver/kg/d
         // eingegeben wurde (Rueckrechnung fuer die Anzeige).
         const effProteinAddPer100ml = proteinAddPer100ml.gt(0)
@@ -1371,6 +1381,10 @@ class NutritionCalculator {
             fm85GramsPerMeal: fm85GramsPerMeal.toNumber(),
             proteinPowderPerDay: proteinPowderPerDay.toNumber(),
             proteinPowderPerMeal: proteinPowderPerMeal.toNumber(),
+            proteinAddGramsPerMeal: proteinAddGramsPerMeal.toNumber(),
+            proteinAddGramsPerDay: proteinAddGramsPerDay.toNumber(),
+            proteinSolutionMlPerMeal: proteinSolutionMlPerMeal.toNumber(),
+            proteinSolutionMlPerDay: proteinSolutionMlPerDay.toNumber(),
             proteinAddPer100ml: effProteinAddPer100ml.toNumber(),
             proteinPer100mlFinal: proteinPer100mlFinal.toNumber(),
             enteralVolKg: enteralVolKg.toNumber(),
@@ -1979,6 +1993,10 @@ class NutritionCalculator {
                     proteinAddPer100ml: n.proteinAddPer100ml,
                     proteinPowderPerMeal: n.proteinPowderPerMeal,
                     proteinPowderPerDay: n.proteinPowderPerDay,
+                    proteinAddGramsPerMeal: n.proteinAddGramsPerMeal,
+                    proteinAddGramsPerDay: n.proteinAddGramsPerDay,
+                    proteinSolutionMlPerMeal: n.proteinSolutionMlPerMeal,
+                    proteinSolutionMlPerDay: n.proteinSolutionMlPerDay,
                     proteinPer100mlFinal: n.proteinPer100mlFinal
                 },
                 // v3.1 — enteraler Aufbau & Supplemente

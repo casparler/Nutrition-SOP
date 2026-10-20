@@ -1801,3 +1801,43 @@ describe('T) Entscheidungen 02.10.2026 (v3.5)', () => {
         expect(r.results.birthWeightPercentile).toBe(null);
     });
 });
+
+describe('U) Eiweißlösung 1 ml = 1 g (v3.5)', () => {
+    it('U1: Zubereitung nennt Eiweiß in g und das Volumen der Hauslösung (1 g = 1 ml)', () => {
+        // Fall aus dem Stationsalltag: 400 g, 100 ml/kg/d, 12 Mahlzeiten, Zusatz 2 g/100 ml
+        const r = calc.calculate(baseInput({
+            birthWeight: 400, currentWeight: 400, ssw: 24, postnatalAge: 12,
+            tfi: 208, enteralVolume: 100, mealFrequency: 12, proteinAddPer100ml: 2,
+            gir: 0, protein: 0, lipids: 0
+        }));
+        const p = r.results.preparation;
+        // Nahrung: 0,4 kg × 100 ml = 40 ml/d, 3,3 ml je Mahlzeit — das ist NICHT das Eiweiß
+        expect(p.dailyVolumeMl).toBe(40);
+        expect(p.mealVolumeMl).toBe(3.3);
+        // Zusatz: 40 ml × 2 g/100 ml = 0,8 g Eiweiß/d = 0,8 ml Lösung/d
+        expect(p.proteinAddGramsPerDay).toBeCloseTo(0.8, 2);
+        expect(p.proteinSolutionMlPerDay).toBeCloseTo(0.8, 2);
+        expect(p.proteinSolutionMlPerMeal).toBeCloseTo(0.067, 3);
+        // Pulver-Angabe bleibt unverändert
+        expect(p.proteinPowderPerDay).toBeCloseTo(0.97, 2);
+    });
+
+    it('U2: Ohne Zusatz sind alle Zusatzmengen 0', () => {
+        const r = calc.calculate(baseInput({ tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0 }));
+        const p = r.results.preparation;
+        expect(p.proteinAddGramsPerDay).toBe(0);
+        expect(p.proteinSolutionMlPerDay).toBe(0);
+        expect(p.proteinSolutionMlPerMeal).toBe(0);
+    });
+
+    it('U3: Das Zusatz-Eiweiß in g entspricht dem Eiweiß-Beitrag der Rechnung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 20,
+            tfi: 150, enteralVolume: 150, mealFrequency: 8, proteinAddPer100ml: 1,
+            gir: 0, protein: 0, lipids: 0
+        }));
+        // 1,2 kg × 150 ml × 1 g/100 ml = 1,8 g/d
+        expect(r.results.preparation.proteinAddGramsPerDay).toBeCloseTo(1.8, 2);
+        expect(r.results.preparation.proteinAddGramsPerDay / 1.2).toBeCloseTo(r.results.aptamilProteinNetGKg, 2);
+    });
+});

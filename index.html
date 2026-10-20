@@ -2122,7 +2122,7 @@
                         const nz = v => Number(v) > 0;
                         if (hl) {
                             hl.innerText = prep.dailyVolumeMl > 0
-                                ? `${prep.dailyVolumeMl} ml/Tag auf ${prep.meals} Mahlzeiten = ${prep.mealVolumeMl} ml je Mahlzeit`
+                                ? `Nahrung: ${prep.dailyVolumeMl} ml/Tag auf ${prep.meals} Mahlzeiten = ${prep.mealVolumeMl} ml Nahrung je Mahlzeit`
                                 : 'Keine enterale Nahrung eingestellt';
                         }
                         if (rows) {
@@ -2140,7 +2140,9 @@
                                              `${prep.fm85GramsPerMeal} g`, `${prep.fm85GramsPerDay} g`);
                             }
                             if (nz(prep.proteinAddPer100ml)) {
-                                html += line(`Aptamil Eiweiß+ (${prep.proteinAddPer100ml} g/100 ml)`,
+                                html += line(`Eiweißlösung (1 ml = 1 g Eiweiß), Zusatz ${prep.proteinAddPer100ml} g/100 ml`,
+                                             `${prep.proteinSolutionMlPerMeal} ml`, `${prep.proteinSolutionMlPerDay} ml`);
+                                html += line(`Aptamil Eiweiß+ Pulver (falls Pulver)`,
                                              `${prep.proteinPowderPerMeal} g`, `${prep.proteinPowderPerDay} g`);
                             }
                             if (!html) html = '<tr><td class="py-0.5 text-gray-500">Keine Anreicherung eingestellt</td></tr>';

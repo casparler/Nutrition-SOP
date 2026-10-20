@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 02.10.2026, Version v3.5, 174 Tests.
+Stand: 20.10.2026, Version v3.5, 177 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -204,6 +204,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 | 11.12 | **FM85-Empfehlungen** (Erinnerung ab 50 ml/kg/d, Start-Kriterium ab 100 ml/kg/d, Titrationsplan auf 4 %, Fazit-Zeile, Hinweis ab Tag 28) nur bei **Geburtsgewicht < 1800 g** | Entscheidung 02.10.2026, Geltungsbereich ESPGHAN 2022 | `FORTIFIER.maxBirthWeight` | T7, T8 |
 | 11.13 | FM85 bei enteral < 100 ml/kg/d → Hinweis; Voraussetzungs-Erinnerung (stabiles Abdomen, > 5–7 Tage toleriert) | Haus | `calculate` | – |
 | 11.14 | Zielkonzentration wird eingegeben (g Eiweiß/100 ml, FM85 in 0,5-%-Schritten); Aptamil Eiweiß+: 82,1 g Protein je 100 g Pulver, 338 kcal; Zielkonzentration hat Vorrang | Entscheidung (v3.4) | `calculate` | Q15–Q19 |
+| 11.14a | **Eiweißlösung der Station: 1 g Eiweiß = 1 ml.** Die Zubereitung nennt das Zusatz-Eiweiß in g und das Volumen der Lösung je Mahlzeit und pro Tag. Die Zeile „Nahrung: … ml je Mahlzeit“ meint die Milchmenge, nicht das Eiweiß. Das Pulver bleibt als zweite Zeile | Entscheidung 20.10.2026 | `PROTEIN_SOLUTION`, `results.preparation` | U1–U3 |
 | 11.15 | Liquigen: 4,5 kcal/ml, 0,5 g Fett/ml. Supplement-Volumen erhöht die Gesamtflüssigkeit **nicht** | Haus | `calculate` Step 7b | N15–N20 |
 | 11.16 | Harnstoff < 3 mmol/l bei enteral ≥ 100 → Hinweis (Eiweißmangel); > 8 mmol/l → Hinweis (Eiweiß prüfen) | Haus, **Offen** (17.4) | `calculate` | – |
 | 11.17 | Wachstum: Growth Velocity = (Gewicht − Vortag) / Gewicht × 1000 g/kg/d; ab Tag 28 unter 15 → Hinweis | Leitlinie | `calculateGrowthVelocity` | E1 |
@@ -290,4 +291,5 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |
 | 02.10.2026 | Ca:P entfällt. Beatmungs-CRITICAL bleibt. Kalium: Warnung bei hoher Zufuhr, kaliumfreie Tage 1–2. Vitamin-D-/Proprems-Grenze (3 ml absolut) bleibt. Nur mit realem Gewicht rechnen. Hypoglykämie ist CRITICAL. SGA-Erkennung ja, Phototherapie nein. Geschlecht zurückgestellt. FM85-Empfehlungen nur bei < 1800 g. Energie-Obergrenze des enteralen Ziels erst ab Tag 4 |
