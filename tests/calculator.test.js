@@ -1889,3 +1889,28 @@ describe('V) Eiweiß-Zusatz in g/kg/d als zweite Eingabeform (v3.5)', () => {
         }
     });
 });
+
+describe('W) Versionsstand von Oberfläche und Rechenkern (v3.5.1)', () => {
+    const fs = require('node:fs');
+    const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+
+    it('W1: calculator.VERSION, EXPECTED_CALC_VERSION und die ?v= der Skript-Tags stimmen überein', () => {
+        const erwartet = html.match(/EXPECTED_CALC_VERSION\s*=\s*'([^']+)'/);
+        expect(erwartet, 'EXPECTED_CALC_VERSION fehlt in index.html').toBeTruthy();
+        expect(calc.VERSION).toBe(erwartet[1]);
+        for (const f of ['calculator.js', 'products.js', 'fenton_data.js']) {
+            const m = html.match(new RegExp(`<script src="${f.replace('.', '\\.')}\\?v=([^"]+)"`));
+            expect(m, `${f} ohne ?v= eingebunden`).toBeTruthy();
+            expect(m[1], f).toBe(calc.VERSION);
+        }
+    });
+
+    it('W2: Die Oberfläche bricht bei abweichender Version ab, bevor sie rechnet', () => {
+        const start = html.indexOf('window.updateCalculations = function updateCalculations()');
+        const guard = html.indexOf('calculator.VERSION !== EXPECTED_CALC_VERSION', start);
+        const aufruf = html.indexOf('calculator.calculate(data)', start);
+        expect(start).toBeGreaterThan(0);
+        expect(guard).toBeGreaterThan(start);
+        expect(guard).toBeLessThan(aufruf);
+    });
+});

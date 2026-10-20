@@ -1107,9 +1107,10 @@
     <input type="hidden" id="input-micro-vol-hidden" value="0">
 
     <!-- App Logic -->
-    <script src="products.js"></script>
-    <script src="fenton_data.js"></script>
-    <script src="calculator.js"></script>
+    <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
+    <script src="products.js?v=3.5.1"></script>
+    <script src="fenton_data.js?v=3.5.1"></script>
+    <script src="calculator.js?v=3.5.1"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1366,6 +1367,9 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             const calculator = new NutritionCalculator();
+            // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
+            // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
+            const EXPECTED_CALC_VERSION = '3.5.1';
 
             // Tippy tooltips
             const tipInstances = {};
@@ -1853,6 +1857,17 @@
             });
 
             window.updateCalculations = function updateCalculations() {
+                // --- Versions-Wächter: nie mit einem veralteten Rechenkern rechnen ---
+                if (calculator.VERSION !== EXPECTED_CALC_VERSION) {
+                    const vb = document.getElementById('validation-error-banner');
+                    const vm = document.getElementById('validation-error-message');
+                    const vf = document.getElementById('validation-error-field');
+                    if (vm) vm.textContent = `Rechenkern veraltet (calculator.js ${calculator.VERSION || 'unbekannt'}, erwartet ${EXPECTED_CALC_VERSION}). ` +
+                        'Bitte calculator.js, products.js und fenton_data.js zusammen mit index.html ersetzen und die Seite mit Strg+F5 neu laden. Es wird nicht gerechnet.';
+                    if (vf) vf.textContent = '';
+                    if (vb) vb.classList.remove('hidden');
+                    return;
+                }
                 const day = parseInt(document.getElementById('input-day').value) || 1;
                 // v3.5: nur mit realem Gewicht rechnen — kein stiller Ersatzwert (vorher 1000 g).
                 // Leere Felder gehen unverändert an calculate(), das dann abbricht.
@@ -2150,7 +2165,7 @@
                             }
                             if (nz(prep.proteinAddPer100ml)) {
                                 html += line(`Eiweißlösung (1 ml = 1 g Eiweiß), Zusatz ${prep.proteinAddPer100ml} g/100 ml`,
-                                             `${prep.proteinSolutionMlPerMeal} ml`, `${prep.proteinSolutionMlPerDay} ml`);
+                                             `${prep.proteinSolutionMlPerMeal ?? '–'} ml`, `${prep.proteinSolutionMlPerDay ?? '–'} ml`);
                                 html += line(`Aptamil Eiweiß+ Pulver (falls Pulver)`,
                                              `${prep.proteinPowderPerMeal} g`, `${prep.proteinPowderPerDay} g`);
                             }

@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.5, 182 Tests.
+Stand: 20.10.2026, Version v3.5.1, 184 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -32,6 +32,7 @@ Spalte *Code*: Funktion bzw. Konstante in `calculator.js`. Spalte *Test*: ID in
 | 1.2 | ELBW-Grenze **inklusiv bei 1000 g** (`bw <= 1000`), überall im Code (seit v3.5 auch im Natrium-Block) | Entscheidung | `getTargets`, `calculate` (IWL-Block) | C1, Q7, S1 |
 | 1.3 | Eingabeprüfung am Anfang von `calculate()` darf nie entfernt oder gelockert werden | Entscheidung | `calculate` Step 0 | A3a–c, A4*, A5* |
 | 1.4 | In der Oberfläche läuft `calculate()` nur innerhalb von try-catch | Entscheidung | `index.html` | J1 |
+| 1.5 | **Versionswächter:** Die Oberfläche rechnet nur, wenn `calculator.VERSION` zu `EXPECTED_CALC_VERSION` in `index.html` passt, sonst Banner „Rechenkern veraltet“ und keine Berechnung. Die Skript-Tags tragen `?v=` gegen den Browser-Cache. Bei jeder Änderung an `calculator.js` oder `index.html` die Version an **drei Stellen** hochzählen | Entscheidung 20.10.2026 | `VERSION`, `index.html` | W1, W2 |
 
 ## 2. Eingaben und Plausibilitätsgrenzen
 
@@ -292,6 +293,7 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 20.10.2026 | Versionswächter gegen veralteten Rechenkern (Anlass: neue Oberfläche mit alter `calculator.js` zeigte „undefined“ und ignorierte g/kg/d stumm) |
 | 20.10.2026 | Eiweiß-Zusatz wahlweise in g/100 ml (Hauptform) oder g/kg/d |
 | 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |
 | 02.10.2026 | Ca:P entfällt. Beatmungs-CRITICAL bleibt. Kalium: Warnung bei hoher Zufuhr, kaliumfreie Tage 1–2. Vitamin-D-/Proprems-Grenze (3 ml absolut) bleibt. Nur mit realem Gewicht rechnen. Hypoglykämie ist CRITICAL. SGA-Erkennung ja, Phototherapie nein. Geschlecht zurückgestellt. FM85-Empfehlungen nur bei < 1800 g. Energie-Obergrenze des enteralen Ziels erst ab Tag 4 |
