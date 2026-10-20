@@ -309,11 +309,17 @@ describe('C) ESPGHAN Targets & Tiered Alerts', () => {
         expect(r.protein.max).toBe(3.0);
     });
 
-    it('C3: Ca:P Ratio außerhalb 1.5–2.0 → Warnung', () => {
+    // v3.5 — klinisch begründete Anpassung (Neonatologe, 02.10.2026): Calcium und
+    // Phosphat werden dienstags im Urin bestimmt und die Phosphat-Substitution daran
+    // angepasst; eine Ca:P-Bewertung der Zufuhr hat auf Station keine Funktion. Vorher
+    // prüfte dieser Test die Warnung. Das Verhältnis wird weiter berechnet.
+    it('C3: Ca:P Ratio außerhalb 1.5–2.0 löst keine Warnung mehr aus (Wert bleibt sichtbar)', () => {
         const r = calc.calculate(baseInput({
-            calcium: 30, phosphate: 80 // Ratio ≈ 0.29 → out of range
+            calcium: 30, phosphate: 80 // Ratio ≈ 0.29
         }));
-        expect(r.warnings.some(w => w.includes('Ca:P'))).toBe(true);
+        expect(r.warnings.some(w => w.includes('Ca:P'))).toBe(false);
+        expect(r.fazit.join(' ')).not.toMatch(/Ca:P/);
+        expect(r.results.caPRatio).toBeGreaterThan(0);
     });
 
     it('C4: P:AA Ratio < 1.0 → Warnung', () => {
@@ -1365,12 +1371,21 @@ describe('Q-GEW) Gewichtsverlauf als Kontrollgröße', () => {
         expect(r.warnings.some(w => /noch nicht wieder erreicht/.test(w))).toBe(true);
     });
 
+    // v3.5 — klinisch begründete Anpassung (Neonatologe, 02.10.2026): Es wird nur mit
+    // realem Gewicht gerechnet. Ab Lebenstag 2 bricht die App ohne aktuelles Gewicht
+    // ab, statt es auf das Geburtsgewicht zu setzen. Das Ziel des Tests (keine
+    // Falschmeldung „0 % Verlust“) bleibt erhalten: an Tag 1 gilt das Geburtsgewicht,
+    // danach gibt es gar kein Ergebnis mehr.
     it('Q12: Ohne Gewichtseingabe keine Falschmeldung', () => {
-        const input = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 4, tfi: 150 });
-        delete input.currentWeight;
-        const r = calc.calculate(input);
+        const tag1 = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 1, tfi: 80 });
+        delete tag1.currentWeight;
+        const r = calc.calculate(tag1);
         expect(r.results.weightChangePercent).toBe(null);
         expect(r.warnings.some(w => /Gewichtsverlust/.test(w))).toBe(false);
+
+        const tag4 = baseInput({ birthWeight: 800, ssw: 26, postnatalAge: 4, tfi: 150 });
+        delete tag4.currentWeight;
+        expect(() => calc.calculate(tag4)).toThrow(/Aktuelles Gewicht fehlt/);
     });
 });
 
@@ -1505,6 +1520,372 @@ describe('R) Auffindbarkeit der Anreicherungs-Felder', () => {
                 const st = (n.getAttribute && n.getAttribute('style')) || '';
                 expect(/display:\s*none/.test(st), `${id} ist verborgen`).toBe(false);
             }
+        }
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION S — Fehlerkorrekturen aus der Patientensimulation (v3.5)
+ * Befunde: SIMULATIONSBERICHT.md, Abschnitte A1–A3, B3–B5.
+ * ────────────────────────────────────────────────────────────────*/
+describe('S) Korrekturen aus der Patientensimulation (v3.5)', () => {
+
+    // S1 — Invariante 2 gilt auch für den Natrium-/IWL-Block
+    it('S1: Exakt 1000 g bekommt die ELBW-Natriumhinweise wie 999 g, 1001 g nicht', () => {
+        const mk = bw => calc.calculate(baseInput({
+            birthWeight: bw, currentWeight: bw - 50, ssw: 28, postnatalAge: 3,
+            tfi: 90, sodium: 6
+        }));
+        const hat = r => ({
+            iwl: r.warnings.some(w => /IWL-bedingte Hypernatriämie/.test(w)),
+            na: r.warnings.some(w => /Na-Zufuhr .* ELBW Tag 1–7/.test(w))
+        });
+        expect(hat(mk(999))).toEqual({ iwl: true, na: true });
+        expect(hat(mk(1000))).toEqual({ iwl: true, na: true });
+        expect(hat(mk(1001))).toEqual({ iwl: false, na: false });
+    });
+
+    // S2–S3 — Glukose fehlt bei laufender PN
+    it('S2: GIR 0 bei laufendem PN-Volumen ist CRITICAL und steht im Fazit', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 2100, currentWeight: 2100, ssw: 34, postnatalAge: 1,
+            tfi: 60, gir: 0, protein: 1.5, lipids: 1.0
+        }));
+        const w = r.warnings.find(x => /Keine Glukosezufuhr/.test(x));
+        expect(w).toBeTruthy();
+        expect(w.startsWith('CRITICAL')).toBe(true);
+        expect(r.isSafe).toBe(false);
+        expect(r.fazit.join(' ')).toMatch(/Keine Glukosezufuhr/);
+        expect(r.fazit.join(' ')).not.toMatch(/keine Korrekturen erforderlich/);
+    });
+
+    it('S3: Kein Alarm bei Vollnahrung mit kleinem PN-Rest ohne Glukose', () => {
+        // 140 ml/kg EBM liefern rechnerisch ~6,8 mg/kg/min Kohlenhydrate.
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 12,
+            tfi: 150, enteralVolume: 140, gir: 0, protein: 0, lipids: 0
+        }));
+        expect(r.warnings.some(x => /Glukosezufuhr|unter Minimum/.test(x))).toBe(false);
+    });
+
+    // S4–S5 — Fazit darf kritische Befunde nicht verschweigen
+    it('S4: GIR über dem Maximum steht im Fazit, nicht „keine Korrekturen“', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 700, currentWeight: 650, ssw: 25, postnatalAge: 2,
+            tfi: 110, gir: 11, secondarySolution: 'glucose10', secondaryRateKg: 20,
+            protein: 2, lipids: 1.5
+        }));
+        expect(r.warnings.some(x => /^CRITICAL: GIR/.test(x))).toBe(true);
+        expect(r.fazit.join(' ')).toMatch(/GIR .* überschreitet Maximum/);
+        expect(r.fazit.join(' ')).not.toMatch(/keine Korrekturen erforderlich/);
+    });
+
+    it('S5: Hypertriglyceridämie steht im Fazit, ohne gegenläufige Energie-Steigerung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 900, currentWeight: 850, ssw: 27, postnatalAge: 10,
+            tfi: 150, gir: 7, protein: 3.5, lipids: 3.5, triglycerides: 300
+        }));
+        expect(r.fazit.join(' ')).toMatch(/Triglyzeride > 250/);
+        expect(r.fazit.join(' ')).not.toMatch(/Energiezufuhr um/);
+    });
+
+    it('S5b: Ein unauffälliger Plan behält das „keine Korrekturen“-Fazit', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 3,
+            tfi: 120, gir: 6, protein: 3.5, lipids: 3.0, calcium: 60, phosphate: 36
+        }));
+        if (r.warnings.length === 0) {
+            expect(r.fazit).toEqual(['Ernährungsplan im ESPGHAN-Zielbereich – keine Korrekturen erforderlich.']);
+        }
+        expect(r.fazit.join(' ')).not.toMatch(/Glukosezufuhr prüfen/);
+    });
+
+    // S6 — Perzentile nach korrigiertem Alter
+    it('S6: Gewichtsperzentile nutzt das korrigierte Gestationsalter', async () => {
+        const { GrowthCalculator } = await import('../fenton_data.js').then(m => m.default || m);
+        globalThis.GrowthCalculator = GrowthCalculator;
+        try {
+            const r = calc.calculate(baseInput({
+                birthWeight: 880, currentWeight: 1250, ssw: 26, postnatalAge: 28,
+                tfi: 150, enteralVolume: 150
+            }));
+            // Tag 28 = 4 Wochen → 30+0 SSW korrigiert
+            const erwartet = GrowthCalculator.getPercentile('WEIGHT', 26 + 27 / 7, 1250);
+            expect(r.results.weightPercentile).toBe(erwartet);
+            expect(r.results.weightPercentile).not.toBe('> 97.');
+            // Tag 1 bleibt unverändert beim Alter bei Geburt
+            const r1 = calc.calculate(baseInput({
+                birthWeight: 880, currentWeight: 880, ssw: 26, postnatalAge: 1, tfi: 80
+            }));
+            expect(r1.results.weightPercentile).toBe(GrowthCalculator.getPercentile('WEIGHT', 26, 880));
+        } finally {
+            delete globalThis.GrowthCalculator;
+        }
+    });
+
+    // S7 — FM85 nur bei Muttermilch
+    it('S7: FM85-Feld bei Formelnahrung erscheint nicht in der Zubereitung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 2100, currentWeight: 2000, ssw: 34, postnatalAge: 6,
+            tfi: 150, enteralVolume: 150, selectedEnteralProduct: 'aptamilPre',
+            fm85Percent: 4
+        }));
+        expect(r.results.preparation.fm85Percent).toBe(0);
+        expect(r.results.preparation.fm85GramsPerDay).toBe(0);
+        expect(r.results.preparation.fm85GramsPerMeal).toBe(0);
+        expect(r.warnings.some(w => /FM85 4 % wird nur bei Muttermilch/.test(w))).toBe(true);
+        expect(r.reminders.some(m => /FM85/.test(m))).toBe(false);
+    });
+
+    it('S7b: Bei Muttermilch bleibt die FM85-Zubereitung unverändert', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 20,
+            tfi: 160, enteralVolume: 150, fm85Percent: 4
+        }));
+        expect(r.results.preparation.fm85Percent).toBe(4);
+        expect(r.results.preparation.fm85GramsPerDay).toBeGreaterThan(0);
+        expect(r.warnings.some(w => /wird nur bei Muttermilch/.test(w))).toBe(false);
+    });
+
+    // S8 — Hinweis bei FM85 als Treiber der Protein-Überschreitung
+    it('S8: Ist FM85 der Treiber, nennt der Hinweis die noch mögliche FM85-Stufe', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 620, currentWeight: 1050, ssw: 25, postnatalAge: 28,
+            tfi: 160, enteralVolume: 160, fm85Percent: 4
+        }));
+        expect(r.safetyChecks.proteinLimit).toBe(false);
+        const h = r.warnings.find(w => /wäre FM85 höchstens/.test(w));
+        expect(h).toBeTruthy();
+        const stufe = parseFloat(h.match(/höchstens ([\d.]+) %/)[1]);
+        // Gewählte Stufe darf das Limit bei diesem Volumen nicht mehr sprengen
+        const eiweiss = 160 * (1.13 + stufe * 0.4675) / 100;
+        expect(eiweiss).toBeLessThanOrEqual(4.5);
+        // und die nächste halbe Stufe sprengt es
+        expect(160 * (1.13 + (stufe + 0.5) * 0.4675) / 100).toBeGreaterThan(4.5);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION T — Entscheidungen des Neonatologen vom 02.10.2026 (v3.5)
+ * Jede Regel steht zusätzlich im REGELWERK.md.
+ * ────────────────────────────────────────────────────────────────*/
+describe('T) Entscheidungen 02.10.2026 (v3.5)', () => {
+
+    it('T1: GIR unter Minimum bei laufender PN ist CRITICAL', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 3,
+            tfi: 120, gir: 2, protein: 2, lipids: 2
+        }));
+        const w = r.warnings.find(x => /unter Minimum/.test(x));
+        expect(w).toBeTruthy();
+        expect(w.startsWith('CRITICAL')).toBe(true);
+        expect(r.isSafe).toBe(false);
+    });
+
+    // --- Kalium ---
+    it('T2: Kalium an Lebenstag 1 und 2 löst die Warnung „kaliumfreie Phase“ aus, ab Tag 3 nicht', () => {
+        const mk = d => calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 780, ssw: 26, postnatalAge: d,
+            tfi: 100, gir: 6, protein: 2, lipids: 1.5, potassium: 1
+        }));
+        const frei = r => r.warnings.some(w => /kaliumfrei/.test(w));
+        expect(frei(mk(1))).toBe(true);
+        expect(frei(mk(2))).toBe(true);
+        expect(frei(mk(3))).toBe(false);
+    });
+
+    it('T3: Kein Kalium an Tag 1–2 → keine Kalium-Warnung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 800, ssw: 26, postnatalAge: 1,
+            tfi: 80, gir: 5, protein: 2, lipids: 1, potassium: 0
+        }));
+        expect(r.warnings.some(w => /Kalium/.test(w))).toBe(false);
+    });
+
+    it('T4: Kalium-Obergrenze: < 1500 g über 5, ab 1500 g über 3 mmol/kg/d', () => {
+        const mk = (bw, k) => calc.calculate(baseInput({
+            birthWeight: bw, currentWeight: bw, ssw: 30, postnatalAge: 6,
+            tfi: 140, gir: 6, protein: 3, lipids: 2, potassium: k
+        }));
+        const hoch = r => r.warnings.some(w => /Kalium .* über der Obergrenze/.test(w));
+        expect(hoch(mk(1200, 5))).toBe(false);
+        expect(hoch(mk(1200, 5.5))).toBe(true);
+        expect(hoch(mk(1800, 3))).toBe(false);
+        expect(hoch(mk(1800, 3.5))).toBe(true);
+    });
+
+    // --- Energiedeckel erst ab Tag 4 ---
+    it('T5: Enterales Ziel an Tag 1–3 wird nicht durch die Tages-Energie gedeckelt', () => {
+        for (const d of [1, 2, 3]) {
+            const t = calc.getTargets({ birthWeight: 700, ssw: 25, postnatalAge: d, selectedEnteralProduct: 'ebm' });
+            expect(t.enteralTarget.min, `Tag ${d}`).toBe(160);
+            expect(t.enteralTarget.max, `Tag ${d}`).toBe(180);
+            expect(t.enteralTarget.limitedBy).toBe(null);
+        }
+        const r = calc.calculate(baseInput({
+            birthWeight: 700, currentWeight: 700, ssw: 25, postnatalAge: 1,
+            tfi: 80, enteralVolume: 10, gir: 5, protein: 2, lipids: 1
+        }));
+        expect(r.reminders.some(m => /Überernährung/.test(m))).toBe(false);
+    });
+
+    it('T6: Ab Tag 4 greift der Energiedeckel weiter (Absicherung O3 bleibt wirksam)', () => {
+        const t = calc.getTargets({ birthWeight: 700, ssw: 25, postnatalAge: 5, selectedEnteralProduct: 'ebm', fm85Percent: 2 });
+        expect(t.enteralTarget.limitedBy).toBe('energy');
+    });
+
+    // --- Anreicherung nur für < 1800 g (Geltungsbereich ESPGHAN 2022) ---
+    it('T7: Reifgeborenes mit EBM bekommt keine FM85-Empfehlung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 3400, currentWeight: 3250, ssw: 39, postnatalAge: 5,
+            tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0
+        }));
+        expect(r.reminders.some(m => /FM85/.test(m))).toBe(false);
+        expect(r.recommendations.fortification).toBe(null);
+        expect(r.fazit.join(' ')).not.toMatch(/FM85/);
+    });
+
+    it('T8: Frühgeborenes unter 1800 g behält die FM85-Empfehlung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1700, currentWeight: 1650, ssw: 32, postnatalAge: 10,
+            tfi: 150, enteralVolume: 120, gir: 0, protein: 0, lipids: 0
+        }));
+        expect(r.reminders.some(m => /FM85 Start-Kriterium/.test(m))).toBe(true);
+        expect(r.recommendations.fortification).toBeTruthy();
+    });
+
+    // --- Fehlendes Gewicht ---
+    it('T9: Ohne Geburtsgewicht wird nicht gerechnet', () => {
+        for (const leer of ['', null, undefined]) {
+            expect(() => calc.calculate(baseInput({ birthWeight: leer })), String(leer))
+                .toThrow(/Geburtsgewicht fehlt/);
+        }
+        try { calc.calculate(baseInput({ birthWeight: '' })); } catch (e) {
+            expect(e.name).toBe('ValidationError');
+            expect(e.field).toBe('birthWeight');
+        }
+    });
+
+    it('T10: Ab Tag 2 ohne aktuelles Gewicht wird nicht gerechnet, an Tag 1 genügt das Geburtsgewicht', () => {
+        expect(() => calc.calculate(baseInput({ postnatalAge: 2, currentWeight: '' })))
+            .toThrow(/Aktuelles Gewicht fehlt/);
+        expect(() => calc.calculate(baseInput({ postnatalAge: 1, currentWeight: '' }))).not.toThrow();
+    });
+
+    // --- SGA ---
+    it('T11: SGA wird über die Geburtsgewichts-Perzentile erkannt', async () => {
+        const { GrowthCalculator } = await import('../fenton_data.js').then(m => m.default || m);
+        globalThis.GrowthCalculator = GrowthCalculator;
+        try {
+            const sga = calc.calculate(baseInput({
+                birthWeight: 1450, currentWeight: 1450, ssw: 38, postnatalAge: 1, tfi: 60
+            }));
+            expect(['sga', 'severe']).toContain(sga.results.sga);
+            expect(sga.warnings.some(w => /SGA/.test(w))).toBe(true);
+
+            const aga = calc.calculate(baseInput({
+                birthWeight: 3300, currentWeight: 3300, ssw: 39, postnatalAge: 1, tfi: 60
+            }));
+            expect(aga.results.sga).toBe('none');
+            expect(aga.warnings.some(w => /SGA/.test(w))).toBe(false);
+        } finally {
+            delete globalThis.GrowthCalculator;
+        }
+    });
+
+    it('T12: Ohne Fenton-Modul bleibt die SGA-Erkennung still (null, kein Fehler)', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1450, currentWeight: 1450, ssw: 38, postnatalAge: 1, tfi: 60
+        }));
+        expect(r.results.sga).toBe(null);
+        expect(r.results.birthWeightPercentile).toBe(null);
+    });
+});
+
+describe('U) Eiweißlösung 1 ml = 1 g (v3.5)', () => {
+    it('U1: Zubereitung nennt Eiweiß in g und das Volumen der Hauslösung (1 g = 1 ml)', () => {
+        // Fall aus dem Stationsalltag: 400 g, 100 ml/kg/d, 12 Mahlzeiten, Zusatz 2 g/100 ml
+        const r = calc.calculate(baseInput({
+            birthWeight: 400, currentWeight: 400, ssw: 24, postnatalAge: 12,
+            tfi: 208, enteralVolume: 100, mealFrequency: 12, proteinAddPer100ml: 2,
+            gir: 0, protein: 0, lipids: 0
+        }));
+        const p = r.results.preparation;
+        // Nahrung: 0,4 kg × 100 ml = 40 ml/d, 3,3 ml je Mahlzeit — das ist NICHT das Eiweiß
+        expect(p.dailyVolumeMl).toBe(40);
+        expect(p.mealVolumeMl).toBe(3.3);
+        // Zusatz: 40 ml × 2 g/100 ml = 0,8 g Eiweiß/d = 0,8 ml Lösung/d
+        expect(p.proteinAddGramsPerDay).toBeCloseTo(0.8, 2);
+        expect(p.proteinSolutionMlPerDay).toBeCloseTo(0.8, 2);
+        expect(p.proteinSolutionMlPerMeal).toBeCloseTo(0.067, 3);
+        // Pulver-Angabe bleibt unverändert
+        expect(p.proteinPowderPerDay).toBeCloseTo(0.97, 2);
+    });
+
+    it('U2: Ohne Zusatz sind alle Zusatzmengen 0', () => {
+        const r = calc.calculate(baseInput({ tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0 }));
+        const p = r.results.preparation;
+        expect(p.proteinAddGramsPerDay).toBe(0);
+        expect(p.proteinSolutionMlPerDay).toBe(0);
+        expect(p.proteinSolutionMlPerMeal).toBe(0);
+    });
+
+    it('U3: Das Zusatz-Eiweiß in g entspricht dem Eiweiß-Beitrag der Rechnung', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 20,
+            tfi: 150, enteralVolume: 150, mealFrequency: 8, proteinAddPer100ml: 1,
+            gir: 0, protein: 0, lipids: 0
+        }));
+        // 1,2 kg × 150 ml × 1 g/100 ml = 1,8 g/d
+        expect(r.results.preparation.proteinAddGramsPerDay).toBeCloseTo(1.8, 2);
+        expect(r.results.preparation.proteinAddGramsPerDay / 1.2).toBeCloseTo(r.results.aptamilProteinNetGKg, 2);
+    });
+});
+
+describe('V) Eiweiß-Zusatz in g/kg/d als zweite Eingabeform (v3.5)', () => {
+    const base = o => baseInput({
+        birthWeight: 1200, currentWeight: 1200, ssw: 30, postnatalAge: 20,
+        tfi: 150, enteralVolume: 150, mealFrequency: 8, gir: 0, protein: 0, lipids: 0, ...o
+    });
+
+    it('V1: 1,5 g/kg/d bei 150 ml/kg/d entspricht 1 g/100 ml', () => {
+        const a = calc.calculate(base({ proteinAddGKg: 1.5 })).results;
+        const b = calc.calculate(base({ proteinAddPer100ml: 1 })).results;
+        expect(a.aptamilProteinNetGKg).toBeCloseTo(1.5, 2);
+        expect(a.preparation.proteinAddPer100ml).toBeCloseTo(1, 2);
+        expect(a.preparation.proteinSolutionMlPerDay).toBeCloseTo(b.preparation.proteinSolutionMlPerDay, 2);
+        expect(a.preparation.proteinPowderPerDay).toBeCloseTo(b.preparation.proteinPowderPerDay, 2);
+        expect(a.proteinTotalGPerKg).toBeCloseTo(b.proteinTotalGPerKg, 2);
+    });
+
+    it('V2: Vorrang g/100 ml vor g/kg/d vor Pulvereingabe', () => {
+        const x = calc.calculate(base({ proteinAddPer100ml: 1, proteinAddGKg: 3, aptamilProteinGKg: 4 })).results;
+        expect(x.aptamilProteinNetGKg).toBeCloseTo(1.5, 2);
+        const y = calc.calculate(base({ proteinAddGKg: 1, aptamilProteinGKg: 4 })).results;
+        expect(y.aptamilProteinNetGKg).toBeCloseTo(1, 2);
+        const z = calc.calculate(base({ aptamilProteinGKg: 1 })).results;
+        expect(z.aptamilProteinNetGKg).toBeCloseTo(0.821, 2);
+    });
+
+    it('V3: Unplausibler Wert (> 5 g/kg/d) bricht ab', () => {
+        expect(() => calc.calculate(base({ proteinAddGKg: 6 }))).toThrow(/proteinAddGKg|Eiweiß-Zusatz/);
+    });
+
+    it('V4: Zusatz ohne enterale Nahrung wird gemeldet', () => {
+        const r = calc.calculate(base({ enteralVolume: 0, tfi: 100, proteinAddGKg: 1 }));
+        expect(r.warnings.some(w => /Eiweiß-Zusatz eingestellt, aber keine enterale Nahrung/.test(w))).toBe(true);
+    });
+
+    it('V5: Die Einheiten-Auswahl existiert in der Oberfläche und liegt im sichtbaren Bereich', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = await import('node:fs');
+        const doc = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8')).window.document;
+        const sel = doc.getElementById('input-protein-add-unit');
+        expect(sel).toBeTruthy();
+        expect([...sel.options].map(o => o.value)).toEqual(['per100', 'gkg']);
+        expect(sel.value).toBe('per100');
+        for (let n = sel; n && n !== doc.body; n = n.parentElement) {
+            expect(/display:\s*none/.test((n.getAttribute && n.getAttribute('style')) || '')).toBe(false);
         }
     });
 });
