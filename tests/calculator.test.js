@@ -322,12 +322,17 @@ describe('C) ESPGHAN Targets & Tiered Alerts', () => {
         expect(r.results.caPRatio).toBeGreaterThan(0);
     });
 
-    it('C4: P:AA Ratio < 1.0 → Warnung', () => {
-        // Viel Protein, wenig Phosphat → Ratio < 1.0
+    // v3.5 — klinisch begründete Anpassung (Neonatologe, 20.10.2026): Phosphat wird über
+    // Urin und Labor gesteuert, alle Hauslösungen liegen bei 0,5–0,77 mmol/g und lösten die
+    // Warnung ständig aus. Vorher prüfte dieser Test die Warnung. Der Wert wird weiter berechnet.
+    it('C4: P:AA Ratio < 1.0 löst keine Warnung mehr aus (Wert bleibt sichtbar)', () => {
         const r = calc.calculate(baseInput({
             protein: 4.0, phosphate: 20
         }));
-        expect(r.warnings.some(w => w.includes('P:AA'))).toBe(true);
+        expect(r.warnings.some(w => w.includes('P:AA'))).toBe(false);
+        expect(r.fazit.join(' ')).not.toMatch(/P:AA/);
+        expect(r.results.paaRatio).toBeGreaterThan(0);
+        expect(r.results.paaRatio).toBeLessThan(1);
     });
 
     it('C5: NPC Lipid-% < 25 → Imbalance-Warnung', () => {
@@ -2082,5 +2087,32 @@ describe('Z) Darstellung der Befunde (v3.6)', () => {
         doc.querySelectorAll('.f-item').forEach(el => {
             expect(el.querySelector('.f-icon').textContent.trim().length).toBeGreaterThan(0);
         });
+    });
+});
+
+describe('AA) Deutsche Beschriftungen (v3.6.1)', () => {
+    it('AA1: In der sichtbaren Seite stehen keine englischen Beschriftungen mehr', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+        const doc = new JSDOM(html).window.document;
+        doc.querySelectorAll('script,style').forEach(n => n.remove());
+        const text = doc.body.textContent;
+        for (const wort of ['Copy for Documentation', 'Quick View', 'Smart Defaults', 'Energy-Gap-Index',
+                            'Growth Velocity', 'Weight Velocity', 'PDF Export', 'Virtual NICU']) {
+            expect(text, wort).not.toContain(wort);
+        }
+        expect(text).toContain('In Akte kopieren');
+        expect(text).toContain('Zurücksetzen');
+    });
+
+    it('AA2: Die Meldungen des Rechners nennen die Wachstumsrate auf Deutsch', () => {
+        const r = calc.calculate(baseInput({
+            birthWeight: 800, currentWeight: 1500, previousWeight: 1480, ssw: 26, postnatalAge: 35,
+            tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0
+        }));
+        const alle = [...r.warnings, ...r.reminders, r.documentation].join(' ');
+        expect(alle).not.toMatch(/Growth Velocity/);
+        expect(r.documentation).toMatch(/Wachstumsrate/);
     });
 });

@@ -172,7 +172,7 @@
             <h1 class="text-2xl font-bold tracking-tight">NeoNutri <span id="app-version" class="text-sm font-normal opacity-75"></span></h1>
             <div class="flex items-center gap-6">
                 <div id="gv-header-display" class="hidden text-center">
-                    <p class="text-[10px] uppercase tracking-wider opacity-75">Growth Velocity</p>
+                    <p class="text-[10px] uppercase tracking-wider opacity-75">Wachstumsrate</p>
                     <p id="gv-header-value" class="text-xl font-extrabold tabular-nums">—</p>
                     <p class="text-[10px] opacity-60">g/kg/d</p>
                 </div>
@@ -260,7 +260,7 @@
         <section id="simulator-section" class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg shadow-sm mb-4 border-l-4 border-amber-500 no-print">
             <button onclick="toggleSimSection()" class="w-full flex justify-between items-center px-4 py-2 cursor-pointer">
                 <div class="flex items-center gap-2">
-                    <h3 class="text-xs font-bold text-amber-800 uppercase tracking-wider">🧪 Virtual NICU — Simulationen</h3>
+                    <h3 class="text-xs font-bold text-amber-800 uppercase tracking-wider">🧪 Virtuelle NICU — Simulationen</h3>
                     <span id="sim-mode-badge" class="hidden bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase font-bold animate-pulse">Sim-Modus</span>
                 </div>
                 <svg id="sim-section-icon" class="h-4 w-4 text-amber-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -712,9 +712,9 @@
                   <div class="flex items-center justify-between gap-2 flex-wrap">
                       <div class="flex items-center gap-2">
                           <span class="text-base">💡</span>
-                          <span class="text-[11px] font-bold text-indigo-800 uppercase tracking-widest">Smart Defaults</span>
+                          <span class="text-[11px] font-bold text-indigo-800 uppercase tracking-widest">Startwerte</span>
                           <span id="sd-day-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/70 text-indigo-700">Tag –</span>
-                          <span class="teach text-indigo-400" tabindex="0" role="button" aria-label="Erklärung Smart Defaults" onclick="openEduModal('smartDefaults')" title="Erklärung & Algorithmus">ⓘ</span>
+                          <span class="teach text-indigo-400" tabindex="0" role="button" aria-label="Erklärung Startwerte" onclick="openEduModal('smartDefaults')" title="Erklärung & Algorithmus">ⓘ</span>
                       </div>
                       <button id="sd-apply-all" onclick="applySmartDefaults()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md transition">Alle übernehmen</button>
                   </div>
@@ -753,7 +753,7 @@
                                 class="bg-gray-800 hover:bg-black text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md flex items-center gap-1.5 transition no-print"
                                 title="Formatierten EPR-Text in die Zwischenablage kopieren">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                            <span id="btn-copy-doc-label">Copy for Documentation</span>
+                            <span id="btn-copy-doc-label">In Akte kopieren</span>
                         </button>
                     </div>
                     <div class="px-4 py-3">
@@ -776,7 +776,7 @@
 
                 <!-- Quick-View -->
                 <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden">
-                    <p class="qv-title">Quick View</p>
+                    <p class="qv-title">Auf einen Blick</p>
                     <div class="qv-grid">
                         <div class="qv-cell">
                             <p class="qv-label">Wachstum
@@ -803,7 +803,7 @@
                 <!-- v3.0 — ENERGY-GAP-INDEX: kumulatives Kaloriendefizit über alle Tage -->
                 <div id="egi-card" class="bg-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-4 flex flex-col">
                     <div class="flex items-center justify-between mb-2">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">⚡ Energy-Gap-Index
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">⚡ Energiedefizit-Index
                             <span class="teach text-slate-400" tabindex="0" onclick="openEduModal('energyGap')" title="Erklärung & Algorithmus">ⓘ</span>
                         </p>
                         <span id="egi-severity" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">–</span>
@@ -1077,7 +1077,7 @@
                                     <td class="p-3 text-right text-gray-400 text-sm">Fenton</td>
                                 </tr>
                                 <tr class="extra-detail hidden">
-                                    <td class="p-3 font-medium">Weight Velocity</td>
+                                    <td class="p-3 font-medium">Wachstumsrate</td>
                                     <td id="res-weight-velocity" class="p-3 text-right font-bold text-green-800">-</td>
                                     <td class="p-3 text-right text-gray-400 text-sm">g/kg/d</td>
                                 </tr>
@@ -1116,9 +1116,9 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        PDF Export
+                        PDF-Export
                     </button>
-                    <button id="btn-reset" class="bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-600 font-bold py-3 px-6 rounded-lg transition">Reset</button>
+                    <button id="btn-reset" class="bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-600 font-bold py-3 px-6 rounded-lg transition">Zurücksetzen</button>
                 </div>
             </section>
         </div>
@@ -1133,9 +1133,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.0"></script>
-    <script src="fenton_data.js?v=3.6.0"></script>
-    <script src="calculator.js?v=3.6.0"></script>
+    <script src="products.js?v=3.6.1"></script>
+    <script src="fenton_data.js?v=3.6.1"></script>
+    <script src="calculator.js?v=3.6.1"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1394,7 +1394,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.0';
+            const EXPECTED_CALC_VERSION = '3.6.1';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1430,7 +1430,7 @@
                 set('tip-energy',
                     `<strong>Energie (gesamt, Tag ${t.energyDay})</strong>: ${t.energy.min}–${t.energy.max} kcal/kg/d<br>` +
                     `<span style="font-size:11px">ESPGHAN: Aufbau bis 110–135 kcal/kg/d (Phase B/C).<br>` +
-                    `Voraussetzung für Growth Velocity ≥ 15 g/kg/d.<br>` +
+                    `Voraussetzung für eine Wachstumsrate ≥ 15 g/kg/d.<br>` +
                     `Unterhalb Phase A 45–60, Tag 2 60–80, Tag 3 80–100.</span>`);
                 set('tip-glucose',
                     '<strong>Glukose-Konz. (PN)</strong><br>' +
@@ -1593,19 +1593,19 @@
                     algo: 'kcal/kg/d = Σ(Protein g·4 + Kohlenhydrate g·4 + Lipide g·9 + enterale kcal) ÷ aktuellem Gewicht (kg). Zielspanne tagesabhängig aus getTargets(). Ampel: grün = im Ziel, gelb/rot = außerhalb.'
                 },
                 weightVelocity: {
-                    title: 'Weight Velocity (g/kg/d)',
+                    title: 'Wachstumsrate (g/kg/d)',
                     intro: 'Tägliche Gewichtszunahme bezogen auf das Körpergewicht — Schlüsselindikator für adäquates Wachstum.',
                     espghan: 'Zielkorridor postnatal nach Stabilisierung: <strong>15–20 g/kg/d</strong> (entspricht intrauteriner Wachstumsrate). In der Transitionsphase (Tag 1–7) ist physiologischer Gewichtsverlust bis ~10 % normal.',
-                    algo: 'Weight Velocity = (aktuelles Gewicht − Vortagesgewicht) ÷ Vortagesgewicht(kg). Negative Werte in Phase A meist IWL-/Flüssigkeits-bedingt, nicht zwingend pathologisch.'
+                    algo: 'Wachstumsrate = (aktuelles Gewicht − Vortagesgewicht) ÷ Vortagesgewicht(kg). Negative Werte in Phase A meist IWL-/Flüssigkeits-bedingt, nicht zwingend pathologisch.'
                 },
                 energyGap: {
-                    title: 'Energy-Gap-Index (kumulativ)',
+                    title: 'Energiedefizit-Index (kumulativ)',
                     intro: 'Summe des täglichen Kalorien-Defizits (Ziel-Minimum minus Ist-Zufuhr) über alle dokumentierten Tage. Macht das schleichende „kumulative Defizit" sichtbar.',
                     espghan: 'Embleton et al. 2001: Das früh akkumulierte Energiedefizit der ersten Lebenswochen korreliert linear mit späterer Wachstumsrestriktion. Konservativer Trigger in dieser App: ab <strong>&gt; 150 kcal/kg kumulativ</strong> steigt das PEW-Risiko deutlich.',
                     algo: 'Index = Σ max(0, kcalMin_Tag − kcalIst_Tag) über alle History-Tage. Ampel: ok &lt; 75 ≤ watch ≤ 150 &lt; high. Diagnostischer Hinweis (Modell B) — niemals ein Stop-Signal.'
                 },
                 smartDefaults: {
-                    title: 'Smart Defaults',
+                    title: 'Startwerte',
                     intro: 'Tages-basierte Startwert-Vorschläge für Flüssigkeit (TFI), Aminosäuren und Lipide. Der Arzt bestätigt statt frei zu tippen.',
                     espghan: 'Die Werte stammen ausschließlich aus den hinterlegten Zielspannen (hausinterner Standard und ESPGHAN 2018). Es werden keine eigenen Schwellwerte erzeugt.',
                     algo: 'Flüssigkeit: untere Zielgrenze (konservativer Aufbau, durch den Beatmungs-Cap begrenzt). Protein und Lipide: Mittelwert der jeweiligen Zielspanne.'
@@ -1718,7 +1718,7 @@
             async function copyDocumentation(text) {
                 const btn = document.getElementById('btn-copy-doc');
                 const lbl = document.getElementById('btn-copy-doc-label');
-                const origLabel = 'Copy for Documentation';
+                const origLabel = 'In Akte kopieren';
                 try {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         await navigator.clipboard.writeText(text);
@@ -2163,7 +2163,7 @@
                     const paaEl = document.getElementById('res-paa-ratio');
                     paaEl.innerText = `${r.paaRatio}`;
                     paaEl.className = 'p-3 text-right font-bold tabular-nums ' + (
-                        r.paaRatio > 0 && r.paaRatio < 1.0 ? 'text-red-700' : 'text-teal-700'
+                        'text-teal-700'
                     );
                 }
 

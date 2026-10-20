@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.6.0, 198 Tests.
+Stand: 20.10.2026, Version v3.6.1, 200 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -168,7 +168,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
 | 10.1 | **Ca:P-Verhältnis wird nicht mehr bewertet** — keine Warnung, kein Fazit, kein Zielbereich. Der Wert wird weiter berechnet und angezeigt. Grund: Calcium und Phosphat werden dienstags im Urin bestimmt und die Phosphat-Substitution daran angepasst | Entscheidung 02.10.2026 | `calculate` Step 9 | C3 |
-| 10.2 | P:AA-Verhältnis (mmol Phosphat je g Protein) unter 1,0 → Warnung | Haus, **Offen** (17.1) | `calculate` | C4 |
+| 10.2 | **P:AA-Verhältnis wird nicht mehr bewertet** — keine Warnung, kein Fazit. Der Wert wird weiter berechnet und angezeigt. Grund: Phosphat wird über Urin und Labor gesteuert, alle Hauslösungen liegen bei 0,5–0,77 mmol/g und lösten die Warnung ständig aus | Entscheidung 20.10.2026 | `calculate` | C4 |
 | 10.3 | Energie je g Protein (NPC/P) unter 20 → Warnung „Protein wird energetisch verwertet“; über 40 → „Verfettungsrisiko“ | Leitlinie | `calculate` | – |
 | 10.4 | Ausfällung in der PN: Ca + P > 72 mmol/l → CRITICAL; > 55 → Warnung | Haus | `calculate` | – |
 | 10.5 | Ab Tag 14 bei enteral ≥ 100 ml/kg/d: Calcium gesamt < 120 oder Phosphat gesamt < 60 mg/kg/d → Hinweis (Osteopenie) | Leitlinie, **Offen** (17.2) | `calculate` | – |
@@ -209,7 +209,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 | 11.14b | **Eiweiß-Zusatz in zwei Einheiten** über eine Auswahl am Eingabefeld: **g/100 ml** (Hauptform, die Station steigert in der Regel bis 2 g/100 ml) oder **g Eiweiß/kg/d**. Vorrang: g/100 ml, dann g/kg/d, dann direkte Pulvereingabe. Grenzen: g/100 ml 0–3, g/kg/d 0–5. Zusatz ohne enterale Nahrung → Hinweis | Entscheidung 20.10.2026 | `proteinAddGKg`, `proteinAddPer100ml` | V1–V5, Q16–Q19 |
 | 11.15 | Liquigen: 4,5 kcal/ml, 0,5 g Fett/ml. Supplement-Volumen erhöht die Gesamtflüssigkeit **nicht** | Haus | `calculate` Step 7b | N15–N20 |
 | 11.16 | Harnstoff < 3 mmol/l bei enteral ≥ 100 → Hinweis (Eiweißmangel); > 8 mmol/l → Hinweis (Eiweiß prüfen) | Haus, **Offen** (17.4) | `calculate` | – |
-| 11.17 | Wachstum: Growth Velocity = (Gewicht − Vortag) / Gewicht × 1000 g/kg/d; ab Tag 28 unter 15 → Hinweis | Leitlinie | `calculateGrowthVelocity` | E1 |
+| 11.17 | Wachstumsrate = (Gewicht − Vortag) / Gewicht × 1000 g/kg/d; ab Tag 28 unter 15 → Hinweis (Bezeichnung „Wachstumsrate“) | Leitlinie | `calculateGrowthVelocity` | E1 |
 
 *Leitlinie (ESPGHAN 2022, < 1800 g):* Energie 115–140 kcal/kg/d, darüber nur bei zu geringem Wachstum
 und höchstens 160. Multikomponenten-Fortifier ab 40–100 ml/kg/d enteral. Harnstoff > 5,7 mmol/l ohne
@@ -282,7 +282,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 
 | Nr. | Punkt | Stand |
 |---|---|---|
-| 17.1 | **P:AA-Warnung (10.2)**: soll sie bleiben oder entfallen? Alle Hauslösungen liegen bei 0,5–0,77 mmol/g und lösen sie immer aus | zur Erklärung vorgelegt |
+| 17.1 | ~~P:AA-Warnung~~ | **entschieden 20.10.2026: entfällt** (siehe 10.2) |
 | 17.2 | **Osteopenie-Hinweise (10.5)**: Calcium und Phosphat steuern Sie über den Urin am Dienstag. Sollen die Zufuhr-Hinweise entfallen? | offen |
 | 17.3 | **Rechengewicht (3.1)**: Tag-10-Sprung. Immer aktuelles Gewicht, oder Geburtsgewicht bis es wieder erreicht ist? | offen |
 | 17.4 | **Harnstoff (11.16)**: Haus-Grenze > 8 mmol/l, ESPGHAN 2022 nennt > 5,7 mmol/l als Anlass, die Proteinzufuhr zu senken | offen |
@@ -291,6 +291,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.7 | **Geschlecht (13.6)** für Perzentile und SGA | zurückgestellt |
 | 17.8 | **Protein-Obergrenze 4,5 g/kg/d für Reife** (6.2): in ESPGHAN 2022 nicht geregelt (nur < 1800 g) | Quelle fehlt |
 | 17.9 | **Energie- und Protein-Ziele für Reife** (5.1, 6.1): Leitlinienwerte für Reife nicht belegt | Quelle fehlt |
+| 17.10 | **FM85-Zusammensetzung (11.9)**: Die App rechnet je 1 g FM85 auf 100 ml mit 0,4675 g Eiweiß und 3,5 kcal. Händlerangaben zur Packung nennen **35,5 g Eiweiß und 435 kcal je 100 g** (= 0,355 g und 4,35 kcal je 1 %). Bitte mit der Packung abgleichen. Folge der jetzigen Werte: EBM + FM85 4 % ergibt 3,0 g Eiweiß/100 ml, bei 160 ml/kg/d 4,8 g/kg und damit dauerhaft kritisch | Packungswerte nötig |
 
 ---
 
@@ -313,6 +314,7 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 20.10.2026 | P:AA-Warnung entfällt (Wert bleibt sichtbar). Alle sichtbaren Beschriftungen auf Deutsch: „In Akte kopieren“, „Auf einen Blick“, „Startwerte“, „Energiedefizit-Index“, „Wachstumsrate“, „PDF-Export“, „Zurücksetzen“ |
 | 20.10.2026 | Meldungen gestaffelt: eine Hierarchie, kritisch immer sichtbar, Warnungen begrenzt, Hinweise und Erinnerungen eingeklappt; Fazit-Karte und Einzellisten entfallen |
 | 20.10.2026 | Versionswächter gegen veralteten Rechenkern (Anlass: neue Oberfläche mit alter `calculator.js` zeigte „undefined“ und ignorierte g/kg/d stumm) |
 | 20.10.2026 | Eiweiß-Zusatz wahlweise in g/100 ml (Hauptform) oder g/kg/d |

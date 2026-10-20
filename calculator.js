@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.0';
+        this.VERSION = '3.6.1';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -539,7 +539,7 @@ class NutritionCalculator {
             if (r.weightVelocity < 0) {
                 push('warning', `Gewichtsverlust ${r.weightVelocity} g/kg/d — Trend evaluieren.`);
             } else if (r.weightVelocity >= 15 && r.weightVelocity <= 25) {
-                push('positive', `Growth Velocity ${r.weightVelocity} g/kg/d → physiologisch.`);
+                push('positive', `Wachstumsrate ${r.weightVelocity} g/kg/d → physiologisch.`);
             } else if (r.weightVelocity < 15 && phase.id === 'C') {
                 push('warning', `Wachstumsstagnation (${r.weightVelocity} g/kg/d) — Fortifizierung prüfen.`);
             }
@@ -679,7 +679,7 @@ class NutritionCalculator {
         }
 
         if (typeof r.weightVelocity === 'number') {
-            lines.push(`- Growth Velocity ${num(r.weightVelocity, 1)} g/kg/d${bw && cw ? ` (BW ${bw} g → akt. ${cw} g)` : ''}`);
+            lines.push(`- Wachstumsrate ${num(r.weightVelocity, 1)} g/kg/d${bw && cw ? ` (BW ${bw} g → akt. ${cw} g)` : ''}`);
         }
 
         // Beurteilung — narrative Synthese
@@ -723,7 +723,7 @@ class NutritionCalculator {
      */
     _buildAlerts(warnings, reminders) {
         const DOMAINS = [
-            { id: 'growth',      label: 'Wachstum',          re: /SGA|Gewichtsverlust|Geburtsgewicht|Growth Velocity|Perzentile|Wachstum/ },
+            { id: 'growth',      label: 'Wachstum',          re: /SGA|Gewichtsverlust|Geburtsgewicht|Wachstumsrate|Perzentile|Wachstum/ },
             { id: 'pn',          label: 'Glukose & PN',      re: /GIR|Glukose|Hypoglyk|Osmolarit|Ausfällung|Lipid-Volumen|Ca\+P/ },
             { id: 'electrolytes',label: 'Elektrolyte',       re: /Natrium|Na-Zufuhr|Na-Kontrolle|Kalium|Na:Cl|SID|Hypernatri|Calcium|Phosphat|P:AA|Osteopenie/ },
             { id: 'enteral',     label: 'Enteral',           re: /Enteral|enteral|Nahrungspause|Aufbau-Korridor|FM85|Anreicherung|Eiweiß-Zusatz|Zielkorridor/ },
@@ -1790,10 +1790,10 @@ class NutritionCalculator {
             }
         }
 
-        // P:AA Rule (ESPGHAN): ≥ 1 mmol P per 1 g Protein
-        if (n.paaRatio > 0 && n.paaRatio < 1.0 && n.proteinTotalGKg > 0) {
-            warnings.push(`Warnung: P:AA Ratio ${n.paaRatio} mmol/g – Risiko für PIFS/Elektrolytshift: Phosphat im Verhältnis zum Protein zu niedrig (Ziel ≥ 1.0).`);
-        }
+        // v3.5 (Entscheidung Neonatologe 20.10.2026): Keine P:AA-Bewertung mehr.
+        // Phosphat wird über Urin und Labor gesteuert; alle Hauslösungen liegen bei
+        // 0,5–0,77 mmol/g und lösten die Warnung ständig aus. Der Wert wird weiter
+        // berechnet und angezeigt, löst aber weder Warnung noch Fazit aus.
 
         // --- AUDIT: SID-light warning (metabolic acidosis proxy) ---
         if (n.sidLight !== undefined && (n.effectiveNa > 0 || n.effectiveK > 0)) {
@@ -1846,7 +1846,7 @@ class NutritionCalculator {
             warnings.push('Hinweis: Monat 2+ bei >140 ml/kg/d enteral mit FM85 < 4% — Fortifizierung auf 4% empfohlen.');
         }
         if (postnatalAge >= 28 && weightVelocity !== 'Initial' && weightVelocity < 15 && n.enteralVolKg >= 100) {
-            warnings.push(`Hinweis: Growth Velocity ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation. Fortifizierung prüfen.`);
+            warnings.push(`Hinweis: Wachstumsrate ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation. Fortifizierung prüfen.`);
         }
         if (postnatalAge >= 28 && urea !== null && urea < 3 && n.enteralVolKg >= 100 && fm85Percent >= 4 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             warnings.push('Hinweis: BUN < 3 mmol/l trotz FM85 4% in Phase C — Aptamil Eiweiß+ Supplementierung prüfen.');
@@ -2026,9 +2026,6 @@ class NutritionCalculator {
         }
         if (fazit.length < 3 && n.npcPerProtein > 0 && n.npcPerProtein < 20) {
             fazit.push(`NPC/Protein-Ratio zu niedrig (${n.npcPerProtein}) – Glukose- oder Lipidzufuhr steigern für optimale Proteinverwertung.`);
-        }
-        if (fazit.length < 3 && n.paaRatio > 0 && n.paaRatio < 1.0 && n.proteinTotalGKg > 0) {
-            fazit.push(`Phosphat um ~${this._round((1.0 - n.paaRatio) * n.proteinTotalGKg * this.MOLAR_MASS.PHOSPHORUS, 0)} mg/kg erhöhen (P:AA Ratio ${n.paaRatio} → Ziel ≥ 1.0).`);
         }
         if (fazit.length < 3 && fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             fazit.push('FM85-Fortifizierung starten – enterales Volumen ≥ 100 ml/kg/d erreicht.');
