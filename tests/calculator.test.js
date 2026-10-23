@@ -2466,3 +2466,33 @@ describe('AF) Keine parenterale Ernährung (v3.6.4, Lipide ausgenommen v3.6.5)',
         expect(lip.value).toBe('2');
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AG — NPC/P nur bei laufender PN (v3.6.6)
+ * Praxisfall: Muttermilch allein (NPC/P ≈ 59) meldete „Verfettungsrisiko“.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AG) NPC/P-Bewertung nur bei laufender PN (v3.6.6)', () => {
+    const kind = o => baseInput({
+        birthWeight: 400, currentWeight: 430, ssw: 28, postnatalAge: 16, tfi: 187,
+        enteralVolume: 128, mealFrequency: 12, access: 'peripheral',
+        gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const npcWarn = r => r.warnings.filter(w => /NPC\/P|Verfettung|Energie-Ungleichgewicht/.test(w));
+
+    it('AG1: Muttermilch allein (mit Sterofundin) erzeugt keine NPC/P-Meldung, der Wert bleibt sichtbar', () => {
+        const r = calc.calculate(kind({ secondarySolution: 'sterofundinIso', secondaryRateKg: 24 / 0.43 }));
+        expect(r.results.npcPerProtein).toBeGreaterThan(40);
+        expect(npcWarn(r)).toEqual([]);
+        expect(r.assessment.bullets.some(b => /NPC\/Protein/.test(b.text || b))).toBe(false);
+    });
+
+    it('AG2: Reine Milchernährung ohne alles andere ebenfalls ohne NPC/P-Meldung', () => {
+        expect(npcWarn(calc.calculate(kind({ tfi: 128 })))).toEqual([]);
+    });
+
+    it('AG3: Bei laufender PN mit zu viel Energie je g Eiweiß bleibt die Warnung bestehen', () => {
+        const r = calc.calculate(kind({ tfi: 150, enteralVolume: 0, gir: 10, protein: 1, lipids: 2 }));
+        expect(r.results.kcalParenteralKg).toBeGreaterThan(0);
+        expect(npcWarn(r).some(w => /Verfettungsrisiko/.test(w))).toBe(true);
+    });
+});

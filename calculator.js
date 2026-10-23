@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.5';
+        this.VERSION = '3.6.6';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -556,7 +556,9 @@ class NutritionCalculator {
         }
 
         // 5) NPC/Protein (energetische Effizienz)
-        if (bullets.length < 5 && r.npcPerProtein > 0 && (r.npcPerProtein < 20 || r.npcPerProtein > 40)) {
+        // v3.6.6: nur bei laufender PN. Der Zielbereich 20–40 stammt aus der PN-Leitlinie; reine Muttermilch liegt
+        // mit ca. 50–60 kcal/g systematisch darüber (Eiweißmangel wird über Fortifizierung/Protein-Ziel gemeldet).
+        if (bullets.length < 5 && r.kcalParenteralKg > 0 && r.npcPerProtein > 0 && (r.npcPerProtein < 20 || r.npcPerProtein > 40)) {
             push('warning', `NPC/Protein ${r.npcPerProtein} kcal/g — ${r.npcPerProtein < 20 ? 'Energie zu knapp' : 'Verfettungsrisiko'}.`);
         }
 
@@ -1828,7 +1830,8 @@ class NutritionCalculator {
 
         // ENERGY EFFICIENCY: NPC/P Ratio (ESPGHAN 2018)
         // Zielbereich: 20–30 kcal pro 1g Protein
-        if (n.npcPerProtein > 0 && n.proteinTotalGKg > 0.5) {
+        // v3.6.6: nur bei laufender PN (Energie aus Glukose, Lipiden oder Aminosäuren i. v.), siehe oben.
+        if (n.kcalParenteralKg > 0 && n.npcPerProtein > 0 && n.proteinTotalGKg > 0.5) {
             if (n.npcPerProtein < 20) {
                 warnings.push(`Warnung: Energie-Ungleichgewicht: Protein wird energetisch verwertet (NPC/P ${n.npcPerProtein} < 20 kcal/g).`);
             } else if (n.npcPerProtein > 40) {
