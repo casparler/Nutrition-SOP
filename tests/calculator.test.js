@@ -2471,7 +2471,7 @@ describe('AF) Keine parenterale Ernährung (v3.6.4, Lipide ausgenommen v3.6.5)',
  * SECTION AG — NPC/P nur bei laufender PN (v3.6.6)
  * Praxisfall: Muttermilch allein (NPC/P ≈ 59) meldete „Verfettungsrisiko“.
  * ────────────────────────────────────────────────────────────────*/
-describe('AG) NPC/P-Bewertung nur bei laufender PN, „Verfettungsrisiko“ nur bei Lipiden i. v. (v3.6.6/3.6.7)', () => {
+describe('AG) NPC/P: nur „zu knapp“ bei laufender PN, keine Obergrenze (v3.6.6–3.6.8)', () => {
     const kind = o => baseInput({
         birthWeight: 400, currentWeight: 430, ssw: 28, postnatalAge: 16, tfi: 187,
         enteralVolume: 128, mealFrequency: 12, access: 'peripheral',
@@ -2490,17 +2490,22 @@ describe('AG) NPC/P-Bewertung nur bei laufender PN, „Verfettungsrisiko“ nur 
         expect(npcWarn(calc.calculate(kind({ tfi: 128 })))).toEqual([]);
     });
 
-    it('AG3: Bei laufender PN mit zu viel Energie je g Eiweiß bleibt die Warnung bestehen', () => {
+    // v3.6.8 (Entscheidung nach Literaturrecherche 23.10.2026): Die Obergrenze „Verfettungsrisiko“ (NPC/P > 40) entfällt.
+    // Klinische Begründung: kein belegter Schwellenwert (ESPGHAN benennt das optimale Energie/Eiweiß-Verhältnis als offen),
+    // die implizierte Maßnahme (Energie senken) widerspricht der Datenlage (niedriges Eiweiß/Energie-Verhältnis und zu wenig Energie
+    // gehen mit mehr Fettmasse einher), echte Überversorgung wird über Energie-Zielbereich, Lipid-Maximum, Lipid-Anteil und Triglyzeride gemeldet.
+    it('AG3: Bei PN mit Lipiden und hohem NPC/P gibt es keine „Verfettungsrisiko“-Warnung mehr, der Wert bleibt sichtbar', () => {
         const r = calc.calculate(kind({ tfi: 150, enteralVolume: 0, gir: 10, protein: 1, lipids: 2 }));
         expect(r.results.kcalParenteralKg).toBeGreaterThan(0);
-        expect(npcWarn(r).some(w => /Verfettungsrisiko/.test(w))).toBe(true);
+        expect(r.results.npcPerProtein).toBeGreaterThan(40);
+        expect(npcWarn(r)).toEqual([]);
+        expect(r.assessment.bullets.some(b => /Verfettung/.test(JSON.stringify(b)))).toBe(false);
     });
 
-    it('AG4: Ohne Lipide i. v. gibt es kein „Verfettungsrisiko“, auch wenn die PN NPC/P über 40 hat (v3.6.7)', () => {
+    it('AG4: Ohne Lipide i. v. ebenfalls keine „Verfettungsrisiko“-Warnung', () => {
         const r = calc.calculate(kind({ tfi: 150, enteralVolume: 0, gir: 12, protein: 1, lipids: 0 }));
         expect(r.results.npcPerProtein).toBeGreaterThan(40);
-        expect(r.results.lipidsPNKg).toBe(0);
-        expect(npcWarn(r).some(w => /Verfettungsrisiko/.test(w))).toBe(false);
+        expect(npcWarn(r)).toEqual([]);
     });
 
     it('AG5: „Energie zu knapp“ (NPC/P unter 20) bleibt bei laufender PN ohne Lipide erhalten (v3.6.7)', () => {

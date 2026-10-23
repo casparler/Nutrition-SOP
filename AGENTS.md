@@ -519,7 +519,7 @@ git push -u origin feature/{name}-v{X.Y}
 
 | v3.6.4 | `claude/zen-babbage-vjgke2` | Auswahl „Keine parenterale Ernährung“: leert und sperrt GIR, Aminosäuren, Ca, P, Na und K selbst (Lipide bleiben einstellbar, v3.6.5), stellt sie bei anderer Auswahl wieder her. → Tests AF1–AF6. **231 Tests total** | in Arbeit |
 
-| v3.6.5–3.6.7 | `claude/zen-babbage-vjgke2` | Keine-PN-Auswahl lässt Lipide unberührt; NPC/P-Warnungen (unter 20, über 40) nur bei laufender PN, Muttermilch allein meldet kein „Verfettungsrisiko“ mehr, und „Verfettungsrisiko“ erscheint nur noch bei Lipiden i. v. → Tests AF6, AG1–AG5. **236 Tests total** | in Arbeit |
+| v3.6.5–3.6.8 | `claude/zen-babbage-vjgke2` | Keine-PN-Auswahl lässt Lipide unberührt; NPC/P-Warnungen (unter 20, über 40) nur bei laufender PN, Muttermilch allein meldet kein „Verfettungsrisiko“ mehr, und die Obergrenze „Verfettungsrisiko“ (NPC/P über 40) entfällt, weil kein belegter Schwellenwert (nur „zu knapp“ unter 20 bei PN bleibt). → Tests AF6, AG1–AG5. **236 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```

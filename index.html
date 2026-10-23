@@ -1137,9 +1137,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.7"></script>
-    <script src="fenton_data.js?v=3.6.7"></script>
-    <script src="calculator.js?v=3.6.7"></script>
+    <script src="products.js?v=3.6.8"></script>
+    <script src="fenton_data.js?v=3.6.8"></script>
+    <script src="calculator.js?v=3.6.8"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1401,7 +1401,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.7';
+            const EXPECTED_CALC_VERSION = '3.6.8';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1473,9 +1473,9 @@
                     '&lt; 25%: Risiko für EFA-Deficiency.<br>&gt; 50%: Cholestase- &amp; Hyperlipidämie-Risiko.</span>');
                 set('tip-npc-p',
                     '<strong>NPC/Protein Ratio</strong><br>' +
-                    '<span style="font-size:11px">Ziel: <strong>20–30 kcal NPC pro g Protein</strong> (ESPGHAN).<br>' +
-                    '&lt; 20: Protein wird zur Energiegewinnung verbrannt → kein Wachstum.<br>' +
-                    '&gt; 40: Verfettungsrisiko, NEC-Trigger bei FG.</span>');
+                    '<span style="font-size:11px">Orientierung: <strong>etwa 20–30 kcal NPC pro g Protein</strong> bei PN.<br>' +
+                    '&lt; 20 (bei PN): Protein wird zur Energiegewinnung verbrannt → Warnung.<br>' +
+                    'Darüber gibt es <strong>keinen belegten Grenzwert</strong>; unverstärkte Muttermilch liegt bei 50–60 kcal/g. Der Wert wird nur angezeigt.</span>');
             }
 
             // v2.0 — Chief Physician Review: Card-Rendering nach jedem Update
