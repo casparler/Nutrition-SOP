@@ -2359,3 +2359,93 @@ describe('AE) PN-Beutel und Sekundärinfusion getrennt (v3.6.3)', () => {
         expect(g).not.toMatch(/Ursache prüfen/);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AF — Auswahl „Keine parenterale Ernährung“ (v3.6.4)
+ * Die Seite wird mit ihren eigenen Skripten ausgeführt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AF) Keine parenterale Ernährung (v3.6.4)', () => {
+    async function boot() {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        return w;
+    }
+    const set = (w, vals) => {
+        for (const [id, v] of Object.entries(vals)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+    };
+    const choose = (w, v) => {
+        const sel = w.document.getElementById('input-solution');
+        sel.value = v;
+        sel.dispatchEvent(new w.Event('change'));
+    };
+    const sel = w => w.document.getElementById('input-solution');
+    const PN = ['input-gir', 'input-protein', 'input-calcium', 'input-phosphate', 'input-sodium', 'input-potassium', 'input-lipids'];
+    const kind = {
+        'birth-weight': 400, 'current-weight': 430, 'input-ssw': 28, 'input-day': 16, 'input-tfi': 187,
+        'input-enteral': 128, 'input-meal-frequency': 12, 'input-access': 'peripheral',
+        'input-gir': 6, 'input-protein': 2, 'input-lipids': 1, 'input-calcium': 40, 'input-phosphate': 31,
+        'input-secondary-solution': 'sterofundinIso'
+    };
+
+    it('AF1: Die Auswahl existiert und trägt den Wert keinePN', async () => {
+        const w = await boot();
+        const opt = [...w.document.querySelectorAll('#input-solution option')].find(o => o.value === 'keinePN');
+        expect(opt).toBeTruthy();
+        expect(opt.textContent).toMatch(/Keine parenterale Ernährung/);
+    });
+
+    it('AF2: Auswählen setzt alle PN-Felder auf 0 und sperrt sie', async () => {
+        const w = await boot();
+        set(w, kind);
+        choose(w, 'keinePN');
+        PN.forEach(id => {
+            const el = w.document.getElementById(id);
+            expect(el.value, id).toBe('0');
+            expect(el.disabled, id).toBe(true);
+        });
+        expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(false);
+    });
+
+    it('AF3: Anderes Auswählen stellt die bisherigen Werte wieder her und entsperrt die Felder', async () => {
+        const w = await boot();
+        set(w, kind);
+        choose(w, 'keinePN');
+        choose(w, 'none');
+        expect(w.document.getElementById('input-gir').value).toBe('6');
+        expect(w.document.getElementById('input-protein').value).toBe('2');
+        expect(w.document.getElementById('input-calcium').value).toBe('40');
+        PN.forEach(id => expect(w.document.getElementById(id).disabled, id).toBe(false));
+        expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(true);
+    });
+
+    it('AF4: Praxisfall (Sterofundin 1 ml/h, keine PN) zeigt nach der Auswahl keine kritische Meldung', async () => {
+        const w = await boot();
+        set(w, { ...kind, 'input-secondary-rate': 1 });   // Oberfläche: ml/h
+        w.updateCalculations();
+        choose(w, 'keinePN');
+        const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')];
+        expect(kritisch.map(e => e.textContent)).toEqual([]);
+    });
+
+    it('AF5: Eine Vorlage überschreibt die PN-Felder auch bei aktiver Auswahl „Keine PN“', async () => {
+        const w = await boot();
+        set(w, kind);
+        choose(w, 'keinePN');
+        w.loadSimulation('elbw');
+        expect(sel(w).value).not.toBe('keinePN');
+        PN.forEach(id => expect(w.document.getElementById(id).disabled, id).toBe(false));
+        expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(true);
+    });
+});
