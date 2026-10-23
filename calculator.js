@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.10';
+        this.VERSION = '3.6.11';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -38,6 +38,11 @@ class NutritionCalculator {
             LIPIDS: { max: 4.0, unit: 'g/kg/d' },
             OSM_PERIPHERAL: 900
         };
+        // --- v3.6.11: Triglyzerid-Kontrollhinweis (Entscheidung Neonatologe 23.10.2026, Regelwerk 17.14) ---
+        // Triglyzeride werden auf der Station kaum bestimmt. Der Hinweis erscheint nur ohne eingetragenen Wert, wenn Lipide i. v.
+        // mehr als 3 g/kg/d laufen (Steigerung bis 3 g/kg/d fördert das Wachstum, Frost 2023) oder bei ELBW ab 2 g/kg/d
+        // (niedriges Geburtsgewicht und Lipiddosis sind Risikofaktoren, Suh 2025; Zufallswert genügt, Bader 2021).
+        this.LIPID_TG_HINT = { dose: 3, doseElbw: 2 };
         // --- FM85 (Nestlé) — Zusammensetzung je 1 % (= 1 g Pulver auf 100 ml Muttermilch) ---
         // Quelle: Packungsangabe je 100 g Pulver, vom Neonatologen übermittelt am 20.10.2026:
         //   Energie 435 kcal, Eiweiß 35,5 g, Fett 18,1 g, Kohlenhydrate 32,4 g,
@@ -1648,6 +1653,15 @@ class NutritionCalculator {
         }
         if (triglycerides !== null && triglycerides > 250) {
             warnings.push('CRITICAL: Triglyzeride > 250 mg/dl – Hypertriglyceridämie! Lipidzufuhr auf 0,5–1,0 g/kg/d reduzieren (ESPGHAN).');
+        }
+        // v3.6.11: Kein Triglyzerid-Wert eingetragen, aber Lipid-Dosis mit erhöhtem Risiko → Kontrolle anregen (nie ein Stopp).
+        if (triglycerides === null && n.lipidsPNKg > 0
+            && (n.lipidsPNKg > this.LIPID_TG_HINT.dose
+                || (birthWeightG.lte(1000) && n.lipidsPNKg >= this.LIPID_TG_HINT.doseElbw))) {
+            const grund = n.lipidsPNKg > this.LIPID_TG_HINT.dose
+                ? `über ${this.LIPID_TG_HINT.dose} g/kg/d`
+                : `bei Geburtsgewicht bis 1000 g ab ${this.LIPID_TG_HINT.doseElbw} g/kg/d`;
+            warnings.push(`Hinweis: Lipide i. v. ${n.lipidsPNKg} g/kg/d (${grund}) und kein Triglyzerid-Wert eingetragen – Triglyzeride kontrollieren (Zufallswert genügt).`);
         }
 
         // C-01: Glucose concentration > 12.5% at peripheral access

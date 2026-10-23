@@ -2600,3 +2600,43 @@ describe('AH) Lipid-Anteil an NPC: Gesamtenergie, Regel nur bei vollständiger P
         expect(r.warnings.some(w => w.includes('Lipid-Anteil an NPC'))).toBe(false);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AI — Triglyzerid-Kontrollhinweis (v3.6.11)
+ * Triglyzeride werden auf der Station kaum bestimmt; der Hinweis regt die Kontrolle an, wenn kein Wert vorliegt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AI) Triglyzerid-Kontrollhinweis (v3.6.11)', () => {
+    const mk = o => calc.calculate(baseInput({ birthWeight: 1200, currentWeight: 1200, tfi: 150, enteralVolume: 0, gir: 8, protein: 3, lipids: 2, triglycerides: null, ...o }));
+    const tgHint = r => r.warnings.filter(w => /^Hinweis: Lipide i\. v\..*Triglyzeride kontrollieren/.test(w));
+
+    it('AI1: Lipide über 3 g/kg/d ohne Triglyzerid-Wert → Hinweis', () => {
+        const h = tgHint(mk({ lipids: 3.5 }));
+        expect(h).toHaveLength(1);
+        expect(h[0]).toMatch(/über 3 g\/kg\/d/);
+        expect(h[0]).toMatch(/Zufallswert genügt/);
+    });
+
+    it('AI2: Lipide bis einschließlich 3 g/kg/d bei Geburtsgewicht über 1000 g → kein Hinweis', () => {
+        expect(tgHint(mk({ lipids: 3 }))).toEqual([]);
+        expect(tgHint(mk({ lipids: 2 }))).toEqual([]);
+    });
+
+    it('AI3: ELBW ab 2 g/kg/d → Hinweis, 1000 g gehört dazu (inklusive Grenze), 1001 g nicht', () => {
+        expect(tgHint(mk({ birthWeight: 800, currentWeight: 800, lipids: 2 }))).toHaveLength(1);
+        expect(tgHint(mk({ birthWeight: 1000, currentWeight: 1000, lipids: 2 }))).toHaveLength(1);
+        expect(tgHint(mk({ birthWeight: 1001, currentWeight: 1001, lipids: 2 }))).toEqual([]);
+        expect(tgHint(mk({ birthWeight: 800, currentWeight: 800, lipids: 1.5 }))).toEqual([]);
+    });
+
+    it('AI4: Mit eingetragenem Triglyzerid-Wert entfällt der Hinweis (die bestehende Prüfung übernimmt)', () => {
+        expect(tgHint(mk({ lipids: 3.5, triglycerides: 120 }))).toEqual([]);
+        expect(mk({ lipids: 3.5, triglycerides: 300 }).warnings.some(w => /^CRITICAL: Triglyzeride > 250/.test(w))).toBe(true);
+    });
+
+    it('AI5: Ohne Lipide i. v. kein Hinweis, und der Hinweis ist kein Stopp (isSafe bleibt unberührt)', () => {
+        expect(tgHint(mk({ lipids: 0 }))).toEqual([]);
+        const ohne = mk({ lipids: 3.5 });
+        expect(ohne.warnings.some(w => /^CRITICAL/.test(w))).toBe(false);
+        expect(ohne.isSafe).toBe(true);
+    });
+});

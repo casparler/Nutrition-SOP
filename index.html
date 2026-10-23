@@ -1137,9 +1137,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.10"></script>
-    <script src="fenton_data.js?v=3.6.10"></script>
-    <script src="calculator.js?v=3.6.10"></script>
+    <script src="products.js?v=3.6.11"></script>
+    <script src="fenton_data.js?v=3.6.11"></script>
+    <script src="calculator.js?v=3.6.11"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1401,7 +1401,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.10';
+            const EXPECTED_CALC_VERSION = '3.6.11';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
