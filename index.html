@@ -1137,9 +1137,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.9"></script>
-    <script src="fenton_data.js?v=3.6.9"></script>
-    <script src="calculator.js?v=3.6.9"></script>
+    <script src="products.js?v=3.6.10"></script>
+    <script src="fenton_data.js?v=3.6.10"></script>
+    <script src="calculator.js?v=3.6.10"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1381,7 +1381,7 @@
                     value: r.npcLipidPercentTotal,
                     unit: '%',
                     min: 25,
-                    max: 100
+                    max: r.enteralVolKg < 25 ? 50 : 100
                 }
             ];
 
@@ -1401,7 +1401,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.9';
+            const EXPECTED_CALC_VERSION = '3.6.10';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1469,9 +1469,9 @@
                 set('tip-npc',
                     '<strong>NPC Lipid-Anteil</strong><br>' +
                     '<span style="font-size:11px">Bezug: <strong>gesamte</strong> Nicht-Protein-Energie (parenteral + enteral).<br>' +
-                    'Mindestens <strong>25%</strong> aus Lipiden (ESPGHAN 2018 für PN).<br>' +
+                    'ESPGHAN 2018: <strong>25–50%</strong> aus Lipiden — gilt für <strong>vollständig parenteral</strong> ernährte Kinder (hier: bis 24 ml/kg/d enteral).<br>' +
                     'Lipide liefern essentielle FA (LCPUFA, ω-3, ω-6) &amp; sind isokalorisch dichter (9 kcal/g vs 4 kcal/g Glukose).<br>' +
-                    '&lt; 25%: Risiko für EFA-Deficiency.<br>Obergrenze: keine; Muttermilch liefert selbst etwa die Hälfte als Fett. Lipid-Maximum und Triglyzeride werden separat geprüft.</span>');
+                    '&lt; 25%: Risiko für EFA-Deficiency.<br>&gt; 50%: bei vollständiger PN Glukoseanteil erhöhen.<br>Bei relevanter enteraler Ernährung gilt keine Anteilsregel (Milch liefert selbst etwa die Hälfte als Fett); Lipid-Maximum und Triglyzeride werden separat geprüft.</span>');
                 set('tip-npc-p',
                     '<strong>NPC/Protein Ratio</strong><br>' +
                     '<span style="font-size:11px">Orientierung: <strong>etwa 20–30 kcal NPC pro g Protein</strong> bei PN.<br>' +
@@ -2212,7 +2212,7 @@
                 const npcLipidEl = document.getElementById('res-npc-lipid');
                 npcLipidEl.innerText = `${r.npcLipidPercentTotal}`;
                 npcLipidEl.className = 'p-3 text-right font-bold tabular-nums ' + (
-                    r.npcTotal > 0 && r.npcLipidPercentTotal < 25 ? 'text-red-700' : 'text-violet-600'
+                    r.npcTotal > 0 && r.enteralVolKg < 25 && (r.npcLipidPercentTotal < 25 || r.npcLipidPercentTotal > 50) ? 'text-red-700' : 'text-violet-600'
                 );
                 document.getElementById('res-npc-glucose').innerText = `${r.npcGlucosePercentTotal}`;
 

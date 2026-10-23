@@ -2520,7 +2520,7 @@ describe('AG) NPC/P: nur „zu knapp“ bei laufender PN, keine Obergrenze (v3.6
  * Praxisfall: Sterofundin 1 ml/h, Muttermilch 128 ml/kg/d, Lipide i. v. → „Lipid-Anteil an NPC 100 % > 50 %“,
  * weil nur die PN betrachtet wurde. Die Oberfläche wird mit ihren eigenen Skripten (inkl. Produktdaten) ausgeführt.
  * ────────────────────────────────────────────────────────────────*/
-describe('AH) Lipid-Anteil an NPC bezieht die Gesamtenergie ein (v3.6.9)', () => {
+describe('AH) Lipid-Anteil an NPC: Gesamtenergie, Regel nur bei vollständiger PN (v3.6.9/3.6.10)', () => {
     async function boot(values) {
         const { JSDOM } = await import('jsdom');
         const fs = require('node:fs');
@@ -2577,11 +2577,26 @@ describe('AH) Lipid-Anteil an NPC bezieht die Gesamtenergie ein (v3.6.9)', () =>
         const r = calc.calculate(baseInput({ gir: 10, lipids: 0.5, protein: 3.0 }));
         const w = r.warnings.find(x => x.includes('Lipid-Anteil an NPC'));
         expect(w).toMatch(/gesamt \(parenteral \+ enteral\)/);
-        expect(w).toMatch(/mindestens 25%/);
+        expect(w).toMatch(/Ziel 25–50% bei vollständiger PN/);
     });
 
-    it('AH5: Eine Obergrenze für den Lipid-Anteil gibt es nicht mehr (reine Lipidinfusion ohne Glucose)', () => {
+    // v3.6.10 (nach Rückfrage des Neonatologen und Leitlinienrecherche 23.10.2026): ESPGHAN/ESPEN/ESPR/CSPEN 2018 (Lipide) empfiehlt
+    // 25–50 % der Nicht-Eiweiß-Energie als Lipid für VOLLSTÄNDIG parenteral ernährte Patienten. Die Anteilsregel gilt daher nur bis zur
+    // trophischen Ernährung (< 25 ml/kg/d); mit relevanter enteraler Ernährung entfällt sie (AH5 vorher: „keine Obergrenze“).
+    it('AH5: Bei vollständiger PN gilt 25–50 %: reine Lipidinfusion ohne Glucose warnt vor zu hohem Lipid-Anteil', () => {
         const r = calc.calculate(baseInput({ gir: 0, protein: 0, lipids: 2, tfi: 130, enteralVolume: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
-        expect(r.warnings.some(w => /Lipid-Anteil an NPC.*> 50|Glucose-Anteil erhöhen/.test(w))).toBe(false);
+        expect(r.warnings.some(w => /Lipid-Anteil an NPC.*> 50%.*vollständiger PN/.test(w))).toBe(true);
+    });
+
+    it('AH6: Trophische Ernährung (unter 25 ml/kg/d) zählt noch als vollständige PN, ab 25 ml/kg/d entfällt die Anteilsregel', () => {
+        const mk = ev => calc.calculate(baseInput({ gir: 0, protein: 0, lipids: 2, tfi: 130, enteralVolume: ev, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
+        expect(mk(20).warnings.some(w => /Lipid-Anteil an NPC/.test(w))).toBe(true);
+        expect(mk(25).warnings.some(w => /Lipid-Anteil an NPC/.test(w))).toBe(false);
+        expect(mk(100).warnings.some(w => /Lipid-Anteil an NPC/.test(w))).toBe(false);
+    });
+
+    it('AH7: Zu wenig Lipid bei teilweiser enteraler Ernährung warnt nicht (Anteilsregel gilt nur bei vollständiger PN)', () => {
+        const r = calc.calculate(baseInput({ gir: 10, lipids: 0.5, protein: 3.0, tfi: 150, enteralVolume: 60 }));
+        expect(r.warnings.some(w => w.includes('Lipid-Anteil an NPC'))).toBe(false);
     });
 });

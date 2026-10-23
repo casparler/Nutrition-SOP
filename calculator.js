@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.9';
+        this.VERSION = '3.6.10';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1832,11 +1832,16 @@ class NutritionCalculator {
             }
         }
 
-        // NPC-Ratio Guard (v3.6.9): Bezugsgröße ist die GESAMTE Nicht-Eiweiß-Energie (parenteral + enteral), nicht nur die PN.
-        // Untergrenze 25 % (essentielle Fettsäuren). Eine Obergrenze gibt es nicht mehr: Milch liefert selbst etwa die Hälfte
-        // ihrer Nicht-Eiweiß-Energie als Fett; Risiken der i. v.-Lipide meldet das Lipid-Maximum und die Triglyzerid-Prüfung.
-        if (n.npcTotal > 0 && hasPNVolume && n.npcLipidPercentTotal < 25) {
-            warnings.push(`Warnung: Lipid-Anteil an NPC gesamt (parenteral + enteral) nur ${n.npcLipidPercentTotal}% (Ziel mindestens 25%) – Risiko für Mangel an essentiellen Fettsäuren, Lipide steigern.`);
+        // NPC-Ratio Guard (v3.6.10): ESPGHAN/ESPEN/ESPR/CSPEN 2018 (Lipide) empfiehlt 25–50 % der Nicht-Eiweiß-Energie als Lipid
+        // für VOLLSTÄNDIG parenteral ernährte Patienten. Daher nur bis zur trophischen Ernährung (< 25 ml/kg/d, wie enteralPhase);
+        // sobald relevant enteral gefüttert wird, gibt es keine Anteilsregel (Milch liefert selbst etwa die Hälfte als Fett).
+        // Bezugsgröße ist die gesamte Nicht-Eiweiß-Energie (parenteral + enteral).
+        if (n.npcTotal > 0 && hasPNVolume && n.enteralVolKg < 25) {
+            if (n.npcLipidPercentTotal < 25) {
+                warnings.push(`Warnung: Lipid-Anteil an NPC gesamt (parenteral + enteral) nur ${n.npcLipidPercentTotal}% (Ziel 25–50% bei vollständiger PN) – Risiko für Mangel an essentiellen Fettsäuren, Lipide steigern.`);
+            } else if (n.npcLipidPercentTotal > 50) {
+                warnings.push(`Warnung: Lipid-Anteil an NPC gesamt (parenteral + enteral) ${n.npcLipidPercentTotal}% > 50% (Ziel 25–50% bei vollständiger PN) – Glucose-Anteil erhöhen.`);
+            }
         }
 
         // ENERGY EFFICIENCY: NPC/P Ratio (ESPGHAN 2018)
