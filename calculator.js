@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.4';
+        this.VERSION = '3.6.8';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -556,8 +556,10 @@ class NutritionCalculator {
         }
 
         // 5) NPC/Protein (energetische Effizienz)
-        if (bullets.length < 5 && r.npcPerProtein > 0 && (r.npcPerProtein < 20 || r.npcPerProtein > 40)) {
-            push('warning', `NPC/Protein ${r.npcPerProtein} kcal/g — ${r.npcPerProtein < 20 ? 'Energie zu knapp' : 'Verfettungsrisiko'}.`);
+        // v3.6.6/3.6.8: Nur „zu knapp“ (< 20) und nur bei laufender PN. Eine Obergrenze (früher „Verfettungsrisiko“ > 40)
+        // gibt es nicht mehr: kein belegter Schwellenwert, reine Muttermilch liegt bei 50–60 kcal/g, siehe REGELWERK 10.3.
+        if (bullets.length < 5 && r.npcPerProtein > 0 && r.npcPerProtein < 20 && r.kcalParenteralKg > 0) {
+            push('warning', `NPC/Protein ${r.npcPerProtein} kcal/g — Energie zu knapp.`);
         }
 
         // Wenn nach allem KEIN Bullet, dann positives Default
@@ -1828,11 +1830,10 @@ class NutritionCalculator {
 
         // ENERGY EFFICIENCY: NPC/P Ratio (ESPGHAN 2018)
         // Zielbereich: 20–30 kcal pro 1g Protein
+        // v3.6.6/3.6.8: nur „< 20“ und nur bei laufender PN (Energie i. v. > 0); keine Obergrenze mehr, siehe oben.
         if (n.npcPerProtein > 0 && n.proteinTotalGKg > 0.5) {
-            if (n.npcPerProtein < 20) {
+            if (n.npcPerProtein < 20 && n.kcalParenteralKg > 0) {
                 warnings.push(`Warnung: Energie-Ungleichgewicht: Protein wird energetisch verwertet (NPC/P ${n.npcPerProtein} < 20 kcal/g).`);
-            } else if (n.npcPerProtein > 40) {
-                warnings.push(`Warnung: Verfettungsrisiko (NPC/P ${n.npcPerProtein} > 40 kcal/g).`);
             }
         }
 

@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 23.10.2026, Version v3.6.4, 230 Tests.
+Stand: 23.10.2026, Version v3.6.8, 236 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -188,7 +188,7 @@ Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 
 | 9a.6 | **PN-Beutel und Sekundärinfusion sind getrennt:** Osmolarität und Glukosekonzentration der PN betrachten nur Glukose, Eiweiß, Natrium und Kalium des PN-Beutels, geteilt durch das PN-Volumen. Natrium, Kalium und Glukose der Sekundärinfusion gehen in Gesamtzufuhr, GIR und Energie ein, nicht in die PN-Konzentration. Ohne PN-Inhalte ist die PN-Osmolarität 0 | Fehlerkorrektur 23.10.2026 (Praxisfall: 430 g, Sterofundin 1 ml/h, keine PN) | `calculate` (`pnGlucoseG`, `pnNaMmolKg`, `pnKMmolKg`) | AE1–AE4 |
 | 9a.7 | **Die Sekundärlösung selbst** wird bei peripherem Zugang gegen 900 mOsm/l geprüft (Faustformel Glukose g/l × 5 + (Na + K) mmol/l × 2). Glucose 20 % peripher: CRITICAL, Glucose 10 % und Sterofundin: keine Meldung | Entscheidung 23.10.2026 | `secondaryOsmolarity` | AE5 |
 | 9a.8 | **Ursachenzeile:** Bleiben bei eingetragenen PN-Inhalten weniger als 50 ml/kg/d PN-Volumen frei (TFI − enteral − Sekundärinfusion − Träger − Lipide), nennen die CRITICAL-Meldungen zu Osmolarität, Glukosekonzentration, Ausfällung und Lipid-Volumen diese Ursache. Die Meldung bleibt bestehen, die Eingaben passen dann nicht zusammen | Entscheidung 23.10.2026 | `pnVolumenUrsache` | AE6, AE7 |
-| 9a.9 | **Auswahl „Keine parenterale Ernährung“** (Infusionslösung): GIR, Aminosäuren, Calcium, Phosphat, Natrium, Kalium und Lipide werden von der App auf 0 gesetzt und gesperrt, ein Hinweis erklärt das. Bei anderer Auswahl (oder Vorlage) kehren die bisherigen Werte zurück bzw. werden verworfen. Der Rechenkern erhält `selectedSolution: none` mit Nullen | Entscheidung 23.10.2026 (Neonatologe: „selbst leeren“) | `index.html` (`applyNoPN`, `discardNoPN`) | AF1–AF5 |
+| 9a.9 | **Auswahl „Keine parenterale Ernährung“** (Infusionslösung): GIR, Aminosäuren, Calcium, Phosphat, Natrium und Kalium werden von der App auf 0 gesetzt und gesperrt; **Lipide bleiben unabhängig einstellbar** (manche Kinder erhalten Lipide i. v. ohne PN-Lösung, Korrektur 23.10.2026), ein Hinweis erklärt das. Bei anderer Auswahl (oder Vorlage) kehren die bisherigen Werte zurück bzw. werden verworfen. Der Rechenkern erhält `selectedSolution: none` mit Nullen | Entscheidung 23.10.2026 (Neonatologe: „selbst leeren“) | `index.html` (`applyNoPN`, `discardNoPN`) | AF1–AF6 |
 
 ## 10. Calcium, Phosphat, Eiweiß-Verhältnisse
 
@@ -196,7 +196,7 @@ Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 
 |---|---|---|---|---|
 | 10.1 | **Ca:P-Verhältnis wird nicht mehr bewertet** — keine Warnung, kein Fazit, kein Zielbereich. Der Wert wird weiter berechnet und angezeigt. Grund: Calcium und Phosphat werden dienstags im Urin bestimmt und die Phosphat-Substitution daran angepasst | Entscheidung 02.10.2026 | `calculate` Step 9 | C3 |
 | 10.2 | **P:AA-Verhältnis wird nicht mehr bewertet** — keine Warnung, kein Fazit. Der Wert wird weiter berechnet und angezeigt. Grund: Phosphat wird über Urin und Labor gesteuert, alle Hauslösungen liegen bei 0,5–0,77 mmol/g und lösten die Warnung ständig aus | Entscheidung 20.10.2026 | `calculate` | C4 |
-| 10.3 | Energie je g Protein (NPC/P) unter 20 → Warnung „Protein wird energetisch verwertet“; über 40 → „Verfettungsrisiko“ | Leitlinie | `calculate` | – |
+| 10.3 | Energie je g Protein (NPC/P): unter 20 → Warnung „Protein wird energetisch verwertet“, **nur bei laufender PN** (Energie i. v. größer 0). **Keine Obergrenze mehr** (früher „Verfettungsrisiko“ über 40). Der Wert bleibt immer sichtbar. Begründung: kein belegter Schwellenwert (die ESPGHAN/ESPEN/ESPR/CSPEN-Gruppe nennt das optimale Energie/Eiweiß-Verhältnis bei Frühgeborenen ausdrücklich als offen, Johnson 2022, doi:10.1038/s41390-021-01670-9); Muttermilch allein liegt bei 50–60 kcal/g; die implizierte Maßnahme (Energie senken) widerspricht der Datenlage, nach der niedrige Energie- und Eiweißzufuhr mit höherer Fettmasse einhergehen (Lingwood 2020, doi:10.1017/S000711451900343X; Cardoso 2023, doi:10.3390/nu15061533). Echte Überversorgung melden weiter Energie-Zielbereich, Lipid-Maximum, Lipid-Anteil an NPC und Triglyzeride. Untergrenze: Huston 2025 (doi:10.1177/19345798251318605), niedriges NPC:AA mit höherem Harnstoff | Entscheidung 23.10.2026 nach Literaturrecherche | `calculate`, `generateClinicalAssessment`, Tooltip | AG1–AG5 |
 | 10.4 | Ausfällung in der PN: Ca + P > 72 mmol/l → CRITICAL; > 55 → Warnung | Haus | `calculate` | – |
 | 10.5 | Ab Tag 14 bei enteral ≥ 100 ml/kg/d: Calcium gesamt < 120 oder Phosphat gesamt < 60 mg/kg/d → Hinweis (Osteopenie) | Leitlinie, **Offen** (17.2) | `calculate` | – |
 
@@ -321,6 +321,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.10 | ~~FM85-Zusammensetzung~~ | **entschieden 20.10.2026:** Packungswerte übernommen (siehe 11.9). Folge: Der Standardverlauf EBM + FM85 4 % ist nicht mehr dauerhaft kritisch; die Energie begrenzt das Volumen bei 4 % auf 150 ml/kg/d |
 | 17.11 | **Sterofundin ISO (9a)**: Zusammensetzung aus meinem Wissen eingetragen, **nicht an der Packung geprüft**. Bitte mit dem Etikett abgleichen. Ist eine andere Sterofundin-Variante im Einsatz (z. B. mit Glucose oder Halbelektrolyt), fehlt sie noch | Packungswerte nötig |
 | 17.12 | ~~Osmolarität bei Sekundärinfusion~~ **erledigt 23.10.2026** (Regeln 9a.6–9a.9). Die stehengebliebenen PN-Felder leert die App jetzt selbst über die Auswahl „Keine parenterale Ernährung“ | erledigt |
+| 17.13 | ~~NPC/P bei gemischter Ernährung~~ **erledigt 23.10.2026** durch Wegfall der Obergrenze (Regel 10.3). Offen bleibt: Soll die Untergrenze 20 für „zu knapp“ an einer Quelle belegt werden (ESPGHAN-Volltext lag nicht vor)? | erledigt / Quelle offen |
 
 ---
 
@@ -353,3 +354,7 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |
 | 02.10.2026 | Ca:P entfällt. Beatmungs-CRITICAL bleibt. Kalium: Warnung bei hoher Zufuhr, kaliumfreie Tage 1–2. Vitamin-D-/Proprems-Grenze (3 ml absolut) bleibt. Nur mit realem Gewicht rechnen. Hypoglykämie ist CRITICAL. SGA-Erkennung ja, Phototherapie nein. Geschlecht zurückgestellt. FM85-Empfehlungen nur bei < 1800 g. Energie-Obergrenze des enteralen Ziels erst ab Tag 4 |
 | 23.10.2026 | Auswahl „Keine parenterale Ernährung“ leert und sperrt die PN-Felder (Regel 9a.9), Version 3.6.4 |
+| 23.10.2026 | „Keine parenterale Ernährung“ lässt die Lipide unberührt (Rückmeldung: manche Kinder erhalten Lipide ohne PN-Lösung), Version 3.6.5 |
+| 23.10.2026 | NPC/P-Warnungen (unter 20, über 40) nur noch bei laufender PN; Muttermilch allein meldet kein „Verfettungsrisiko“ mehr (Regel 10.3, Version 3.6.6) |
+| 23.10.2026 | „Verfettungsrisiko“ (NPC/P über 40) nur noch bei Lipiden i. v.; „Energie zu knapp“ (unter 20) bei laufender PN (Regel 10.3, Version 3.6.7) |
+| 23.10.2026 | „Verfettungsrisiko“ (NPC/P über 40) entfällt nach Literaturrecherche; Wert bleibt sichtbar, „zu knapp“ bei PN bleibt (Regel 10.3, Version 3.6.8) |
