@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.6.3, 218 Tests.
+Stand: 23.10.2026, Version v3.6.3, 225 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -185,6 +185,9 @@ Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 
 | 9a.3 | **Calcium aus der Sekundärinfusion** zählt zur Gesamtzufuhr, nicht zur PN-Konzentration (die Ausfällungsprüfung betrifft nur den PN-Beutel) | Entscheidung 23.10.2026 | `totalCaMgKg` | AC2 |
 | 9a.4 | **Korrektur der Produktdaten:** NaCl 0,9 % hatte 154 statt 15,4 mmol Natrium je 100 ml, NaCl 0,45 % 77 statt 7,7. Die App rechnete bei diesen Lösungen mit zehnfachem Natrium (z. B. 74 statt 7,4 mmol/kg bei 48 ml/kg/d) | Fehlerkorrektur 23.10.2026 | `products.js` | AD1–AD4 |
 | 9a.5 | Jede Auswahl der Oberfläche muss in den Produktdaten existieren | Technisch | `index.html`, `products.js` | AC8 |
+| 9a.6 | **PN-Beutel und Sekundärinfusion sind getrennt:** Osmolarität und Glukosekonzentration der PN betrachten nur Glukose, Eiweiß, Natrium und Kalium des PN-Beutels, geteilt durch das PN-Volumen. Natrium, Kalium und Glukose der Sekundärinfusion gehen in Gesamtzufuhr, GIR und Energie ein, nicht in die PN-Konzentration. Ohne PN-Inhalte ist die PN-Osmolarität 0 | Fehlerkorrektur 23.10.2026 (Praxisfall: 430 g, Sterofundin 1 ml/h, keine PN) | `calculate` (`pnGlucoseG`, `pnNaMmolKg`, `pnKMmolKg`) | AE1–AE4 |
+| 9a.7 | **Die Sekundärlösung selbst** wird bei peripherem Zugang gegen 900 mOsm/l geprüft (Faustformel Glukose g/l × 5 + (Na + K) mmol/l × 2). Glucose 20 % peripher: CRITICAL, Glucose 10 % und Sterofundin: keine Meldung | Entscheidung 23.10.2026 | `secondaryOsmolarity` | AE5 |
+| 9a.8 | **Ursachenzeile:** Bleiben bei eingetragenen PN-Inhalten weniger als 50 ml/kg/d PN-Volumen frei (TFI − enteral − Sekundärinfusion − Träger − Lipide), nennen die CRITICAL-Meldungen zu Osmolarität, Glukosekonzentration, Ausfällung und Lipid-Volumen diese Ursache. Die Meldung bleibt bestehen, die Eingaben passen dann nicht zusammen | Entscheidung 23.10.2026 | `pnVolumenUrsache` | AE6, AE7 |
 
 ## 10. Calcium, Phosphat, Eiweiß-Verhältnisse
 
@@ -316,7 +319,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.9 | **Energie- und Protein-Ziele für Reife** (5.1, 6.1): Leitlinienwerte für Reife nicht belegt | Quelle fehlt |
 | 17.10 | ~~FM85-Zusammensetzung~~ | **entschieden 20.10.2026:** Packungswerte übernommen (siehe 11.9). Folge: Der Standardverlauf EBM + FM85 4 % ist nicht mehr dauerhaft kritisch; die Energie begrenzt das Volumen bei 4 % auf 150 ml/kg/d |
 | 17.11 | **Sterofundin ISO (9a)**: Zusammensetzung aus meinem Wissen eingetragen, **nicht an der Packung geprüft**. Bitte mit dem Etikett abgleichen. Ist eine andere Sterofundin-Variante im Einsatz (z. B. mit Glucose oder Halbelektrolyt), fehlt sie noch | Packungswerte nötig |
-| 17.12 | **Osmolarität bei Sekundärinfusion**: Die App verrechnet Natrium und Kalium der Sekundärinfusion mit dem (verkleinerten) PN-Volumen und kann dadurch die Osmolaritäts-Meldung des PN-Beutels überhöhen (Sterofundin 48 ml/kg/d: Natriumanteil 193 mOsm/l). Soll die PN-Osmolarität nur den PN-Beutel betrachten? | offen |
+| 17.12 | ~~Osmolarität bei Sekundärinfusion~~ **erledigt 23.10.2026** (Regeln 9a.6–9a.8). Offen bleibt nur: stehengebliebene PN-Felder (GIR, Eiweiß, Lipide, Ca, P, Na, K) bei Kindern, die nur noch Sekundärinfusion erhalten, müssen von Hand auf 0 gesetzt werden. Soll die App beim Auswählen „keine PN“ diese Felder selbst leeren oder nachfragen? | offen |
 
 ---
 
@@ -340,6 +343,7 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
 | 23.10.2026 | Sterofundin ISO als Sekundärinfusion; NaCl-Natrium je 100 ml korrigiert (war zehnfach zu hoch) |
+| 23.10.2026 | PN-Osmolarität und Glukosekonzentration nur aus dem PN-Beutel; Eigenosmolarität der Sekundärlösung; Ursachenzeile bei zu kleinem PN-Volumen (Regeln 9a.6–9a.8) |
 | 20.10.2026 | FM85 nach Packungsangabe gerechnet (35,5 g Eiweiß und 435 kcal je 100 g); damit entfällt die dauerhaft kritische Eiweißmeldung im Standardverlauf |
 | 20.10.2026 | P:AA-Warnung entfällt (Wert bleibt sichtbar). Alle sichtbaren Beschriftungen auf Deutsch: „In Akte kopieren“, „Auf einen Blick“, „Startwerte“, „Energiedefizit-Index“, „Wachstumsrate“, „PDF-Export“, „Zurücksetzen“ |
 | 20.10.2026 | Meldungen gestaffelt: eine Hierarchie, kritisch immer sichtbar, Warnungen begrenzt, Hinweise und Erinnerungen eingeklappt; Fazit-Karte und Einzellisten entfallen |

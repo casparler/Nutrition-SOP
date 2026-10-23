@@ -2288,3 +2288,74 @@ describe('AD) Natrium der Sekundärlösungen je 100 ml (v3.6.3)', () => {
         expect(r.results.osmolarity).toBeLessThan(1500);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AE — PN-Beutel und Sekundärinfusion getrennt (v3.6.3)
+ * Fall aus der Praxis: 430 g, 128 ml/kg/d Muttermilch, Sterofundin 1 ml/h, keine PN.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AE) PN-Beutel und Sekundärinfusion getrennt (v3.6.3)', () => {
+    const kind = o => baseInput({
+        birthWeight: 400, currentWeight: 430, ssw: 28, postnatalAge: 16,
+        enteralVolume: 128, mealFrequency: 12, access: 'peripheral',
+        gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const sterofundin1mlh = 1 * 24 / 0.43;   // 55,8 ml/kg/d
+
+    it('AE1: Sterofundin allein (keine PN-Inhalte) erzeugt keine kritische Meldung und keine PN-Osmolarität', () => {
+        const r = calc.calculate(kind({ tfi: 187, secondarySolution: 'sterofundinIso', secondaryRateKg: sterofundin1mlh }));
+        expect(r.results.osmolarity).toBe(0);
+        expect(r.warnings.filter(w => w.startsWith('CRITICAL'))).toEqual([]);
+        expect(r.isSafe).toBe(true);
+    });
+
+    it('AE2: Auch bei winzigem PN-Restvolumen (Rundung) bleibt die PN-Osmolarität 0, wenn keine PN-Inhalte laufen', () => {
+        const r = calc.calculate(kind({ tfi: 184, secondarySolution: 'sterofundinIso', secondaryRateKg: sterofundin1mlh }));
+        expect(r.results.pnDaily).toBeLessThan(0.5);
+        expect(r.results.osmolarity).toBe(0);
+        expect(r.warnings.some(w => /Osmolarität/.test(w))).toBe(false);
+    });
+
+    it('AE3: Natrium der Sekundärinfusion zählt nicht zur Osmolarität des PN-Beutels', () => {
+        const r = calc.calculate(kind({ tfi: 230, enteralVolume: 100, sodium: 3, secondarySolution: 'sterofundinIso', secondaryRateKg: 50 }));
+        const pnLiter = r.results.pnDaily / 1000;
+        // nur das PN-Natrium (3 mmol/kg × 0,43 kg) im PN-Volumen, Faktor 2 für NaCl
+        expect(r.results.osmolarityBreakdown.sodium).toBeCloseTo(2 * 3 * 0.43 / pnLiter, -1);
+        expect(r.results.osmolarityBreakdown.potassium).toBe(0);
+        // Gesamt-Natrium enthält Sterofundin weiterhin
+        expect(r.results.effectiveNa).toBeGreaterThan(3 + 50 * 0.145 - 0.5);
+    });
+
+    it('AE4: Glukose einer Sekundärinfusion zählt nicht zur Glukosekonzentration des PN-Beutels', () => {
+        const r = calc.calculate(kind({ tfi: 230, enteralVolume: 100, secondarySolution: 'glucose10', secondaryRateKg: 40 }));
+        expect(r.results.glucoseConc).toBe(0);
+        expect(r.warnings.some(w => /Glukose-Konzentration/.test(w))).toBe(false);
+        // die Glukose zählt aber weiter zur GIR und zur Energie
+        expect(r.results.effectiveGIR).toBeGreaterThan(0);
+    });
+
+    it('AE5: Die Sekundärlösung selbst wird peripher gegen 900 mOsm/l geprüft (Glucose 20 % ja, 10 % nein, zentral nein)', () => {
+        const mk = (lsg, zugang) => calc.calculate(kind({ tfi: 230, enteralVolume: 100, access: zugang, secondarySolution: lsg, secondaryRateKg: 20 }));
+        expect(mk('glucose20', 'peripheral').warnings.some(w => /^CRITICAL: Sekundärinfusion Glucose 20%/.test(w))).toBe(true);
+        expect(mk('glucose10', 'peripheral').warnings.some(w => /Sekundärinfusion/.test(w))).toBe(false);
+        expect(mk('glucose20', 'central').warnings.some(w => /Sekundärinfusion Glucose/.test(w))).toBe(false);
+    });
+
+    it('AE6: Sind PN-Inhalte eingetragen, aber kaum PN-Volumen frei, nennen die Meldungen die Ursache', () => {
+        const r = calc.calculate(kind({
+            tfi: 187, gir: 6, protein: 2, lipids: 0.5, calcium: 40, phosphate: 31,
+            secondarySolution: 'nacl09', secondaryRateKg: 0.7 * 24 / 0.43
+        }));
+        const g = r.warnings.find(w => /^CRITICAL: Glukose-Konzentration/.test(w));
+        expect(g).toBeTruthy();
+        expect(g).toMatch(/Ursache prüfen: nur \d+ ml\/kg\/d PN-Volumen frei/);
+        // die Konzentration bleibt gemeldet — die PN-Inhalte passen nicht zum Restvolumen
+        expect(r.results.glucoseConc).toBeGreaterThan(12.5);
+    });
+
+    it('AE7: Bei ausreichendem PN-Volumen steht keine Ursachenzeile', () => {
+        const r = calc.calculate(kind({ tfi: 100, enteralVolume: 0, gir: 11, protein: 2, lipids: 2 }));
+        const g = r.warnings.find(w => /^CRITICAL: Glukose-Konzentration/.test(w));
+        expect(g).toBeTruthy();
+        expect(g).not.toMatch(/Ursache prüfen/);
+    });
+});
