@@ -2471,7 +2471,7 @@ describe('AF) Keine parenterale Ernährung (v3.6.4, Lipide ausgenommen v3.6.5)',
  * SECTION AG — NPC/P nur bei laufender PN (v3.6.6)
  * Praxisfall: Muttermilch allein (NPC/P ≈ 59) meldete „Verfettungsrisiko“.
  * ────────────────────────────────────────────────────────────────*/
-describe('AG) NPC/P-Bewertung nur bei laufender PN (v3.6.6)', () => {
+describe('AG) NPC/P-Bewertung nur bei laufender PN, „Verfettungsrisiko“ nur bei Lipiden i. v. (v3.6.6/3.6.7)', () => {
     const kind = o => baseInput({
         birthWeight: 400, currentWeight: 430, ssw: 28, postnatalAge: 16, tfi: 187,
         enteralVolume: 128, mealFrequency: 12, access: 'peripheral',
@@ -2494,5 +2494,18 @@ describe('AG) NPC/P-Bewertung nur bei laufender PN (v3.6.6)', () => {
         const r = calc.calculate(kind({ tfi: 150, enteralVolume: 0, gir: 10, protein: 1, lipids: 2 }));
         expect(r.results.kcalParenteralKg).toBeGreaterThan(0);
         expect(npcWarn(r).some(w => /Verfettungsrisiko/.test(w))).toBe(true);
+    });
+
+    it('AG4: Ohne Lipide i. v. gibt es kein „Verfettungsrisiko“, auch wenn die PN NPC/P über 40 hat (v3.6.7)', () => {
+        const r = calc.calculate(kind({ tfi: 150, enteralVolume: 0, gir: 12, protein: 1, lipids: 0 }));
+        expect(r.results.npcPerProtein).toBeGreaterThan(40);
+        expect(r.results.lipidsPNKg).toBe(0);
+        expect(npcWarn(r).some(w => /Verfettungsrisiko/.test(w))).toBe(false);
+    });
+
+    it('AG5: „Energie zu knapp“ (NPC/P unter 20) bleibt bei laufender PN ohne Lipide erhalten (v3.6.7)', () => {
+        const r = calc.calculate(kind({ tfi: 150, enteralVolume: 0, gir: 2, protein: 3.5, lipids: 0 }));
+        expect(r.results.npcPerProtein).toBeLessThan(20);
+        expect(npcWarn(r).some(w => /Energie-Ungleichgewicht/.test(w))).toBe(true);
     });
 });
