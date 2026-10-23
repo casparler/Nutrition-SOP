@@ -618,7 +618,7 @@
                             </div>
                         </div>
 
-                        <p id="no-pn-note" class="hidden text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-2">Keine parenterale Ernährung: GIR, Aminosäuren, Calcium, Phosphat, Natrium, Kalium und Lipide stehen auf 0. Bei anderer Auswahl kehren die bisherigen Werte zurück.</p>
+                        <p id="no-pn-note" class="hidden text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-2">Keine parenterale Ernährung: GIR, Aminosäuren, Calcium, Phosphat, Natrium und Kalium stehen auf 0. Lipide bleiben unabhängig einstellbar. Bei anderer Auswahl kehren die bisherigen Werte zurück.</p>
 
                         <!-- Manual PN inputs (hidden when solution selected) -->
                         <div id="manual-pn-inputs">
@@ -1137,9 +1137,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.4"></script>
-    <script src="fenton_data.js?v=3.6.4"></script>
-    <script src="calculator.js?v=3.6.4"></script>
+    <script src="products.js?v=3.6.5"></script>
+    <script src="fenton_data.js?v=3.6.5"></script>
+    <script src="calculator.js?v=3.6.5"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1401,7 +1401,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.4';
+            const EXPECTED_CALC_VERSION = '3.6.5';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1932,7 +1932,7 @@
             // „Keine parenterale Ernährung“: PN-Felder werden auf 0 gesetzt und gesperrt, die bisherigen
             // Werte bleiben erhalten (localStorage wird nicht überschrieben) und kehren bei anderer Auswahl zurück.
             const NO_PN_FIELDS = ['input-gir', 'input-protein', 'input-calcium', 'input-phosphate',
-                                  'input-sodium', 'input-potassium', 'input-lipids'];
+                                  'input-sodium', 'input-potassium'];
             let noPnSaved = null;
             function applyNoPN(active) {
                 const note = document.getElementById('no-pn-note');

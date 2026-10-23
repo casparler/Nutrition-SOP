@@ -2364,7 +2364,7 @@ describe('AE) PN-Beutel und Sekundärinfusion getrennt (v3.6.3)', () => {
  * SECTION AF — Auswahl „Keine parenterale Ernährung“ (v3.6.4)
  * Die Seite wird mit ihren eigenen Skripten ausgeführt.
  * ────────────────────────────────────────────────────────────────*/
-describe('AF) Keine parenterale Ernährung (v3.6.4)', () => {
+describe('AF) Keine parenterale Ernährung (v3.6.4, Lipide ausgenommen v3.6.5)', () => {
     async function boot() {
         const { JSDOM } = await import('jsdom');
         const fs = require('node:fs');
@@ -2391,7 +2391,7 @@ describe('AF) Keine parenterale Ernährung (v3.6.4)', () => {
         sel.dispatchEvent(new w.Event('change'));
     };
     const sel = w => w.document.getElementById('input-solution');
-    const PN = ['input-gir', 'input-protein', 'input-calcium', 'input-phosphate', 'input-sodium', 'input-potassium', 'input-lipids'];
+    const PN = ['input-gir', 'input-protein', 'input-calcium', 'input-phosphate', 'input-sodium', 'input-potassium'];   // Lipide gehören nicht dazu (v3.6.5)
     const kind = {
         'birth-weight': 400, 'current-weight': 430, 'input-ssw': 28, 'input-day': 16, 'input-tfi': 187,
         'input-enteral': 128, 'input-meal-frequency': 12, 'input-access': 'peripheral',
@@ -2432,7 +2432,7 @@ describe('AF) Keine parenterale Ernährung (v3.6.4)', () => {
 
     it('AF4: Praxisfall (Sterofundin 1 ml/h, keine PN) zeigt nach der Auswahl keine kritische Meldung', async () => {
         const w = await boot();
-        set(w, { ...kind, 'input-secondary-rate': 1 });   // Oberfläche: ml/h
+        set(w, { ...kind, 'input-secondary-rate': 1, 'input-lipids': 0 });   // Oberfläche: ml/h; Praxisfall ohne Lipide (Lipide: AF6)
         w.updateCalculations();
         choose(w, 'keinePN');
         const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')];
@@ -2447,5 +2447,22 @@ describe('AF) Keine parenterale Ernährung (v3.6.4)', () => {
         expect(sel(w).value).not.toBe('keinePN');
         PN.forEach(id => expect(w.document.getElementById(id).disabled, id).toBe(false));
         expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(true);
+    });
+
+    it('AF6: Lipide bleiben bei „Keine PN“ einstellbar und gehen unverändert in die Rechnung ein (v3.6.5)', async () => {
+        const w = await boot();
+        // Sterofundin 1 ml/h (≈ 56 ml/kg/d) + Milch 128 + Lipide 1 g/kg (5 ml/kg) = 189 ml/kg/d
+        set(w, { ...kind, 'input-tfi': 189, 'input-secondary-rate': 1, 'input-lipids': 1 });
+        choose(w, 'keinePN');
+        const lip = w.document.getElementById('input-lipids');
+        expect(lip.disabled).toBe(false);
+        expect(lip.value).toBe('1');
+        PN.forEach(id => expect(w.document.getElementById(id).value, id).toBe('0'));
+        const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')].map(e => e.textContent);
+        expect(kritisch).toEqual([]);
+        // Lipide ändern, ohne dass die Auswahl sie zurücksetzt
+        lip.value = '2';
+        choose(w, 'none');
+        expect(lip.value).toBe('2');
     });
 });

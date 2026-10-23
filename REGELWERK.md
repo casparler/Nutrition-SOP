@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 23.10.2026, Version v3.6.4, 230 Tests.
+Stand: 23.10.2026, Version v3.6.5, 231 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -188,7 +188,7 @@ Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 
 | 9a.6 | **PN-Beutel und Sekundärinfusion sind getrennt:** Osmolarität und Glukosekonzentration der PN betrachten nur Glukose, Eiweiß, Natrium und Kalium des PN-Beutels, geteilt durch das PN-Volumen. Natrium, Kalium und Glukose der Sekundärinfusion gehen in Gesamtzufuhr, GIR und Energie ein, nicht in die PN-Konzentration. Ohne PN-Inhalte ist die PN-Osmolarität 0 | Fehlerkorrektur 23.10.2026 (Praxisfall: 430 g, Sterofundin 1 ml/h, keine PN) | `calculate` (`pnGlucoseG`, `pnNaMmolKg`, `pnKMmolKg`) | AE1–AE4 |
 | 9a.7 | **Die Sekundärlösung selbst** wird bei peripherem Zugang gegen 900 mOsm/l geprüft (Faustformel Glukose g/l × 5 + (Na + K) mmol/l × 2). Glucose 20 % peripher: CRITICAL, Glucose 10 % und Sterofundin: keine Meldung | Entscheidung 23.10.2026 | `secondaryOsmolarity` | AE5 |
 | 9a.8 | **Ursachenzeile:** Bleiben bei eingetragenen PN-Inhalten weniger als 50 ml/kg/d PN-Volumen frei (TFI − enteral − Sekundärinfusion − Träger − Lipide), nennen die CRITICAL-Meldungen zu Osmolarität, Glukosekonzentration, Ausfällung und Lipid-Volumen diese Ursache. Die Meldung bleibt bestehen, die Eingaben passen dann nicht zusammen | Entscheidung 23.10.2026 | `pnVolumenUrsache` | AE6, AE7 |
-| 9a.9 | **Auswahl „Keine parenterale Ernährung“** (Infusionslösung): GIR, Aminosäuren, Calcium, Phosphat, Natrium, Kalium und Lipide werden von der App auf 0 gesetzt und gesperrt, ein Hinweis erklärt das. Bei anderer Auswahl (oder Vorlage) kehren die bisherigen Werte zurück bzw. werden verworfen. Der Rechenkern erhält `selectedSolution: none` mit Nullen | Entscheidung 23.10.2026 (Neonatologe: „selbst leeren“) | `index.html` (`applyNoPN`, `discardNoPN`) | AF1–AF5 |
+| 9a.9 | **Auswahl „Keine parenterale Ernährung“** (Infusionslösung): GIR, Aminosäuren, Calcium, Phosphat, Natrium und Kalium werden von der App auf 0 gesetzt und gesperrt; **Lipide bleiben unabhängig einstellbar** (manche Kinder erhalten Lipide i. v. ohne PN-Lösung, Korrektur 23.10.2026), ein Hinweis erklärt das. Bei anderer Auswahl (oder Vorlage) kehren die bisherigen Werte zurück bzw. werden verworfen. Der Rechenkern erhält `selectedSolution: none` mit Nullen | Entscheidung 23.10.2026 (Neonatologe: „selbst leeren“) | `index.html` (`applyNoPN`, `discardNoPN`) | AF1–AF6 |
 
 ## 10. Calcium, Phosphat, Eiweiß-Verhältnisse
 
@@ -353,3 +353,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |
 | 02.10.2026 | Ca:P entfällt. Beatmungs-CRITICAL bleibt. Kalium: Warnung bei hoher Zufuhr, kaliumfreie Tage 1–2. Vitamin-D-/Proprems-Grenze (3 ml absolut) bleibt. Nur mit realem Gewicht rechnen. Hypoglykämie ist CRITICAL. SGA-Erkennung ja, Phototherapie nein. Geschlecht zurückgestellt. FM85-Empfehlungen nur bei < 1800 g. Energie-Obergrenze des enteralen Ziels erst ab Tag 4 |
 | 23.10.2026 | Auswahl „Keine parenterale Ernährung“ leert und sperrt die PN-Felder (Regel 9a.9), Version 3.6.4 |
+| 23.10.2026 | „Keine parenterale Ernährung“ lässt die Lipide unberührt (Rückmeldung: manche Kinder erhalten Lipide ohne PN-Lösung), Version 3.6.5 |
