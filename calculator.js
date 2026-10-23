@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.8';
+        this.VERSION = '3.6.9';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1397,6 +1397,16 @@ class NutritionCalculator {
             npcPerProtein = npcTotalAll.div(proteinTotalGKg).toDecimalPlaces(1);
         }
 
+        // v3.6.9: Fett- und Kohlenhydratanteil an der GESAMTEN Nicht-Eiweiß-Energie (parenteral + enteral).
+        // `npcLipidPercent`/`npcGlucosePercent` bleiben die reinen PN-Werte (Verträglichkeit der Infusion).
+        const enteralFatKcal = Decimal.min(enteralFatGKg.times(9), enteralNonProteinKcal);
+        let npcLipidPercentTotal = D(0);
+        let npcGlucosePercentTotal = D(0);
+        if (npcTotalAll.gt(0)) {
+            npcLipidPercentTotal = kcalLipid.plus(enteralFatKcal).div(npcTotalAll).times(100).toDecimalPlaces(1);
+            npcGlucosePercentTotal = D(100).minus(npcLipidPercentTotal).toDecimalPlaces(1);
+        }
+
         // --- Step 9: Ca:P Ratio (molar) — TOTAL (PN + Enteral) ---
         let caPRatio = D(0);
         if (totalPMmolKg.gt(0)) {
@@ -1538,6 +1548,9 @@ class NutritionCalculator {
             npcTotal: npcTotal.toNumber(),
             npcLipidPercent: npcLipidPercent.toNumber(),
             npcGlucosePercent: npcGlucosePercent.toNumber(),
+            npcTotalAll: npcTotalAll.toNumber(),
+            npcLipidPercentTotal: npcLipidPercentTotal.toNumber(),
+            npcGlucosePercentTotal: npcGlucosePercentTotal.toNumber(),
             kcalGlucose: kcalGlucose.toNumber(),
             kcalLipid: kcalLipid.toNumber(),
             microVolDaily: microDaily.toNumber(),
@@ -1819,13 +1832,11 @@ class NutritionCalculator {
             }
         }
 
-        // NPC-Ratio Guard: Lipid should be 25–50% of non-protein calories (ESPGHAN)
-        if (n.npcTotal > 0 && hasPNVolume) {
-            if (n.npcLipidPercent < 25) {
-                warnings.push(`Warnung: Lipid-Anteil an NPC nur ${n.npcLipidPercent}% (Ziel 25–50%) – metabolische Imbalance, Lipide steigern.`);
-            } else if (n.npcLipidPercent > 50) {
-                warnings.push(`Warnung: Lipid-Anteil an NPC ${n.npcLipidPercent}% > 50% – metabolische Imbalance, Glucose-Anteil erhöhen.`);
-            }
+        // NPC-Ratio Guard (v3.6.9): Bezugsgröße ist die GESAMTE Nicht-Eiweiß-Energie (parenteral + enteral), nicht nur die PN.
+        // Untergrenze 25 % (essentielle Fettsäuren). Eine Obergrenze gibt es nicht mehr: Milch liefert selbst etwa die Hälfte
+        // ihrer Nicht-Eiweiß-Energie als Fett; Risiken der i. v.-Lipide meldet das Lipid-Maximum und die Triglyzerid-Prüfung.
+        if (n.npcTotal > 0 && hasPNVolume && n.npcLipidPercentTotal < 25) {
+            warnings.push(`Warnung: Lipid-Anteil an NPC gesamt (parenteral + enteral) nur ${n.npcLipidPercentTotal}% (Ziel mindestens 25%) – Risiko für Mangel an essentiellen Fettsäuren, Lipide steigern.`);
         }
 
         // ENERGY EFFICIENCY: NPC/P Ratio (ESPGHAN 2018)
@@ -2176,6 +2187,9 @@ class NutritionCalculator {
                 npcTotal: n.npcTotal,
                 npcLipidPercent: n.npcLipidPercent,
                 npcGlucosePercent: n.npcGlucosePercent,
+                npcTotalAll: n.npcTotalAll,
+                npcLipidPercentTotal: n.npcLipidPercentTotal,
+                npcGlucosePercentTotal: n.npcGlucosePercentTotal,
                 kcalGlucose: n.kcalGlucose,
                 kcalLipid: n.kcalLipid,
                 microVolDaily: n.microVolDaily,

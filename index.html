@@ -937,7 +937,7 @@
                                 </tr>
                                 <tr class="bg-gray-50"><td colspan="3" class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Energieverteilung (NPC)</td></tr>
                                 <tr>
-                                    <td class="p-3 pl-6">NPC Gesamt</td>
+                                    <td class="p-3 pl-6">NPC gesamt (parenteral + enteral)</td>
                                     <td id="res-npc-total" class="p-3 text-right font-bold text-violet-700">-</td>
                                     <td class="p-3 text-right text-gray-400 text-sm">kcal/kg/d</td>
                                 </tr>
@@ -1137,9 +1137,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.8"></script>
-    <script src="fenton_data.js?v=3.6.8"></script>
-    <script src="calculator.js?v=3.6.8"></script>
+    <script src="products.js?v=3.6.9"></script>
+    <script src="fenton_data.js?v=3.6.9"></script>
+    <script src="calculator.js?v=3.6.9"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1377,11 +1377,11 @@
                     max: 1.4
                 },
                 {
-                    name: 'NPC Lipid-Anteil',
-                    value: r.npcLipidPercent,
+                    name: 'Lipid-Anteil an NPC (gesamt)',
+                    value: r.npcLipidPercentTotal,
                     unit: '%',
                     min: 25,
-                    max: 50
+                    max: 100
                 }
             ];
 
@@ -1401,7 +1401,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.8';
+            const EXPECTED_CALC_VERSION = '3.6.9';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1468,9 +1468,10 @@
                     `Phosphat-Substitution folgt den Laborwerten.</span>`);
                 set('tip-npc',
                     '<strong>NPC Lipid-Anteil</strong><br>' +
-                    '<span style="font-size:11px">ESPGHAN 2018: <strong>25–50%</strong> der Nicht-Protein-Kalorien aus Lipiden.<br>' +
+                    '<span style="font-size:11px">Bezug: <strong>gesamte</strong> Nicht-Protein-Energie (parenteral + enteral).<br>' +
+                    'Mindestens <strong>25%</strong> aus Lipiden (ESPGHAN 2018 für PN).<br>' +
                     'Lipide liefern essentielle FA (LCPUFA, ω-3, ω-6) &amp; sind isokalorisch dichter (9 kcal/g vs 4 kcal/g Glukose).<br>' +
-                    '&lt; 25%: Risiko für EFA-Deficiency.<br>&gt; 50%: Cholestase- &amp; Hyperlipidämie-Risiko.</span>');
+                    '&lt; 25%: Risiko für EFA-Deficiency.<br>Obergrenze: keine; Muttermilch liefert selbst etwa die Hälfte als Fett. Lipid-Maximum und Triglyzeride werden separat geprüft.</span>');
                 set('tip-npc-p',
                     '<strong>NPC/Protein Ratio</strong><br>' +
                     '<span style="font-size:11px">Orientierung: <strong>etwa 20–30 kcal NPC pro g Protein</strong> bei PN.<br>' +
@@ -2207,13 +2208,13 @@
                 }
 
                 // NPC Ratio
-                document.getElementById('res-npc-total').innerText = `${r.npcTotal}`;
+                document.getElementById('res-npc-total').innerText = `${r.npcTotalAll}`;
                 const npcLipidEl = document.getElementById('res-npc-lipid');
-                npcLipidEl.innerText = `${r.npcLipidPercent}`;
+                npcLipidEl.innerText = `${r.npcLipidPercentTotal}`;
                 npcLipidEl.className = 'p-3 text-right font-bold tabular-nums ' + (
-                    r.npcTotal > 0 && (r.npcLipidPercent < 25 || r.npcLipidPercent > 50) ? 'text-red-700' : 'text-violet-600'
+                    r.npcTotal > 0 && r.npcLipidPercentTotal < 25 ? 'text-red-700' : 'text-violet-600'
                 );
-                document.getElementById('res-npc-glucose').innerText = `${r.npcGlucosePercent}`;
+                document.getElementById('res-npc-glucose').innerText = `${r.npcGlucosePercentTotal}`;
 
                 // Micro volume
                 const microVolEl = document.getElementById('res-micro-vol');

@@ -2514,3 +2514,74 @@ describe('AG) NPC/P: nur „zu knapp“ bei laufender PN, keine Obergrenze (v3.6
         expect(npcWarn(r).some(w => /Energie-Ungleichgewicht/.test(w))).toBe(true);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AH — Lipid-Anteil an der Gesamtenergie (v3.6.9)
+ * Praxisfall: Sterofundin 1 ml/h, Muttermilch 128 ml/kg/d, Lipide i. v. → „Lipid-Anteil an NPC 100 % > 50 %“,
+ * weil nur die PN betrachtet wurde. Die Oberfläche wird mit ihren eigenen Skripten (inkl. Produktdaten) ausgeführt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AH) Lipid-Anteil an NPC bezieht die Gesamtenergie ein (v3.6.9)', () => {
+    async function boot(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        w.updateCalculations();
+        return w.document;
+    }
+    const kind = {
+        'birth-weight': 400, 'current-weight': 430, 'input-ssw': 28, 'input-day': 16, 'input-tfi': 189,
+        'input-enteral': 128, 'input-meal-frequency': 12, 'input-access': 'peripheral',
+        'input-gir': 0, 'input-protein': 0, 'input-calcium': 0, 'input-phosphate': 0, 'input-sodium': 0, 'input-potassium': 0,
+        'input-lipids': 1, 'input-secondary-solution': 'sterofundinIso', 'input-secondary-rate': 1
+    };
+    // jsdom kennt innerText nicht als Layout-Eigenschaft: die Oberfläche schreibt per innerText, gelesen wird dieselbe Eigenschaft.
+
+    it('AH1: Sterofundin + Muttermilch + Lipide i. v. zeigt keinen „100 %“-Lipidanteil und keine Obergrenzen-Meldung', async () => {
+        const doc = await boot(kind);
+        const anteil = parseFloat(doc.getElementById('res-npc-lipid').innerText);
+        expect(anteil).toBeLessThan(100);
+        expect(anteil).toBeGreaterThan(0);
+        expect(doc.body.textContent).not.toMatch(/Lipid-Anteil an NPC 100/);
+        expect(doc.body.textContent).not.toMatch(/> 50%\s*–\s*metabolische Imbalance/);
+    });
+
+    it('AH2: Die Anzeige und die Regel beziehen sich auf parenteral + enteral (Glucose- und Lipidanteil ergeben 100 %)', async () => {
+        const doc = await boot(kind);
+        const l = parseFloat(doc.getElementById('res-npc-lipid').innerText);
+        const g = parseFloat(doc.getElementById('res-npc-glucose').innerText);
+        expect(l + g).toBeCloseTo(100, 0);
+        expect(doc.getElementById('res-npc-total').innerText).toBeTruthy();
+    });
+
+    it('AH3: Der Rechenkern liefert die PN-Werte unverändert und zusätzlich die Gesamtwerte', () => {
+        const r = calc.calculate(baseInput({ gir: 0, protein: 0, lipids: 1, tfi: 130, enteralVolume: 100, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
+        expect(r.results.npcLipidPercent).toBe(100);                 // nur PN: reine Lipidinfusion
+        expect(r.results.npcLipidPercentTotal).toBeLessThanOrEqual(100);
+        expect(r.results.npcTotalAll).toBeGreaterThanOrEqual(r.results.npcTotal);
+        expect(r.results.npcLipidPercentTotal + r.results.npcGlucosePercentTotal).toBeCloseTo(100, 0);
+    });
+
+    it('AH4: Zu wenig Fett an der Gesamt-NPC (unter 25 %) warnt weiterhin, mit Bezug auf die Gesamtenergie', () => {
+        const r = calc.calculate(baseInput({ gir: 10, lipids: 0.5, protein: 3.0 }));
+        const w = r.warnings.find(x => x.includes('Lipid-Anteil an NPC'));
+        expect(w).toMatch(/gesamt \(parenteral \+ enteral\)/);
+        expect(w).toMatch(/mindestens 25%/);
+    });
+
+    it('AH5: Eine Obergrenze für den Lipid-Anteil gibt es nicht mehr (reine Lipidinfusion ohne Glucose)', () => {
+        const r = calc.calculate(baseInput({ gir: 0, protein: 0, lipids: 2, tfi: 130, enteralVolume: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
+        expect(r.warnings.some(w => /Lipid-Anteil an NPC.*> 50|Glucose-Anteil erhöhen/.test(w))).toBe(false);
+    });
+});
