@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.2';
+        this.VERSION = '3.6.3';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1100,6 +1100,8 @@ class NutritionCalculator {
         let secondaryGlucoseGKg = D(0);
         let secondaryNaMmolKg = D(0);
         let secondaryClMmolKg = D(0);
+        let secondaryKMmolKg = D(0);    // v3.6.3: Sterofundin enthält Kalium und Calcium
+        let secondaryCaMmolKg = D(0);
         const secondaryDaily = weightKg.times(secondaryRateKg).toDecimalPlaces(1);
 
         if (secondarySolution !== 'none' && secondaryRateKg.gt(0) && typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.secondarySolutions) {
@@ -1109,7 +1111,11 @@ class NutritionCalculator {
                 const glucosePer100 = D(secSol.per100ml.glucose_g);
                 const naPer100 = D(secSol.per100ml.sodium_mmol);
                 const clPer100 = D(secSol.per100ml.chloride_mmol);
-                
+                const kPer100 = D(secSol.per100ml.potassium_mmol || 0);
+                const caPer100 = D(secSol.per100ml.calcium_mmol || 0);
+
+                secondaryKMmolKg = secondaryRateKg.times(kPer100).div(100).toDecimalPlaces(3);
+                secondaryCaMmolKg = secondaryRateKg.times(caPer100).div(100).toDecimalPlaces(3);
                 secondaryGlucoseGKg = secondaryRateKg.times(glucosePer100).div(100).toDecimalPlaces(3);
                 secondaryNaMmolKg = secondaryRateKg.times(naPer100).div(100).toDecimalPlaces(2);
                 secondaryClMmolKg = secondaryRateKg.times(clPer100).div(100).toDecimalPlaces(2);
@@ -1310,13 +1316,19 @@ class NutritionCalculator {
         const effectivePMmol = effectiveP_mmol.toDecimalPlaces(3);
 
         // Total Ca/P (PN + Enteral) for metabolic bone disease assessment
-        const totalCaMgKg = effectiveCaMg.plus(enteralCaMgKg).toDecimalPlaces(1);
+        // v3.6.3: Calcium aus einer Sekundärinfusion (Sterofundin) zählt zur Gesamtzufuhr, nicht zur
+        // PN-Konzentration (Ausfällungsprüfung bezieht sich nur auf den PN-Beutel).
+        const secondaryCaMg = secondaryCaMmolKg.times(this.MOLAR_MASS.CALCIUM);
+        const totalCaMgKg = effectiveCaMg.plus(enteralCaMgKg).plus(secondaryCaMg).toDecimalPlaces(1);
         const totalPMgKg = effectivePMg.plus(enteralPMgKg).toDecimalPlaces(1);
         const totalCaMmolKg = totalCaMgKg.div(this.MOLAR_MASS.CALCIUM).toDecimalPlaces(3);
         const totalPMmolKg = totalPMgKg.div(this.MOLAR_MASS.PHOSPHORUS).toDecimalPlaces(3);
 
         // Add secondary Na + Cl to electrolyte balance
         effectiveNa = effectiveNa.plus(secondaryNaMmolKg).plus(hiddenSodiumMmolKg).toDecimalPlaces(2);
+        // v3.6.3: Kalium aus einer Sekundärinfusion wird wie Natrium zur Elektrolytbilanz gerechnet
+        // und löst damit auch die Kaliumregeln aus (kaliumfreie Tage 1–2, Obergrenze).
+        effectiveK = effectiveK.plus(secondaryKMmolKg).toDecimalPlaces(2);
         const effectiveCl = naclMl.plus(kclMl).plus(secondaryClMmolKg).toDecimalPlaces(2);
 
         // v3.2: Gesamt-Natrium = parenteral + enteral.

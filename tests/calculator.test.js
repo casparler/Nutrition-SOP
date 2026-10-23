@@ -2184,3 +2184,107 @@ describe('AB) FM85 nach Packungsangabe (v3.6.2)', () => {
         expect(mit.enteralPMgKg - ohne.enteralPMgKg).toBeCloseTo(4 * 10.95, 0);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AC — Sterofundin ISO als Sekundärinfusion (v3.6.3)
+ * Je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 5 mmol.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AC) Sterofundin ISO als Sekundärinfusion (v3.6.3)', () => {
+    const kind = o => baseInput({
+        birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 6,
+        tfi: 150, enteralVolume: 40, gir: 5, protein: 3, lipids: 2,
+        calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const mitSt = rate => calc.calculate(kind({ secondarySolution: 'sterofundinIso', secondaryRateKg: rate }));
+    const ohne = () => calc.calculate(kind({}));
+
+    it('AC1: 40 ml/kg/d liefern 5,8 mmol Na, 5,08 mmol Cl und 0,16 mmol K je kg', () => {
+        const a = mitSt(40).results, b = ohne().results;
+        expect(a.effectiveNa - b.effectiveNa).toBeCloseTo(5.8, 1);
+        expect(a.effectiveCl - b.effectiveCl).toBeCloseTo(5.08, 1);
+        expect(a.effectiveK - b.effectiveK).toBeCloseTo(0.16, 1);
+    });
+
+    it('AC2: Calcium aus Sterofundin zählt zur Gesamtzufuhr (0,25 mmol je 100 ml = 10 mg/kg bei 100 ml/kg)', () => {
+        const a = mitSt(100).results, b = ohne().results;
+        expect(a.totalCaMgKg - b.totalCaMgKg).toBeCloseTo(0.25 * 40.08, 0);
+    });
+
+    it('AC3: Das Volumen zählt zur Gesamtflüssigkeit und verkleinert den PN-Anteil wie jede Sekundärinfusion', () => {
+        const a = mitSt(40).results, b = ohne().results;
+        expect(a.secondaryDaily).toBeCloseTo(40, 0);
+        expect(b.pnDailyGross - a.pnDailyGross).toBeCloseTo(40, 0);
+    });
+
+    it('AC4: Keine Glukose — die GIR ändert sich nicht', () => {
+        expect(mitSt(40).results.effectiveGIR).toBe(ohne().results.effectiveGIR);
+    });
+
+    it('AC5: Balancierte Lösung — SID-light bleibt positiv, keine Azidose-Warnung', () => {
+        const r = mitSt(60);
+        expect(r.results.sidLight).toBeGreaterThan(0);
+        expect(r.warnings.some(w => /SID-light|Na:Cl|Chlorid-Überhang/.test(w))).toBe(false);
+    });
+
+    it('AC6: Kalium aus Sterofundin löst die kaliumfreien Tage 1–2 aus, ab Tag 3 nicht', () => {
+        const mk = d => calc.calculate(kind({ postnatalAge: d, secondarySolution: 'sterofundinIso', secondaryRateKg: 40 }));
+        expect(mk(1).warnings.some(w => /kaliumfrei/.test(w))).toBe(true);
+        expect(mk(2).warnings.some(w => /kaliumfrei/.test(w))).toBe(true);
+        expect(mk(3).warnings.some(w => /kaliumfrei/.test(w))).toBe(false);
+    });
+
+    it('AC7: Hoher Natriumgehalt wird bei ELBW sichtbar (100 ml/kg/d = 14,5 mmol/kg Na)', () => {
+        const r = mitSt(100);
+        expect(r.results.totalNaMmolKg).toBeGreaterThan(5);
+        expect(r.warnings.some(w => /Na-Zufuhr .* ELBW/.test(w))).toBe(true);
+    });
+
+    it('AC8: Jede Auswahl der Sekundärinfusion in der Oberfläche existiert in den Produktdaten', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const doc = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8')).window.document;
+        const optionen = [...doc.getElementById('input-secondary-solution').options].map(o => o.value).filter(v => v !== 'none');
+        expect(optionen).toContain('sterofundinIso');
+        const ids = window.NeoProducts.secondarySolutions.map(s => s.id);
+        optionen.forEach(v => expect(ids, v).toContain(v));
+    });
+
+    it('AC9: Werte in den Produktdaten entsprechen den Angaben je 1000 ml', () => {
+        const p = window.NeoProducts.secondarySolutions.find(s => s.id === 'sterofundinIso').per100ml;
+        expect(p.sodium_mmol * 10).toBeCloseTo(145, 5);
+        expect(p.potassium_mmol * 10).toBeCloseTo(4, 5);
+        expect(p.calcium_mmol * 10).toBeCloseTo(2.5, 5);
+        expect(p.chloride_mmol * 10).toBeCloseTo(127, 5);
+    });
+});
+
+describe('AD) Natrium der Sekundärlösungen je 100 ml (v3.6.3)', () => {
+    const kind = o => baseInput({
+        birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 6,
+        tfi: 150, enteralVolume: 40, gir: 5, protein: 3, lipids: 2,
+        calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const na = (loesung, rate) => calc.calculate(kind({ secondarySolution: loesung, secondaryRateKg: rate })).results.effectiveNa;
+
+    it('AD1: NaCl 0,9 % = 154 mmol/l → 50 ml/kg/d liefern 7,7 mmol/kg Natrium (nicht 77)', () => {
+        expect(na('nacl09', 50)).toBeCloseTo(7.7, 1);
+    });
+
+    it('AD2: NaCl 0,45 % = 77 mmol/l → 50 ml/kg/d liefern 3,85 mmol/kg Natrium', () => {
+        expect(na('nacl045', 50)).toBeCloseTo(3.85, 1);
+    });
+
+    it('AD3: Die Natriumkonzentration folgt der Masse: Gramm NaCl je Liter / 58,44', () => {
+        const sol = id => window.NeoProducts.secondarySolutions.find(s => s.id === id).per100ml;
+        expect(sol('nacl09').sodium_mmol).toBeCloseTo(9 / 58.44 * 100, 1);
+        expect(sol('nacl045').sodium_mmol).toBeCloseTo(4.5 / 58.44 * 100, 1);
+        expect(sol('nacl09').chloride_mmol).toBe(sol('nacl09').sodium_mmol);
+    });
+
+    it('AD4: NaCl 0,9 % als Sekundärinfusion löst keine absurde Osmolaritäts-Meldung aus', () => {
+        const r = calc.calculate(kind({ access: 'peripheral', tfi: 130, enteralVolume: 0, secondarySolution: 'nacl09', secondaryRateKg: 10 }));
+        // 10 ml/kg/d NaCl 0,9 % = 1,54 mmol/kg Natrium; vorher 15,4 mmol/kg
+        expect(r.results.effectiveNa).toBeCloseTo(1.54, 1);
+        expect(r.results.osmolarity).toBeLessThan(1500);
+    });
+});
