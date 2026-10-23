@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.2';
+        this.VERSION = '3.6.4';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1100,6 +1100,10 @@ class NutritionCalculator {
         let secondaryGlucoseGKg = D(0);
         let secondaryNaMmolKg = D(0);
         let secondaryClMmolKg = D(0);
+        let secondaryOsmolarity = 0;    // v3.6.3: Osmolarität der Sekundärlösung selbst (Faustformel wie PN)
+        let secondaryName = '';
+        let secondaryKMmolKg = D(0);    // v3.6.3: Sterofundin enthält Kalium und Calcium
+        let secondaryCaMmolKg = D(0);
         const secondaryDaily = weightKg.times(secondaryRateKg).toDecimalPlaces(1);
 
         if (secondarySolution !== 'none' && secondaryRateKg.gt(0) && typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.secondarySolutions) {
@@ -1109,7 +1113,14 @@ class NutritionCalculator {
                 const glucosePer100 = D(secSol.per100ml.glucose_g);
                 const naPer100 = D(secSol.per100ml.sodium_mmol);
                 const clPer100 = D(secSol.per100ml.chloride_mmol);
-                
+                const kPer100 = D(secSol.per100ml.potassium_mmol || 0);
+                const caPer100 = D(secSol.per100ml.calcium_mmol || 0);
+
+                secondaryName = secSol.name;
+                // Glukose [g/l] × 5 + (Na + K) [mmol/l] × 2 — gleiche Faustformel wie bei der PN
+                secondaryOsmolarity = glucosePer100.times(10).times(5).plus(naPer100.plus(kPer100).times(10).times(2)).toDecimalPlaces(0).toNumber();
+                secondaryKMmolKg = secondaryRateKg.times(kPer100).div(100).toDecimalPlaces(3);
+                secondaryCaMmolKg = secondaryRateKg.times(caPer100).div(100).toDecimalPlaces(3);
                 secondaryGlucoseGKg = secondaryRateKg.times(glucosePer100).div(100).toDecimalPlaces(3);
                 secondaryNaMmolKg = secondaryRateKg.times(naPer100).div(100).toDecimalPlaces(2);
                 secondaryClMmolKg = secondaryRateKg.times(clPer100).div(100).toDecimalPlaces(2);
@@ -1195,9 +1206,12 @@ class NutritionCalculator {
         // Recalculate effective GIR including secondary glucose
         const totalGIR = totalGlucoseGKg.times(1000).div(1440).toDecimalPlaces(2);
 
-        const glucoseTotalG = totalGlucoseGKg.times(weightKg).toDecimalPlaces(2);
+        // v3.6.3: Konzentration und Osmolarität beschreiben den PN-BEUTEL. Glukose, Natrium und Kalium
+        // einer Sekundärinfusion (eigene Leitung) gehören nicht hinein; sie wurden bisher durch das
+        // kleine Rest-Volumen der PN geteilt (Sterofundin 1 ml/h ohne PN: Osmolarität 71 000 mOsm/l).
+        const pnGlucoseG = effectiveGlucose.times(weightKg).toDecimalPlaces(2);
         const glucoseConc = pnDaily.gt(0)
-            ? glucoseTotalG.div(pnDaily).times(100).toDecimalPlaces(1)
+            ? pnGlucoseG.div(pnDaily).times(100).toDecimalPlaces(1)
             : D(0);
 
         // --- Step 6: Lipid Energy ---
@@ -1310,13 +1324,23 @@ class NutritionCalculator {
         const effectivePMmol = effectiveP_mmol.toDecimalPlaces(3);
 
         // Total Ca/P (PN + Enteral) for metabolic bone disease assessment
-        const totalCaMgKg = effectiveCaMg.plus(enteralCaMgKg).toDecimalPlaces(1);
+        // v3.6.3: Calcium aus einer Sekundärinfusion (Sterofundin) zählt zur Gesamtzufuhr, nicht zur
+        // PN-Konzentration (Ausfällungsprüfung bezieht sich nur auf den PN-Beutel).
+        const secondaryCaMg = secondaryCaMmolKg.times(this.MOLAR_MASS.CALCIUM);
+        const totalCaMgKg = effectiveCaMg.plus(enteralCaMgKg).plus(secondaryCaMg).toDecimalPlaces(1);
         const totalPMgKg = effectivePMg.plus(enteralPMgKg).toDecimalPlaces(1);
         const totalCaMmolKg = totalCaMgKg.div(this.MOLAR_MASS.CALCIUM).toDecimalPlaces(3);
         const totalPMmolKg = totalPMgKg.div(this.MOLAR_MASS.PHOSPHORUS).toDecimalPlaces(3);
 
+        // PN-Beutel-Werte vor Zusatz der Sekundärinfusion festhalten (Osmolarität, Schritt 10)
+        const pnNaMmolKg = effectiveNa;
+        const pnKMmolKg = effectiveK;
+
         // Add secondary Na + Cl to electrolyte balance
         effectiveNa = effectiveNa.plus(secondaryNaMmolKg).plus(hiddenSodiumMmolKg).toDecimalPlaces(2);
+        // v3.6.3: Kalium aus einer Sekundärinfusion wird wie Natrium zur Elektrolytbilanz gerechnet
+        // und löst damit auch die Kaliumregeln aus (kaliumfreie Tage 1–2, Obergrenze).
+        effectiveK = effectiveK.plus(secondaryKMmolKg).toDecimalPlaces(2);
         const effectiveCl = naclMl.plus(kclMl).plus(secondaryClMmolKg).toDecimalPlaces(2);
 
         // v3.2: Gesamt-Natrium = parenteral + enteral.
@@ -1390,10 +1414,10 @@ class NutritionCalculator {
         };
         if (pnDaily.gt(0)) {
             const pnLiters = pnDaily.div(1000);
-            const glucoseGL = glucoseTotalG.div(pnLiters);
+            const glucoseGL = pnGlucoseG.div(pnLiters);
             const proteinGL = effectiveAS.times(weightKg).div(pnLiters);
-            const naMmolL = effectiveNa.times(weightKg).div(pnLiters);
-            const kMmolL = effectiveK.times(weightKg).div(pnLiters);
+            const naMmolL = pnNaMmolKg.times(weightKg).div(pnLiters);
+            const kMmolL = pnKMmolKg.times(weightKg).div(pnLiters);
             const osmGlucose = glucoseGL.times(5);
             const osmProtein = proteinGL.times(10);
             const osmSodium = naMmolL.times(2);
@@ -1555,10 +1579,17 @@ class NutritionCalculator {
 
         // --- Step 12: Warnings (Tiered Alerting) ---
         const warnings = [];
+        // v3.6.3: Gemeinsame Ursache der Konzentrations-Meldungen benennen. Das PN-Volumen ist der
+        // Rest aus TFI − enteral − Sekundärinfusion − Träger − Mikro; bleiben nur wenige ml/kg übrig,
+        // werden die PN-Inhalte zu absurden Konzentrationen „zusammengedrückt“.
+        const pnFreiMlKg = weightKg.gt(0) ? pnDaily.div(weightKg).toDecimalPlaces(0).toNumber() : 0;
+        const pnVolumenUrsache = pnFreiMlKg < 50
+            ? ` Ursache prüfen: nur ${pnFreiMlKg} ml/kg/d PN-Volumen frei (TFI − enteral − Sekundärinfusion − Träger − Lipide). TFI oder PN-Felder anpassen.`
+            : '';
 
         // CRITICAL (red)
         if (access === 'peripheral' && n.osmolarity > this.LIMITS.OSM_PERIPHERAL) {
-            warnings.push(`CRITICAL: Osmolarität ${n.osmolarity} mOsm/l > 900 mOsm/l bei peripherem Zugang!`);
+            warnings.push(`CRITICAL: Osmolarität ${n.osmolarity} mOsm/l > 900 mOsm/l bei peripherem Zugang!${pnVolumenUrsache}`);
         }
         if (n.effectiveGIR > this.LIMITS.GIR.max) {
             warnings.push(`CRITICAL: GIR ${n.effectiveGIR} mg/kg/min überschreitet Maximum (${this.LIMITS.GIR.max}).`);
@@ -1606,12 +1637,16 @@ class NutritionCalculator {
 
         // C-01: Glucose concentration > 12.5% at peripheral access
         if (access === 'peripheral' && n.glucoseConc > 12.5) {
-            warnings.push(`CRITICAL: Glukose-Konzentration ${n.glucoseConc}% > 12,5% bei peripherem Zugang!`);
+            warnings.push(`CRITICAL: Glukose-Konzentration ${n.glucoseConc}% > 12,5% bei peripherem Zugang!${pnVolumenUrsache}`);
+        }
+        // v3.6.3: Die Sekundärlösung selbst darf peripher nicht über 900 mOsm/l liegen (z. B. Glucose 20 %).
+        if (access === 'peripheral' && secondaryRateKg.gt(0) && secondaryOsmolarity > this.LIMITS.OSM_PERIPHERAL) {
+            warnings.push(`CRITICAL: Sekundärinfusion ${secondaryName}: Osmolarität ${secondaryOsmolarity} mOsm/l > 900 mOsm/l bei peripherem Zugang!`);
         }
 
         // R-04: Lipid volume exceeds available PN capacity
         if (lipidExceedsPN) {
-            warnings.push(`CRITICAL: Lipid-Volumen (${n.lipidVolDaily} ml) übersteigt parenterale Kapazität (${n.pnDailyGross} ml)!`);
+            warnings.push(`CRITICAL: Lipid-Volumen (${n.lipidVolDaily} ml) übersteigt parenterale Kapazität (${n.pnDailyGross} ml)!${pnVolumenUrsache}`);
         }
 
         // BLIND-2/5: GIR below minimum — hypoglycemia risk
@@ -1776,7 +1811,7 @@ class NutritionCalculator {
             // Threshold depends on volume density (simplified logic)
             const threshold = 72; 
             if (caPSumMmolL.gt(threshold)) {
-                warnings.push(`CRITICAL: Ausfällungsrisiko! Calcium/Phosphat-Konzentration (${caPSumMmolL.toNumber()} mmol/l) zu hoch für dieses Volumen (Limit ${threshold} mmol/l).`);
+                warnings.push(`CRITICAL: Ausfällungsrisiko! Calcium/Phosphat-Konzentration (${caPSumMmolL.toNumber()} mmol/l) zu hoch für dieses Volumen (Limit ${threshold} mmol/l).${pnVolumenUrsache}`);
             } else if (caPSumMmolL.gt(55)) {
                 warnings.push(`Warnung: Ca+P Konzentration ${caPSumMmolL.toNumber()} mmol/l nähert sich der Löslichkeitsgrenze.`);
             }

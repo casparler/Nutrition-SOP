@@ -256,12 +256,23 @@ const NeoProducts = {
         {
             id: 'nacl045',
             name: 'NaCl 0,45%',
-            per100ml: { glucose_g: 0, sodium_mmol: 77, chloride_mmol: 77 }
+            // 4,5 g NaCl/l = 77 mmol/l = 7,7 mmol je 100 ml (vorher fälschlich 77 je 100 ml)
+            per100ml: { glucose_g: 0, sodium_mmol: 7.7, chloride_mmol: 7.7 }
         },
         {
             id: 'nacl09',
             name: 'NaCl 0,9%',
-            per100ml: { glucose_g: 0, sodium_mmol: 154, chloride_mmol: 154 }
+            // 9 g NaCl/l = 154 mmol/l = 15,4 mmol je 100 ml (vorher fälschlich 154 je 100 ml)
+            per100ml: { glucose_g: 0, sodium_mmol: 15.4, chloride_mmol: 15.4 }
+        },
+        {
+            // Sterofundin ISO (B. Braun), balancierte Vollelektrolytlösung. Werte je 1000 ml:
+            // Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 5 mmol; theoretische
+            // Osmolarität 309 mOsm/l. Hier je 100 ml. ACHTUNG: nicht an der Packung geprüft,
+            // bitte mit Etikett/Fachinformation abgleichen (REGELWERK 17.11).
+            id: 'sterofundinIso',
+            name: 'Sterofundin ISO',
+            per100ml: { glucose_g: 0, sodium_mmol: 14.5, chloride_mmol: 12.7, potassium_mmol: 0.4, calcium_mmol: 0.25, magnesium_mmol: 0.1, acetate_mmol: 2.4, malate_mmol: 0.5 }
         }
     ]
 

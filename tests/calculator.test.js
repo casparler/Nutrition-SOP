@@ -2184,3 +2184,268 @@ describe('AB) FM85 nach Packungsangabe (v3.6.2)', () => {
         expect(mit.enteralPMgKg - ohne.enteralPMgKg).toBeCloseTo(4 * 10.95, 0);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AC — Sterofundin ISO als Sekundärinfusion (v3.6.3)
+ * Je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 5 mmol.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AC) Sterofundin ISO als Sekundärinfusion (v3.6.3)', () => {
+    const kind = o => baseInput({
+        birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 6,
+        tfi: 150, enteralVolume: 40, gir: 5, protein: 3, lipids: 2,
+        calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const mitSt = rate => calc.calculate(kind({ secondarySolution: 'sterofundinIso', secondaryRateKg: rate }));
+    const ohne = () => calc.calculate(kind({}));
+
+    it('AC1: 40 ml/kg/d liefern 5,8 mmol Na, 5,08 mmol Cl und 0,16 mmol K je kg', () => {
+        const a = mitSt(40).results, b = ohne().results;
+        expect(a.effectiveNa - b.effectiveNa).toBeCloseTo(5.8, 1);
+        expect(a.effectiveCl - b.effectiveCl).toBeCloseTo(5.08, 1);
+        expect(a.effectiveK - b.effectiveK).toBeCloseTo(0.16, 1);
+    });
+
+    it('AC2: Calcium aus Sterofundin zählt zur Gesamtzufuhr (0,25 mmol je 100 ml = 10 mg/kg bei 100 ml/kg)', () => {
+        const a = mitSt(100).results, b = ohne().results;
+        expect(a.totalCaMgKg - b.totalCaMgKg).toBeCloseTo(0.25 * 40.08, 0);
+    });
+
+    it('AC3: Das Volumen zählt zur Gesamtflüssigkeit und verkleinert den PN-Anteil wie jede Sekundärinfusion', () => {
+        const a = mitSt(40).results, b = ohne().results;
+        expect(a.secondaryDaily).toBeCloseTo(40, 0);
+        expect(b.pnDailyGross - a.pnDailyGross).toBeCloseTo(40, 0);
+    });
+
+    it('AC4: Keine Glukose — die GIR ändert sich nicht', () => {
+        expect(mitSt(40).results.effectiveGIR).toBe(ohne().results.effectiveGIR);
+    });
+
+    it('AC5: Balancierte Lösung — SID-light bleibt positiv, keine Azidose-Warnung', () => {
+        const r = mitSt(60);
+        expect(r.results.sidLight).toBeGreaterThan(0);
+        expect(r.warnings.some(w => /SID-light|Na:Cl|Chlorid-Überhang/.test(w))).toBe(false);
+    });
+
+    it('AC6: Kalium aus Sterofundin löst die kaliumfreien Tage 1–2 aus, ab Tag 3 nicht', () => {
+        const mk = d => calc.calculate(kind({ postnatalAge: d, secondarySolution: 'sterofundinIso', secondaryRateKg: 40 }));
+        expect(mk(1).warnings.some(w => /kaliumfrei/.test(w))).toBe(true);
+        expect(mk(2).warnings.some(w => /kaliumfrei/.test(w))).toBe(true);
+        expect(mk(3).warnings.some(w => /kaliumfrei/.test(w))).toBe(false);
+    });
+
+    it('AC7: Hoher Natriumgehalt wird bei ELBW sichtbar (100 ml/kg/d = 14,5 mmol/kg Na)', () => {
+        const r = mitSt(100);
+        expect(r.results.totalNaMmolKg).toBeGreaterThan(5);
+        expect(r.warnings.some(w => /Na-Zufuhr .* ELBW/.test(w))).toBe(true);
+    });
+
+    it('AC8: Jede Auswahl der Sekundärinfusion in der Oberfläche existiert in den Produktdaten', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const doc = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8')).window.document;
+        const optionen = [...doc.getElementById('input-secondary-solution').options].map(o => o.value).filter(v => v !== 'none');
+        expect(optionen).toContain('sterofundinIso');
+        const ids = window.NeoProducts.secondarySolutions.map(s => s.id);
+        optionen.forEach(v => expect(ids, v).toContain(v));
+    });
+
+    it('AC9: Werte in den Produktdaten entsprechen den Angaben je 1000 ml', () => {
+        const p = window.NeoProducts.secondarySolutions.find(s => s.id === 'sterofundinIso').per100ml;
+        expect(p.sodium_mmol * 10).toBeCloseTo(145, 5);
+        expect(p.potassium_mmol * 10).toBeCloseTo(4, 5);
+        expect(p.calcium_mmol * 10).toBeCloseTo(2.5, 5);
+        expect(p.chloride_mmol * 10).toBeCloseTo(127, 5);
+    });
+});
+
+describe('AD) Natrium der Sekundärlösungen je 100 ml (v3.6.3)', () => {
+    const kind = o => baseInput({
+        birthWeight: 1000, currentWeight: 1000, ssw: 28, postnatalAge: 6,
+        tfi: 150, enteralVolume: 40, gir: 5, protein: 3, lipids: 2,
+        calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const na = (loesung, rate) => calc.calculate(kind({ secondarySolution: loesung, secondaryRateKg: rate })).results.effectiveNa;
+
+    it('AD1: NaCl 0,9 % = 154 mmol/l → 50 ml/kg/d liefern 7,7 mmol/kg Natrium (nicht 77)', () => {
+        expect(na('nacl09', 50)).toBeCloseTo(7.7, 1);
+    });
+
+    it('AD2: NaCl 0,45 % = 77 mmol/l → 50 ml/kg/d liefern 3,85 mmol/kg Natrium', () => {
+        expect(na('nacl045', 50)).toBeCloseTo(3.85, 1);
+    });
+
+    it('AD3: Die Natriumkonzentration folgt der Masse: Gramm NaCl je Liter / 58,44', () => {
+        const sol = id => window.NeoProducts.secondarySolutions.find(s => s.id === id).per100ml;
+        expect(sol('nacl09').sodium_mmol).toBeCloseTo(9 / 58.44 * 100, 1);
+        expect(sol('nacl045').sodium_mmol).toBeCloseTo(4.5 / 58.44 * 100, 1);
+        expect(sol('nacl09').chloride_mmol).toBe(sol('nacl09').sodium_mmol);
+    });
+
+    it('AD4: NaCl 0,9 % als Sekundärinfusion löst keine absurde Osmolaritäts-Meldung aus', () => {
+        const r = calc.calculate(kind({ access: 'peripheral', tfi: 130, enteralVolume: 0, secondarySolution: 'nacl09', secondaryRateKg: 10 }));
+        // 10 ml/kg/d NaCl 0,9 % = 1,54 mmol/kg Natrium; vorher 15,4 mmol/kg
+        expect(r.results.effectiveNa).toBeCloseTo(1.54, 1);
+        expect(r.results.osmolarity).toBeLessThan(1500);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AE — PN-Beutel und Sekundärinfusion getrennt (v3.6.3)
+ * Fall aus der Praxis: 430 g, 128 ml/kg/d Muttermilch, Sterofundin 1 ml/h, keine PN.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AE) PN-Beutel und Sekundärinfusion getrennt (v3.6.3)', () => {
+    const kind = o => baseInput({
+        birthWeight: 400, currentWeight: 430, ssw: 28, postnatalAge: 16,
+        enteralVolume: 128, mealFrequency: 12, access: 'peripheral',
+        gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o
+    });
+    const sterofundin1mlh = 1 * 24 / 0.43;   // 55,8 ml/kg/d
+
+    it('AE1: Sterofundin allein (keine PN-Inhalte) erzeugt keine kritische Meldung und keine PN-Osmolarität', () => {
+        const r = calc.calculate(kind({ tfi: 187, secondarySolution: 'sterofundinIso', secondaryRateKg: sterofundin1mlh }));
+        expect(r.results.osmolarity).toBe(0);
+        expect(r.warnings.filter(w => w.startsWith('CRITICAL'))).toEqual([]);
+        expect(r.isSafe).toBe(true);
+    });
+
+    it('AE2: Auch bei winzigem PN-Restvolumen (Rundung) bleibt die PN-Osmolarität 0, wenn keine PN-Inhalte laufen', () => {
+        const r = calc.calculate(kind({ tfi: 184, secondarySolution: 'sterofundinIso', secondaryRateKg: sterofundin1mlh }));
+        expect(r.results.pnDaily).toBeLessThan(0.5);
+        expect(r.results.osmolarity).toBe(0);
+        expect(r.warnings.some(w => /Osmolarität/.test(w))).toBe(false);
+    });
+
+    it('AE3: Natrium der Sekundärinfusion zählt nicht zur Osmolarität des PN-Beutels', () => {
+        const r = calc.calculate(kind({ tfi: 230, enteralVolume: 100, sodium: 3, secondarySolution: 'sterofundinIso', secondaryRateKg: 50 }));
+        const pnLiter = r.results.pnDaily / 1000;
+        // nur das PN-Natrium (3 mmol/kg × 0,43 kg) im PN-Volumen, Faktor 2 für NaCl
+        expect(r.results.osmolarityBreakdown.sodium).toBeCloseTo(2 * 3 * 0.43 / pnLiter, -1);
+        expect(r.results.osmolarityBreakdown.potassium).toBe(0);
+        // Gesamt-Natrium enthält Sterofundin weiterhin
+        expect(r.results.effectiveNa).toBeGreaterThan(3 + 50 * 0.145 - 0.5);
+    });
+
+    it('AE4: Glukose einer Sekundärinfusion zählt nicht zur Glukosekonzentration des PN-Beutels', () => {
+        const r = calc.calculate(kind({ tfi: 230, enteralVolume: 100, secondarySolution: 'glucose10', secondaryRateKg: 40 }));
+        expect(r.results.glucoseConc).toBe(0);
+        expect(r.warnings.some(w => /Glukose-Konzentration/.test(w))).toBe(false);
+        // die Glukose zählt aber weiter zur GIR und zur Energie
+        expect(r.results.effectiveGIR).toBeGreaterThan(0);
+    });
+
+    it('AE5: Die Sekundärlösung selbst wird peripher gegen 900 mOsm/l geprüft (Glucose 20 % ja, 10 % nein, zentral nein)', () => {
+        const mk = (lsg, zugang) => calc.calculate(kind({ tfi: 230, enteralVolume: 100, access: zugang, secondarySolution: lsg, secondaryRateKg: 20 }));
+        expect(mk('glucose20', 'peripheral').warnings.some(w => /^CRITICAL: Sekundärinfusion Glucose 20%/.test(w))).toBe(true);
+        expect(mk('glucose10', 'peripheral').warnings.some(w => /Sekundärinfusion/.test(w))).toBe(false);
+        expect(mk('glucose20', 'central').warnings.some(w => /Sekundärinfusion Glucose/.test(w))).toBe(false);
+    });
+
+    it('AE6: Sind PN-Inhalte eingetragen, aber kaum PN-Volumen frei, nennen die Meldungen die Ursache', () => {
+        const r = calc.calculate(kind({
+            tfi: 187, gir: 6, protein: 2, lipids: 0.5, calcium: 40, phosphate: 31,
+            secondarySolution: 'nacl09', secondaryRateKg: 0.7 * 24 / 0.43
+        }));
+        const g = r.warnings.find(w => /^CRITICAL: Glukose-Konzentration/.test(w));
+        expect(g).toBeTruthy();
+        expect(g).toMatch(/Ursache prüfen: nur \d+ ml\/kg\/d PN-Volumen frei/);
+        // die Konzentration bleibt gemeldet — die PN-Inhalte passen nicht zum Restvolumen
+        expect(r.results.glucoseConc).toBeGreaterThan(12.5);
+    });
+
+    it('AE7: Bei ausreichendem PN-Volumen steht keine Ursachenzeile', () => {
+        const r = calc.calculate(kind({ tfi: 100, enteralVolume: 0, gir: 11, protein: 2, lipids: 2 }));
+        const g = r.warnings.find(w => /^CRITICAL: Glukose-Konzentration/.test(w));
+        expect(g).toBeTruthy();
+        expect(g).not.toMatch(/Ursache prüfen/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AF — Auswahl „Keine parenterale Ernährung“ (v3.6.4)
+ * Die Seite wird mit ihren eigenen Skripten ausgeführt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AF) Keine parenterale Ernährung (v3.6.4)', () => {
+    async function boot() {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        return w;
+    }
+    const set = (w, vals) => {
+        for (const [id, v] of Object.entries(vals)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+    };
+    const choose = (w, v) => {
+        const sel = w.document.getElementById('input-solution');
+        sel.value = v;
+        sel.dispatchEvent(new w.Event('change'));
+    };
+    const sel = w => w.document.getElementById('input-solution');
+    const PN = ['input-gir', 'input-protein', 'input-calcium', 'input-phosphate', 'input-sodium', 'input-potassium', 'input-lipids'];
+    const kind = {
+        'birth-weight': 400, 'current-weight': 430, 'input-ssw': 28, 'input-day': 16, 'input-tfi': 187,
+        'input-enteral': 128, 'input-meal-frequency': 12, 'input-access': 'peripheral',
+        'input-gir': 6, 'input-protein': 2, 'input-lipids': 1, 'input-calcium': 40, 'input-phosphate': 31,
+        'input-secondary-solution': 'sterofundinIso'
+    };
+
+    it('AF1: Die Auswahl existiert und trägt den Wert keinePN', async () => {
+        const w = await boot();
+        const opt = [...w.document.querySelectorAll('#input-solution option')].find(o => o.value === 'keinePN');
+        expect(opt).toBeTruthy();
+        expect(opt.textContent).toMatch(/Keine parenterale Ernährung/);
+    });
+
+    it('AF2: Auswählen setzt alle PN-Felder auf 0 und sperrt sie', async () => {
+        const w = await boot();
+        set(w, kind);
+        choose(w, 'keinePN');
+        PN.forEach(id => {
+            const el = w.document.getElementById(id);
+            expect(el.value, id).toBe('0');
+            expect(el.disabled, id).toBe(true);
+        });
+        expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(false);
+    });
+
+    it('AF3: Anderes Auswählen stellt die bisherigen Werte wieder her und entsperrt die Felder', async () => {
+        const w = await boot();
+        set(w, kind);
+        choose(w, 'keinePN');
+        choose(w, 'none');
+        expect(w.document.getElementById('input-gir').value).toBe('6');
+        expect(w.document.getElementById('input-protein').value).toBe('2');
+        expect(w.document.getElementById('input-calcium').value).toBe('40');
+        PN.forEach(id => expect(w.document.getElementById(id).disabled, id).toBe(false));
+        expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(true);
+    });
+
+    it('AF4: Praxisfall (Sterofundin 1 ml/h, keine PN) zeigt nach der Auswahl keine kritische Meldung', async () => {
+        const w = await boot();
+        set(w, { ...kind, 'input-secondary-rate': 1 });   // Oberfläche: ml/h
+        w.updateCalculations();
+        choose(w, 'keinePN');
+        const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')];
+        expect(kritisch.map(e => e.textContent)).toEqual([]);
+    });
+
+    it('AF5: Eine Vorlage überschreibt die PN-Felder auch bei aktiver Auswahl „Keine PN“', async () => {
+        const w = await boot();
+        set(w, kind);
+        choose(w, 'keinePN');
+        w.loadSimulation('elbw');
+        expect(sel(w).value).not.toBe('keinePN');
+        PN.forEach(id => expect(w.document.getElementById(id).disabled, id).toBe(false));
+        expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(true);
+    });
+});

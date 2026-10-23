@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 20.10.2026, Version v3.6.2, 205 Tests.
+Stand: 23.10.2026, Version v3.6.4, 230 Tests.
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -163,6 +163,33 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 |---|---|---|---|
 | 9.8 | SID-light (Na + K − Cl) negativ → CRITICAL; Na:Cl-Verhältnis < 1 → Warnung | Haus | `calculate` |
 
+## 9a. Sekundärinfusionen (v3.6.3)
+
+Auswahl in der Oberfläche; die Rate wird in ml/h eingegeben und in ml/kg/d umgerechnet. Das Volumen zählt zur
+Gesamtflüssigkeit und verkleinert den PN-Anteil. Werte je 100 ml:
+
+| Lösung | Glukose | Natrium | Chlorid | Kalium | Calcium |
+|---|---|---|---|---|---|
+| Glucose 5 / 10 / 20 % | 5 / 10 / 20 g | – | – | – | – |
+| NaCl 0,45 % | – | 7,7 mmol | 7,7 mmol | – | – |
+| NaCl 0,9 % | – | 15,4 mmol | 15,4 mmol | – | – |
+| **Sterofundin ISO** | – | 14,5 mmol | 12,7 mmol | 0,4 mmol | 0,25 mmol |
+
+Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 5 mmol, theoretische Osmolarität
+309 mOsm/l. Magnesium, Acetat und Malat werden nicht gerechnet.
+
+| ID | Regel | Status | Code | Test |
+|---|---|---|---|---|
+| 9a.1 | **Sterofundin ISO** ist als Sekundärinfusion wählbar und trägt Natrium, Chlorid, Kalium und Calcium bei | Entscheidung 23.10.2026 | `products.js`, `calculate` Step 3b | AC1–AC9 |
+| 9a.2 | **Kalium aus der Sekundärinfusion** zählt zur Kaliumzufuhr und löst damit die kaliumfreien Tage 1–2 und die Obergrenze aus (Regeln 9.5, 9.6) | Entscheidung 23.10.2026 | `effectiveK` | AC6 |
+| 9a.3 | **Calcium aus der Sekundärinfusion** zählt zur Gesamtzufuhr, nicht zur PN-Konzentration (die Ausfällungsprüfung betrifft nur den PN-Beutel) | Entscheidung 23.10.2026 | `totalCaMgKg` | AC2 |
+| 9a.4 | **Korrektur der Produktdaten:** NaCl 0,9 % hatte 154 statt 15,4 mmol Natrium je 100 ml, NaCl 0,45 % 77 statt 7,7. Die App rechnete bei diesen Lösungen mit zehnfachem Natrium (z. B. 74 statt 7,4 mmol/kg bei 48 ml/kg/d) | Fehlerkorrektur 23.10.2026 | `products.js` | AD1–AD4 |
+| 9a.5 | Jede Auswahl der Oberfläche muss in den Produktdaten existieren | Technisch | `index.html`, `products.js` | AC8 |
+| 9a.6 | **PN-Beutel und Sekundärinfusion sind getrennt:** Osmolarität und Glukosekonzentration der PN betrachten nur Glukose, Eiweiß, Natrium und Kalium des PN-Beutels, geteilt durch das PN-Volumen. Natrium, Kalium und Glukose der Sekundärinfusion gehen in Gesamtzufuhr, GIR und Energie ein, nicht in die PN-Konzentration. Ohne PN-Inhalte ist die PN-Osmolarität 0 | Fehlerkorrektur 23.10.2026 (Praxisfall: 430 g, Sterofundin 1 ml/h, keine PN) | `calculate` (`pnGlucoseG`, `pnNaMmolKg`, `pnKMmolKg`) | AE1–AE4 |
+| 9a.7 | **Die Sekundärlösung selbst** wird bei peripherem Zugang gegen 900 mOsm/l geprüft (Faustformel Glukose g/l × 5 + (Na + K) mmol/l × 2). Glucose 20 % peripher: CRITICAL, Glucose 10 % und Sterofundin: keine Meldung | Entscheidung 23.10.2026 | `secondaryOsmolarity` | AE5 |
+| 9a.8 | **Ursachenzeile:** Bleiben bei eingetragenen PN-Inhalten weniger als 50 ml/kg/d PN-Volumen frei (TFI − enteral − Sekundärinfusion − Träger − Lipide), nennen die CRITICAL-Meldungen zu Osmolarität, Glukosekonzentration, Ausfällung und Lipid-Volumen diese Ursache. Die Meldung bleibt bestehen, die Eingaben passen dann nicht zusammen | Entscheidung 23.10.2026 | `pnVolumenUrsache` | AE6, AE7 |
+| 9a.9 | **Auswahl „Keine parenterale Ernährung“** (Infusionslösung): GIR, Aminosäuren, Calcium, Phosphat, Natrium, Kalium und Lipide werden von der App auf 0 gesetzt und gesperrt, ein Hinweis erklärt das. Bei anderer Auswahl (oder Vorlage) kehren die bisherigen Werte zurück bzw. werden verworfen. Der Rechenkern erhält `selectedSolution: none` mit Nullen | Entscheidung 23.10.2026 (Neonatologe: „selbst leeren“) | `index.html` (`applyNoPN`, `discardNoPN`) | AF1–AF5 |
+
 ## 10. Calcium, Phosphat, Eiweiß-Verhältnisse
 
 | ID | Regel | Status | Code | Test |
@@ -292,6 +319,8 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.8 | **Protein-Obergrenze 4,5 g/kg/d für Reife** (6.2): in ESPGHAN 2022 nicht geregelt (nur < 1800 g) | Quelle fehlt |
 | 17.9 | **Energie- und Protein-Ziele für Reife** (5.1, 6.1): Leitlinienwerte für Reife nicht belegt | Quelle fehlt |
 | 17.10 | ~~FM85-Zusammensetzung~~ | **entschieden 20.10.2026:** Packungswerte übernommen (siehe 11.9). Folge: Der Standardverlauf EBM + FM85 4 % ist nicht mehr dauerhaft kritisch; die Energie begrenzt das Volumen bei 4 % auf 150 ml/kg/d |
+| 17.11 | **Sterofundin ISO (9a)**: Zusammensetzung aus meinem Wissen eingetragen, **nicht an der Packung geprüft**. Bitte mit dem Etikett abgleichen. Ist eine andere Sterofundin-Variante im Einsatz (z. B. mit Glucose oder Halbelektrolyt), fehlt sie noch | Packungswerte nötig |
+| 17.12 | ~~Osmolarität bei Sekundärinfusion~~ **erledigt 23.10.2026** (Regeln 9a.6–9a.9). Die stehengebliebenen PN-Felder leert die App jetzt selbst über die Auswahl „Keine parenterale Ernährung“ | erledigt |
 
 ---
 
@@ -314,6 +343,8 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 14.08.2026 | TFI-Grenzen 180 / 200 / 300 / 400 |
 | 28.09.2026 | Flüssigkeitsziele ELBW und VLBW 10 ml/kg/d unter ESPGHAN, Plateau ab Tag 5 |
 | 01.10.2026 | Korrekturen aus der Patientensimulation: GIR-0-Warnung, 1000-g-Grenze im Natrium-Block, Fazit mit kritischen Befunden, Perzentile nach korrigiertem Alter, FM85 nur bei Muttermilch |
+| 23.10.2026 | Sterofundin ISO als Sekundärinfusion; NaCl-Natrium je 100 ml korrigiert (war zehnfach zu hoch) |
+| 23.10.2026 | PN-Osmolarität und Glukosekonzentration nur aus dem PN-Beutel; Eigenosmolarität der Sekundärlösung; Ursachenzeile bei zu kleinem PN-Volumen (Regeln 9a.6–9a.8) |
 | 20.10.2026 | FM85 nach Packungsangabe gerechnet (35,5 g Eiweiß und 435 kcal je 100 g); damit entfällt die dauerhaft kritische Eiweißmeldung im Standardverlauf |
 | 20.10.2026 | P:AA-Warnung entfällt (Wert bleibt sichtbar). Alle sichtbaren Beschriftungen auf Deutsch: „In Akte kopieren“, „Auf einen Blick“, „Startwerte“, „Energiedefizit-Index“, „Wachstumsrate“, „PDF-Export“, „Zurücksetzen“ |
 | 20.10.2026 | Meldungen gestaffelt: eine Hierarchie, kritisch immer sichtbar, Warnungen begrenzt, Hinweise und Erinnerungen eingeklappt; Fazit-Karte und Einzellisten entfallen |
@@ -321,3 +352,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 20.10.2026 | Eiweiß-Zusatz wahlweise in g/100 ml (Hauptform) oder g/kg/d |
 | 20.10.2026 | Zubereitung zeigt die Eiweißlösung (1 g = 1 ml) in ml; Milchzeile eindeutig als „Nahrung“ benannt. Anlass: 3,3 ml Nahrung je Mahlzeit wurden als Eiweißmenge gelesen |
 | 02.10.2026 | Ca:P entfällt. Beatmungs-CRITICAL bleibt. Kalium: Warnung bei hoher Zufuhr, kaliumfreie Tage 1–2. Vitamin-D-/Proprems-Grenze (3 ml absolut) bleibt. Nur mit realem Gewicht rechnen. Hypoglykämie ist CRITICAL. SGA-Erkennung ja, Phototherapie nein. Geschlecht zurückgestellt. FM85-Empfehlungen nur bei < 1800 g. Energie-Obergrenze des enteralen Ziels erst ab Tag 4 |
+| 23.10.2026 | Auswahl „Keine parenterale Ernährung“ leert und sperrt die PN-Felder (Regel 9a.9), Version 3.6.4 |
