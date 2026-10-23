@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.8';
+        this.VERSION = '3.6.11';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -38,6 +38,11 @@ class NutritionCalculator {
             LIPIDS: { max: 4.0, unit: 'g/kg/d' },
             OSM_PERIPHERAL: 900
         };
+        // --- v3.6.11: Triglyzerid-Kontrollhinweis (Entscheidung Neonatologe 23.10.2026, Regelwerk 17.14) ---
+        // Triglyzeride werden auf der Station kaum bestimmt. Der Hinweis erscheint nur ohne eingetragenen Wert, wenn Lipide i. v.
+        // mehr als 3 g/kg/d laufen (Steigerung bis 3 g/kg/d fördert das Wachstum, Frost 2023) oder bei ELBW ab 2 g/kg/d
+        // (niedriges Geburtsgewicht und Lipiddosis sind Risikofaktoren, Suh 2025; Zufallswert genügt, Bader 2021).
+        this.LIPID_TG_HINT = { dose: 3, doseElbw: 2 };
         // --- FM85 (Nestlé) — Zusammensetzung je 1 % (= 1 g Pulver auf 100 ml Muttermilch) ---
         // Quelle: Packungsangabe je 100 g Pulver, vom Neonatologen übermittelt am 20.10.2026:
         //   Energie 435 kcal, Eiweiß 35,5 g, Fett 18,1 g, Kohlenhydrate 32,4 g,
@@ -1397,6 +1402,16 @@ class NutritionCalculator {
             npcPerProtein = npcTotalAll.div(proteinTotalGKg).toDecimalPlaces(1);
         }
 
+        // v3.6.9: Fett- und Kohlenhydratanteil an der GESAMTEN Nicht-Eiweiß-Energie (parenteral + enteral).
+        // `npcLipidPercent`/`npcGlucosePercent` bleiben die reinen PN-Werte (Verträglichkeit der Infusion).
+        const enteralFatKcal = Decimal.min(enteralFatGKg.times(9), enteralNonProteinKcal);
+        let npcLipidPercentTotal = D(0);
+        let npcGlucosePercentTotal = D(0);
+        if (npcTotalAll.gt(0)) {
+            npcLipidPercentTotal = kcalLipid.plus(enteralFatKcal).div(npcTotalAll).times(100).toDecimalPlaces(1);
+            npcGlucosePercentTotal = D(100).minus(npcLipidPercentTotal).toDecimalPlaces(1);
+        }
+
         // --- Step 9: Ca:P Ratio (molar) — TOTAL (PN + Enteral) ---
         let caPRatio = D(0);
         if (totalPMmolKg.gt(0)) {
@@ -1538,6 +1553,9 @@ class NutritionCalculator {
             npcTotal: npcTotal.toNumber(),
             npcLipidPercent: npcLipidPercent.toNumber(),
             npcGlucosePercent: npcGlucosePercent.toNumber(),
+            npcTotalAll: npcTotalAll.toNumber(),
+            npcLipidPercentTotal: npcLipidPercentTotal.toNumber(),
+            npcGlucosePercentTotal: npcGlucosePercentTotal.toNumber(),
             kcalGlucose: kcalGlucose.toNumber(),
             kcalLipid: kcalLipid.toNumber(),
             microVolDaily: microDaily.toNumber(),
@@ -1635,6 +1653,15 @@ class NutritionCalculator {
         }
         if (triglycerides !== null && triglycerides > 250) {
             warnings.push('CRITICAL: Triglyzeride > 250 mg/dl – Hypertriglyceridämie! Lipidzufuhr auf 0,5–1,0 g/kg/d reduzieren (ESPGHAN).');
+        }
+        // v3.6.11: Kein Triglyzerid-Wert eingetragen, aber Lipid-Dosis mit erhöhtem Risiko → Kontrolle anregen (nie ein Stopp).
+        if (triglycerides === null && n.lipidsPNKg > 0
+            && (n.lipidsPNKg > this.LIPID_TG_HINT.dose
+                || (birthWeightG.lte(1000) && n.lipidsPNKg >= this.LIPID_TG_HINT.doseElbw))) {
+            const grund = n.lipidsPNKg > this.LIPID_TG_HINT.dose
+                ? `über ${this.LIPID_TG_HINT.dose} g/kg/d`
+                : `bei Geburtsgewicht bis 1000 g ab ${this.LIPID_TG_HINT.doseElbw} g/kg/d`;
+            warnings.push(`Hinweis: Lipide i. v. ${n.lipidsPNKg} g/kg/d (${grund}) und kein Triglyzerid-Wert eingetragen – Triglyzeride kontrollieren (Zufallswert genügt).`);
         }
 
         // C-01: Glucose concentration > 12.5% at peripheral access
@@ -1819,12 +1846,15 @@ class NutritionCalculator {
             }
         }
 
-        // NPC-Ratio Guard: Lipid should be 25–50% of non-protein calories (ESPGHAN)
-        if (n.npcTotal > 0 && hasPNVolume) {
-            if (n.npcLipidPercent < 25) {
-                warnings.push(`Warnung: Lipid-Anteil an NPC nur ${n.npcLipidPercent}% (Ziel 25–50%) – metabolische Imbalance, Lipide steigern.`);
-            } else if (n.npcLipidPercent > 50) {
-                warnings.push(`Warnung: Lipid-Anteil an NPC ${n.npcLipidPercent}% > 50% – metabolische Imbalance, Glucose-Anteil erhöhen.`);
+        // NPC-Ratio Guard (v3.6.10): ESPGHAN/ESPEN/ESPR/CSPEN 2018 (Lipide) empfiehlt 25–50 % der Nicht-Eiweiß-Energie als Lipid
+        // für VOLLSTÄNDIG parenteral ernährte Patienten. Daher nur bis zur trophischen Ernährung (< 25 ml/kg/d, wie enteralPhase);
+        // sobald relevant enteral gefüttert wird, gibt es keine Anteilsregel (Milch liefert selbst etwa die Hälfte als Fett).
+        // Bezugsgröße ist die gesamte Nicht-Eiweiß-Energie (parenteral + enteral).
+        if (n.npcTotal > 0 && hasPNVolume && n.enteralVolKg < 25) {
+            if (n.npcLipidPercentTotal < 25) {
+                warnings.push(`Warnung: Lipid-Anteil an NPC gesamt (parenteral + enteral) nur ${n.npcLipidPercentTotal}% (Ziel 25–50% bei vollständiger PN) – Risiko für Mangel an essentiellen Fettsäuren, Lipide steigern.`);
+            } else if (n.npcLipidPercentTotal > 50) {
+                warnings.push(`Warnung: Lipid-Anteil an NPC gesamt (parenteral + enteral) ${n.npcLipidPercentTotal}% > 50% (Ziel 25–50% bei vollständiger PN) – Glucose-Anteil erhöhen.`);
             }
         }
 
@@ -2176,6 +2206,9 @@ class NutritionCalculator {
                 npcTotal: n.npcTotal,
                 npcLipidPercent: n.npcLipidPercent,
                 npcGlucosePercent: n.npcGlucosePercent,
+                npcTotalAll: n.npcTotalAll,
+                npcLipidPercentTotal: n.npcLipidPercentTotal,
+                npcGlucosePercentTotal: n.npcGlucosePercentTotal,
                 kcalGlucose: n.kcalGlucose,
                 kcalLipid: n.kcalLipid,
                 microVolDaily: n.microVolDaily,
