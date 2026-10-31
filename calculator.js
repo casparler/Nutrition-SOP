@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.11';
+        this.VERSION = '3.6.12';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -988,7 +988,8 @@ class NutritionCalculator {
             : null;
         const gir = D(sp(input.gir, 'gir', { defaultValue: 0 }));
         const proteinPNKg = D(sp(input.protein, 'protein', { defaultValue: 0 }));
-        const lipidsPNKg = D(sp(input.lipids, 'lipids', { defaultValue: 0 }));
+        const lipidsEntered = D(sp(input.lipids, 'lipids', { defaultValue: 0 }));
+        let lipidsPNKg = lipidsEntered;   // v3.6.12: wird auf 0 gesetzt, wenn die Gesamtflüssigkeit kein Volumen dafür frei lässt
         const calciumMgKg = D(sp(input.calcium, 'calcium', { defaultValue: 0 }));
         const phosphateMgKg = D(sp(input.phosphate, 'phosphate', { defaultValue: 0 }));
         const sodiumMmolKg = D(sp(input.sodium, 'sodium', { defaultValue: 0 }));
@@ -1144,7 +1145,7 @@ class NutritionCalculator {
         }
         // lipidVolDaily (ml) = lipids_g_kg * weightKg / (fatPer100ml / 100)
         // = lipids_g_kg * weightKg * 100 / fatPer100ml
-        const lipidVolDaily = lipidsPNKg.times(weightKg).times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
+        let lipidVolDaily = lipidsPNKg.times(weightKg).times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
 
         const microVolKg = D(parseFloat(input.microVolume) || 0);
         const totalDailyFluid = weightKg.times(tfi).toDecimalPlaces(1);
@@ -1158,6 +1159,15 @@ class NutritionCalculator {
         // R-04: PN-Netto = Gross PN minus lipid volume
         const pnDaily = Decimal.max(0, pnDailyGross.minus(lipidVolDaily)).toDecimalPlaces(1);
         const lipidExceedsPN = lipidVolDaily.gt(pnDailyGross) && pnDailyGross.gt(0);
+        // v3.6.12: Lässt die Gesamtflüssigkeit gar kein Volumen für die Lipide frei (Gesamtflüssigkeit = Milch + Sekundärinfusion + ...),
+        // können sie nicht laufen. Sie zählen dann weder zur Energie noch zu den Summen (gleiches Prinzip wie die übrigen PN-Felder
+        // ohne PN-Volumen, BLIND-1). Vorher wurde ein stehengebliebener Standardwert (1 g/kg/d) still als 9 kcal/kg/d mitgerechnet.
+        const lipidsNoRoom = lipidsEntered.gt(0) && pnDailyGross.lte(0);
+        const lipidNoRoomMlKg = lipidsEntered.times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
+        if (lipidsNoRoom) {
+            lipidsPNKg = D(0);
+            lipidVolDaily = D(0);
+        }
 
         // --- Step 3: Solution Configurator ---
         // BLIND-1 Guard: When PN volume = 0, manual PN inputs must not contribute
@@ -1490,6 +1500,7 @@ class NutritionCalculator {
         // --- Convert Decimals to Numbers for comparisons & output ---
         const n = {
             totalDailyFluid: totalDailyFluid.toNumber(),
+            calculationWeightG: calculationWeightG.toNumber(),
             pnDailyGross: pnDailyGross.toNumber(),
             pnDaily: pnDaily.toNumber(),
             lipidVolDaily: lipidVolDaily.toNumber(),
@@ -1674,6 +1685,9 @@ class NutritionCalculator {
         }
 
         // R-04: Lipid volume exceeds available PN capacity
+        if (lipidsNoRoom) {
+            warnings.push(`Hinweis: Lipide i. v. ${lipidsEntered.toNumber()} g/kg/d eingetragen, aber die Gesamtflüssigkeit lässt kein Volumen dafür frei (Lipide brauchen ${lipidNoRoomMlKg.toNumber()} ml/kg/d) – sie werden nicht gerechnet. Laufen Lipide, die Gesamtflüssigkeit entsprechend erhöhen, sonst das Lipid-Feld auf 0 setzen.`);
+        }
         if (lipidExceedsPN) {
             warnings.push(`CRITICAL: Lipid-Volumen (${n.lipidVolDaily} ml) übersteigt parenterale Kapazität (${n.pnDailyGross} ml)!${pnVolumenUrsache}`);
         }
@@ -2146,6 +2160,7 @@ class NutritionCalculator {
                 effectiveCl: n.effectiveCl,
                 secondaryDaily: n.secondaryDaily,
                 singlePortion: n.singlePortion,
+                calculationWeightG: n.calculationWeightG,
                 // v3.4 — Zubereitung
                 preparation: {
                     mealVolumeMl: n.singlePortion,
