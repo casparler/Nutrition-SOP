@@ -387,12 +387,13 @@
                     <div class="bg-gray-800 text-white px-4 py-2 font-semibold">Ernährungsziele & Volumen</div>
                     <div class="p-4 space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Gesamtflüssigkeit (TFI) <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
+                            <label class="block text-sm font-medium text-gray-700">Gesamtflüssigkeit (TFI) <select id="input-tfi-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Gesamtflüssigkeit"><option value="kgd" selected>ml/kg/d</option><option value="d">ml/Tag</option><option value="h">ml/h</option></select></label>
                             <input type="number" id="input-tfi" step="1" value="80" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <p id="tfi-converted" class="text-[10px] text-gray-500 mt-1"></p>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Enterale Ernährung <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
+                                <label class="block text-sm font-medium text-gray-700">Enterale Ernährung <select id="input-enteral-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit enterale Ernährung"><option value="kgd" selected>ml/kg/d</option><option value="meal">ml je Mahlzeit</option><option value="d">ml/Tag</option></select></label>
                                 <input type="number" id="input-enteral" step="1" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 <p id="enteral-converted" class="text-[10px] text-gray-500 mt-1">= 0 ml/d</p>
                         </div>
@@ -524,8 +525,9 @@
                             <div class="space-y-2 pt-2 pb-2">
                                 <p class="text-[10px] text-rose-700">Volumen, das als Spüllösung oder Perfusor-Träger (z.B. für Antibiotika) läuft. Wird vom PN-Restvolumen abgezogen.</p>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">Spülflüssigkeit <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
+                                    <label class="block text-sm font-medium text-gray-700">Spülflüssigkeit <select id="input-carrier-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Spülflüssigkeit"><option value="kgd" selected>ml/kg/d</option><option value="h">ml/h</option><option value="d">ml/Tag</option></select></label>
                                     <input type="number" id="input-carrier" step="1" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-rose-500 focus:border-rose-500">
+                                    <p id="carrier-converted" class="text-[10px] text-gray-500 mt-1"></p>
                                 </div>
                             </div>
                         </div>
@@ -1138,9 +1140,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.12"></script>
-    <script src="fenton_data.js?v=3.6.12"></script>
-    <script src="calculator.js?v=3.6.12"></script>
+    <script src="products.js?v=3.6.13"></script>
+    <script src="fenton_data.js?v=3.6.13"></script>
+    <script src="calculator.js?v=3.6.13"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1317,6 +1319,12 @@
             const preset = scenarios[scenario];
             if (!preset) return;
 
+            // Vorlagen enthalten ml/kg/d: Einheiten der Mengenfelder zurückstellen
+            ['input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit'].forEach(uid => {
+                const u = document.getElementById(uid);
+                if (u) u.value = 'kgd';
+            });
+
             // Eine Vorlage überschreibt auch die PN-Felder: gespeicherte Werte der Auswahl „Keine PN“ verwerfen
             if (typeof window.discardNoPN === 'function') window.discardNoPN();
 
@@ -1402,7 +1410,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.12';
+            const EXPECTED_CALC_VERSION = '3.6.13';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1706,6 +1714,12 @@
                 if (val === null || val === undefined) return;
                 const el = document.getElementById(inputId);
                 if (!el) return;
+                // Vorschläge sind ml/kg/d: steht das Feld auf einer anderen Einheit, zuerst auf ml/kg/d zurückstellen
+                const unitEl = document.getElementById(inputId + '-unit');
+                if (unitEl && unitEl.value !== 'kgd') {
+                    unitEl.value = 'kgd';
+                    unitEl.dispatchEvent(new Event('change', { bubbles: true }));
+                }
                 el.value = val;
                 el.dispatchEvent(new Event('input', { bubbles: true })); // triggert Persistenz + Recalc
             }
@@ -1835,6 +1849,7 @@
                 'input-length', 'input-head', 'input-triglycerides',
                 'input-ssw', 'input-day', 'input-invasive-ventilation',
                 'input-solution', 'input-secondary-solution', 'input-secondary-rate',
+                'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit',
                 'input-birth-date', 'input-ssw-days'
             ];
 
@@ -1871,7 +1886,8 @@
             // Bind listeners
             const selectIds = ['input-invasive-ventilation', 'input-ssw', 'input-ssw-days', 'input-birth-date', 'input-enteral-product',
                                'input-meal-frequency', 'input-lipid-infusion', 'input-access', 'input-solution', 'input-secondary-solution',
-                               'input-feeding-paused', 'input-feeding-pause-reason'];
+                               'input-feeding-paused', 'input-feeding-pause-reason',
+                               'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit'];
             inputs.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -2050,17 +2066,31 @@
                     document.getElementById('computed-corrected-ga').value = gaWeeks + '+' + gaDays;
                 }
 
+                // v3.6.13: Mengenfelder können in ml/kg/d, ml/Tag, ml/h oder (enteral) ml je Mahlzeit eingegeben werden.
+                // Umgerechnet wird mit dem Rechengewicht des Rechenkerns (vor Tag 11 das größere von Geburts- und aktuellem Gewicht);
+                // calculate() erhält weiter ml/kg/d und prüft den umgerechneten Wert gegen die harten Grenzen.
+                const volDay = parseInt(document.getElementById('input-day').value) || 1;
+                const volWeightG = calculator.getCalculationWeightG(
+                    document.getElementById('birth-weight').value, document.getElementById('current-weight').value, volDay);
+                const volMeals = parseInt(document.getElementById('input-meal-frequency').value) || 0;
+                const volMlKg = (id) => {
+                    const raw = document.getElementById(id).value;
+                    const unitEl = document.getElementById(id + '-unit');
+                    const unit = unitEl ? unitEl.value : 'kgd';
+                    if (unit === 'kgd' || raw === '') return raw;
+                    const v = calculator.volumeToMlKg(raw, unit, { weightG: volWeightG, mealsPerDay: volMeals });
+                    return v === null ? '' : v;   // ohne Gewicht keine Umrechnung; calculate() meldet das fehlende Gewicht
+                };
                 const secRateMlH = parseFloat(document.getElementById('input-secondary-rate').value) || 0;
-                const cwForConv = parseFloat(document.getElementById('current-weight').value) || 1000;
-                const secRateKgD = cwForConv > 0 ? (secRateMlH * 24 * 1000) / cwForConv : 0;
+                const secRateKgD = calculator.volumeToMlKg(secRateMlH, 'h', { weightG: volWeightG }) || 0;
                 const secConvEl = document.getElementById('secondary-rate-converted');
                 if (secConvEl) secConvEl.innerText = `= ${Math.round(secRateKgD * 10) / 10} ml/kg/d`;
 
                 const data = {
                     currentWeight: currentWeight,
                     previousWeight: previousWeight,
-                    tfi: parseFloat(document.getElementById('input-tfi').value) || 0,
-                    enteralVolume: document.getElementById('input-enteral').value || 0,
+                    tfi: parseFloat(volMlKg('input-tfi')) || 0,
+                    enteralVolume: volMlKg('input-enteral') || 0,
                     fm85Percent: document.getElementById('input-fm85').value || 0,
                     liquigenMlKg: (document.getElementById('input-liquigen') || {}).value || 0,
                     aptamilProteinGKg: (document.getElementById('input-aptamil-protein') || {}).value || 0,
@@ -2071,7 +2101,7 @@
                         ? ((document.getElementById('input-protein-add') || {}).value || 0) : 0,
                     feedingPaused: !!(document.getElementById('input-feeding-paused') || {}).checked,
                     feedingPauseReason: (document.getElementById('input-feeding-pause-reason') || {}).value || 'other',
-                    carrierVolume: document.getElementById('input-carrier').value || 0,
+                    carrierVolume: volMlKg('input-carrier') || 0,
                     urea: rawUrea === '' || rawUrea == null ? null : parseFloat(rawUrea),
                     gir: document.getElementById('input-gir').value || 0,
                     protein: document.getElementById('input-protein').value || 0,
@@ -2167,12 +2197,24 @@
                 setText('res-enteral-daily', r.enteralDaily, ' ml');
                 setText('res-enteral-rate', r.rates && r.rates.enteral, ' ml/h');
                 // v3.6.12: Die Eingabe ist ml/kg/d. Die Umrechnung zeigt, was am Bett daraus wird (Tagesmenge und Menge je Mahlzeit).
+                const komma = x => String(Math.round(x * 10) / 10).replace('.', ',');
+                const unitOf = id => (document.getElementById(id + '-unit') || { value: 'kgd' }).value;
                 const entConv = document.getElementById('enteral-converted');
                 if (entConv) {
-                    const komma = x => String(Math.round(x * 10) / 10).replace('.', ',');
+                    const vorn = unitOf('input-enteral') !== 'kgd' ? `${komma(r.enteralVolKg)} ml/kg/d · ` : '';
                     entConv.innerText = r.enteralDaily > 0
-                        ? `= ${komma(r.enteralDaily)} ml/d · ${komma(r.singlePortion)} ml je Mahlzeit (${data.mealFrequency}×), Rechengewicht ${komma(r.calculationWeightG)} g`
+                        ? `= ${vorn}${komma(r.enteralDaily)} ml/d · ${komma(r.singlePortion)} ml je Mahlzeit (${data.mealFrequency}×), Rechengewicht ${komma(r.calculationWeightG)} g`
                         : '= 0 ml/d';
+                }
+                const tfiConv = document.getElementById('tfi-converted');
+                if (tfiConv) {
+                    tfiConv.innerText = unitOf('input-tfi') !== 'kgd'
+                        ? `= ${komma(data.tfi)} ml/kg/d · ${komma(r.totalDailyFluid)} ml/d · ${komma(r.totalDailyFluid / 24)} ml/h`
+                        : `= ${komma(r.totalDailyFluid)} ml/d · ${komma(r.totalDailyFluid / 24)} ml/h`;
+                }
+                const carConv = document.getElementById('carrier-converted');
+                if (carConv) {
+                    carConv.innerText = unitOf('input-carrier') !== 'kgd' ? `= ${komma(data.carrierVolume)} ml/kg/d` : '';
                 }
 
                 // Details

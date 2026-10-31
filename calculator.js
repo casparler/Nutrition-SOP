@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.12';
+        this.VERSION = '3.6.13';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -796,6 +796,44 @@ class NutritionCalculator {
         return { items, reminders: rem, counts };
     }
 
+    /**
+     * v3.6.13: Rechengewicht in g. Bis einschließlich Lebenstag 10 das größere von Geburts- und aktuellem Gewicht,
+     * danach das aktuelle (REGELWERK 17.3). Fehlt das aktuelle Gewicht, gilt das Geburtsgewicht. Gibt 0 zurück, wenn kein
+     * Geburtsgewicht vorliegt. Einzige Stelle dieser Regel: calculate() und die Oberfläche (Mengen-Umrechnung) nutzen sie gemeinsam.
+     */
+    getCalculationWeightG(birthWeight, currentWeight, postnatalAge) {
+        const b = parseFloat(birthWeight);
+        if (!(b > 0)) return 0;
+        const c = parseFloat(currentWeight);
+        const cur = c > 0 ? c : b;
+        const day = parseInt(postnatalAge, 10);
+        return Number.isNaN(day) || day <= 10 ? Math.max(b, cur) : cur;
+    }
+
+    /**
+     * v3.6.13: Rechnet eine Mengenangabe in ml/kg/d um. Einheiten: 'kgd' (ml/kg/d), 'd' (ml/Tag), 'h' (ml/h),
+     * 'meal' (ml je Mahlzeit, mit ctx.mealsPerDay). ctx.weightG ist das Rechengewicht in g. Liefert eine Zahl (3 Nachkommastellen)
+     * oder null, wenn nicht umgerechnet werden kann (kein Gewicht, keine Mahlzeitenzahl, keine gültige Zahl).
+     * Die Harte-Grenzen-Prüfung in calculate() gilt danach für den umgerechneten Wert (Tippfehlerschutz bleibt erhalten).
+     */
+    volumeToMlKg(value, unit, ctx = {}) {
+        const v = Number(value);
+        if (value === '' || value === null || value === undefined || !Number.isFinite(v)) return null;
+        if (unit === 'kgd') return new Decimal(v).toDecimalPlaces(3).toNumber();
+        const w = Number(ctx.weightG);
+        if (!(w > 0)) return null;
+        const kg = new Decimal(w).div(1000);
+        let perDay;
+        if (unit === 'd') perDay = new Decimal(v);
+        else if (unit === 'h') perDay = new Decimal(v).times(24);
+        else if (unit === 'meal') {
+            const m = Number(ctx.mealsPerDay);
+            if (!(m > 0)) return null;
+            perDay = new Decimal(v).times(m);
+        } else return null;
+        return perDay.div(kg).toDecimalPlaces(3).toNumber();
+    }
+
     calculate(input) {
         const D = (v) => this._d(v);
 
@@ -1096,9 +1134,7 @@ class NutritionCalculator {
         }
 
         // --- Step 1: Weight Logic ---
-        const calculationWeightG = postnatalAge <= 10
-            ? Decimal.max(birthWeightG, currentWeightG)
-            : currentWeightG;
+        const calculationWeightG = D(this.getCalculationWeightG(birthWeightG.toNumber(), currentWeightG.toNumber(), postnatalAge));
         const weightKg = calculationWeightG.div(1000);
 
         // --- Step 2: Targets ---

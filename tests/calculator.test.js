@@ -2716,3 +2716,107 @@ describe('AJ-UI) Umrechnung unter dem Feld „Enterale Ernährung“ (v3.6.12)',
         expect(doc.querySelector('label[for="input-enteral"], #input-enteral').closest('div').textContent).toMatch(/ml\/kg\/d/);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AK — Mengen in ml/Tag, ml/h oder ml je Mahlzeit eingeben (v3.6.13)
+ * Anlass: 12 × 12 ml Muttermilch bei 800 g (= 180 ml/kg/d) wurden als 144 „ml/kg/d“ eingegeben. Die App rechnet jetzt
+ * auf Wunsch aus Tages-, Stunden- oder Mahlzeitenmengen um, mit dem Rechengewicht des Rechenkerns.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AK) Mengen-Umrechnung (v3.6.13)', () => {
+    it('AK1: Rechengewicht — bis Tag 10 das größere von Geburts- und aktuellem Gewicht, ab Tag 11 das aktuelle', () => {
+        expect(calc.getCalculationWeightG(730, 800, 1)).toBe(800);
+        expect(calc.getCalculationWeightG(850, 780, 10)).toBe(850);
+        expect(calc.getCalculationWeightG(850, 780, 11)).toBe(780);
+        expect(calc.getCalculationWeightG('850', '', 11)).toBe(850);      // aktuelles Gewicht fehlt → Geburtsgewicht
+        expect(calc.getCalculationWeightG('', 800, 3)).toBe(0);           // kein Geburtsgewicht → nicht umrechenbar
+    });
+
+    it('AK2: calculate() nutzt dasselbe Rechengewicht wie die Umrechnung', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 850, currentWeight: 780, postnatalAge: 5, tfi: 100, enteralVolume: 100, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
+        expect(r.results.calculationWeightG).toBe(calc.getCalculationWeightG(850, 780, 5));
+        expect(r.results.totalDailyFluid).toBe(85);
+    });
+
+    it('AK3: volumeToMlKg — ml/Tag, ml/h und ml je Mahlzeit ergeben bei 800 g und 12 Mahlzeiten je 180 ml/kg/d', () => {
+        const ctx = { weightG: 800, mealsPerDay: 12 };
+        expect(calc.volumeToMlKg(144, 'd', ctx)).toBe(180);
+        expect(calc.volumeToMlKg(6, 'h', ctx)).toBe(180);
+        expect(calc.volumeToMlKg(12, 'meal', ctx)).toBe(180);
+        expect(calc.volumeToMlKg(180, 'kgd', ctx)).toBe(180);
+        expect(calc.volumeToMlKg('7.3', 'meal', { weightG: 730, mealsPerDay: 8 })).toBe(80);
+    });
+
+    it('AK4: volumeToMlKg — ohne Gewicht, Mahlzeitenzahl, gültige Zahl oder bekannte Einheit keine Umrechnung (null)', () => {
+        expect(calc.volumeToMlKg(144, 'd', { weightG: 0 })).toBeNull();
+        expect(calc.volumeToMlKg(144, 'd', {})).toBeNull();
+        expect(calc.volumeToMlKg(12, 'meal', { weightG: 800, mealsPerDay: 0 })).toBeNull();
+        expect(calc.volumeToMlKg('', 'd', { weightG: 800 })).toBeNull();
+        expect(calc.volumeToMlKg('abc', 'd', { weightG: 800 })).toBeNull();
+        expect(calc.volumeToMlKg(10, 'Eimer', { weightG: 800 })).toBeNull();
+    });
+});
+
+describe('AK-UI) Einheiten-Auswahl an den Mengenfeldern (v3.6.13)', () => {
+    async function boot(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};   // jsdom kennt scrollIntoView nicht (ValidationError-Banner)
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        return w;
+    }
+    const kind = { 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0 };
+    const text = (w, id) => w.document.getElementById(id).innerText;
+
+    it('AK5: Die drei Mengenfelder haben eine Einheiten-Auswahl, Standard ml/kg/d', async () => {
+        const w = await boot({});
+        for (const id of ['input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit']) {
+            const sel = w.document.getElementById(id);
+            expect(sel, id).toBeTruthy();
+            expect(sel.value).toBe('kgd');
+        }
+        expect([...w.document.querySelectorAll('#input-enteral-unit option')].map(o => o.value)).toEqual(['kgd', 'meal', 'd']);
+    });
+
+    it('AK6: 12 ml je Mahlzeit und 144 ml/Tag Gesamtflüssigkeit ergeben dasselbe wie 180 ml/kg/d, mit sichtbarer Umrechnung', async () => {
+        const w = await boot({ ...kind, 'input-tfi': 180, 'input-enteral': 180 });
+        const soll = text(w, 'qv-kcal');
+        const w2 = await boot({ ...kind, 'input-tfi-unit': 'd', 'input-tfi': 144, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
+        expect(text(w2, 'qv-kcal')).toBe(soll);
+        expect(text(w2, 'enteral-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 12 ml je Mahlzeit (12×), Rechengewicht 800 g');
+        expect(text(w2, 'tfi-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 6 ml/h');
+    });
+
+    it('AK7: Spülflüssigkeit in ml/h wird umgerechnet und angezeigt', async () => {
+        const w = await boot({ ...kind, 'input-tfi': 180, 'input-enteral': 100, 'input-carrier-unit': 'h', 'input-carrier': 1 });
+        expect(text(w, 'carrier-converted')).toBe('= 30 ml/kg/d');
+    });
+
+    it('AK8: Der Tippfehlerschutz gilt für den umgerechneten Wert (800 ml/Tag bei 800 g = 1000 ml/kg/d)', async () => {
+        const w = await boot({ ...kind, 'input-tfi-unit': 'd', 'input-tfi': 800, 'input-enteral': 0 });
+        const banner = w.document.getElementById('validation-error-message').textContent;
+        expect(banner).toMatch(/TFI|Gesamtfl|400/);
+        expect(w.document.getElementById('qv-kcal').textContent).toBe('–');   // nichts berechnet
+    });
+
+    it('AK9: Die Sekundärinfusion (ml/h) rechnet mit dem Rechengewicht, nicht mit dem aktuellen Gewicht', async () => {
+        const w = await boot({ 'birth-weight': 850, 'current-weight': 780, 'input-day': 5, 'input-ssw': 28, 'input-tfi': 120, 'input-enteral': 0, 'input-lipids': 0,
+            'input-secondary-solution': 'nacl09', 'input-secondary-rate': 1 });
+        expect(text(w, 'secondary-rate-converted')).toBe('= 28.2 ml/kg/d');      // 24 ml/d ÷ 0,85 kg
+    });
+
+    it('AK10: Eine Vorlage stellt die Einheiten der Mengenfelder auf ml/kg/d zurück', async () => {
+        const w = await boot({ 'input-tfi-unit': 'h', 'input-enteral-unit': 'meal', 'input-carrier-unit': 'd' });
+        w.loadSimulation('elbw');
+        for (const id of ['input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit']) expect(w.document.getElementById(id).value, id).toBe('kgd');
+    });
+});
