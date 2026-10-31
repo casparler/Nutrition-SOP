@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.11';
+        this.VERSION = '3.6.13';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -796,6 +796,44 @@ class NutritionCalculator {
         return { items, reminders: rem, counts };
     }
 
+    /**
+     * v3.6.13: Rechengewicht in g. Bis einschließlich Lebenstag 10 das größere von Geburts- und aktuellem Gewicht,
+     * danach das aktuelle (REGELWERK 17.3). Fehlt das aktuelle Gewicht, gilt das Geburtsgewicht. Gibt 0 zurück, wenn kein
+     * Geburtsgewicht vorliegt. Einzige Stelle dieser Regel: calculate() und die Oberfläche (Mengen-Umrechnung) nutzen sie gemeinsam.
+     */
+    getCalculationWeightG(birthWeight, currentWeight, postnatalAge) {
+        const b = parseFloat(birthWeight);
+        if (!(b > 0)) return 0;
+        const c = parseFloat(currentWeight);
+        const cur = c > 0 ? c : b;
+        const day = parseInt(postnatalAge, 10);
+        return Number.isNaN(day) || day <= 10 ? Math.max(b, cur) : cur;
+    }
+
+    /**
+     * v3.6.13: Rechnet eine Mengenangabe in ml/kg/d um. Einheiten: 'kgd' (ml/kg/d), 'd' (ml/Tag), 'h' (ml/h),
+     * 'meal' (ml je Mahlzeit, mit ctx.mealsPerDay). ctx.weightG ist das Rechengewicht in g. Liefert eine Zahl (3 Nachkommastellen)
+     * oder null, wenn nicht umgerechnet werden kann (kein Gewicht, keine Mahlzeitenzahl, keine gültige Zahl).
+     * Die Harte-Grenzen-Prüfung in calculate() gilt danach für den umgerechneten Wert (Tippfehlerschutz bleibt erhalten).
+     */
+    volumeToMlKg(value, unit, ctx = {}) {
+        const v = Number(value);
+        if (value === '' || value === null || value === undefined || !Number.isFinite(v)) return null;
+        if (unit === 'kgd') return new Decimal(v).toDecimalPlaces(3).toNumber();
+        const w = Number(ctx.weightG);
+        if (!(w > 0)) return null;
+        const kg = new Decimal(w).div(1000);
+        let perDay;
+        if (unit === 'd') perDay = new Decimal(v);
+        else if (unit === 'h') perDay = new Decimal(v).times(24);
+        else if (unit === 'meal') {
+            const m = Number(ctx.mealsPerDay);
+            if (!(m > 0)) return null;
+            perDay = new Decimal(v).times(m);
+        } else return null;
+        return perDay.div(kg).toDecimalPlaces(3).toNumber();
+    }
+
     calculate(input) {
         const D = (v) => this._d(v);
 
@@ -988,7 +1026,8 @@ class NutritionCalculator {
             : null;
         const gir = D(sp(input.gir, 'gir', { defaultValue: 0 }));
         const proteinPNKg = D(sp(input.protein, 'protein', { defaultValue: 0 }));
-        const lipidsPNKg = D(sp(input.lipids, 'lipids', { defaultValue: 0 }));
+        const lipidsEntered = D(sp(input.lipids, 'lipids', { defaultValue: 0 }));
+        let lipidsPNKg = lipidsEntered;   // v3.6.12: wird auf 0 gesetzt, wenn die Gesamtflüssigkeit kein Volumen dafür frei lässt
         const calciumMgKg = D(sp(input.calcium, 'calcium', { defaultValue: 0 }));
         const phosphateMgKg = D(sp(input.phosphate, 'phosphate', { defaultValue: 0 }));
         const sodiumMmolKg = D(sp(input.sodium, 'sodium', { defaultValue: 0 }));
@@ -1095,9 +1134,7 @@ class NutritionCalculator {
         }
 
         // --- Step 1: Weight Logic ---
-        const calculationWeightG = postnatalAge <= 10
-            ? Decimal.max(birthWeightG, currentWeightG)
-            : currentWeightG;
+        const calculationWeightG = D(this.getCalculationWeightG(birthWeightG.toNumber(), currentWeightG.toNumber(), postnatalAge));
         const weightKg = calculationWeightG.div(1000);
 
         // --- Step 2: Targets ---
@@ -1144,7 +1181,7 @@ class NutritionCalculator {
         }
         // lipidVolDaily (ml) = lipids_g_kg * weightKg / (fatPer100ml / 100)
         // = lipids_g_kg * weightKg * 100 / fatPer100ml
-        const lipidVolDaily = lipidsPNKg.times(weightKg).times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
+        let lipidVolDaily = lipidsPNKg.times(weightKg).times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
 
         const microVolKg = D(parseFloat(input.microVolume) || 0);
         const totalDailyFluid = weightKg.times(tfi).toDecimalPlaces(1);
@@ -1158,6 +1195,15 @@ class NutritionCalculator {
         // R-04: PN-Netto = Gross PN minus lipid volume
         const pnDaily = Decimal.max(0, pnDailyGross.minus(lipidVolDaily)).toDecimalPlaces(1);
         const lipidExceedsPN = lipidVolDaily.gt(pnDailyGross) && pnDailyGross.gt(0);
+        // v3.6.12: Lässt die Gesamtflüssigkeit gar kein Volumen für die Lipide frei (Gesamtflüssigkeit = Milch + Sekundärinfusion + ...),
+        // können sie nicht laufen. Sie zählen dann weder zur Energie noch zu den Summen (gleiches Prinzip wie die übrigen PN-Felder
+        // ohne PN-Volumen, BLIND-1). Vorher wurde ein stehengebliebener Standardwert (1 g/kg/d) still als 9 kcal/kg/d mitgerechnet.
+        const lipidsNoRoom = lipidsEntered.gt(0) && pnDailyGross.lte(0);
+        const lipidNoRoomMlKg = lipidsEntered.times(100).div(lipidFatPer100ml).toDecimalPlaces(1);
+        if (lipidsNoRoom) {
+            lipidsPNKg = D(0);
+            lipidVolDaily = D(0);
+        }
 
         // --- Step 3: Solution Configurator ---
         // BLIND-1 Guard: When PN volume = 0, manual PN inputs must not contribute
@@ -1490,6 +1536,7 @@ class NutritionCalculator {
         // --- Convert Decimals to Numbers for comparisons & output ---
         const n = {
             totalDailyFluid: totalDailyFluid.toNumber(),
+            calculationWeightG: calculationWeightG.toNumber(),
             pnDailyGross: pnDailyGross.toNumber(),
             pnDaily: pnDaily.toNumber(),
             lipidVolDaily: lipidVolDaily.toNumber(),
@@ -1674,6 +1721,9 @@ class NutritionCalculator {
         }
 
         // R-04: Lipid volume exceeds available PN capacity
+        if (lipidsNoRoom) {
+            warnings.push(`Hinweis: Lipide i. v. ${lipidsEntered.toNumber()} g/kg/d eingetragen, aber die Gesamtflüssigkeit lässt kein Volumen dafür frei (Lipide brauchen ${lipidNoRoomMlKg.toNumber()} ml/kg/d) – sie werden nicht gerechnet. Laufen Lipide, die Gesamtflüssigkeit entsprechend erhöhen, sonst das Lipid-Feld auf 0 setzen.`);
+        }
         if (lipidExceedsPN) {
             warnings.push(`CRITICAL: Lipid-Volumen (${n.lipidVolDaily} ml) übersteigt parenterale Kapazität (${n.pnDailyGross} ml)!${pnVolumenUrsache}`);
         }
@@ -2146,6 +2196,7 @@ class NutritionCalculator {
                 effectiveCl: n.effectiveCl,
                 secondaryDaily: n.secondaryDaily,
                 singlePortion: n.singlePortion,
+                calculationWeightG: n.calculationWeightG,
                 // v3.4 — Zubereitung
                 preparation: {
                     mealVolumeMl: n.singlePortion,
