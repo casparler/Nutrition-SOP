@@ -1902,7 +1902,10 @@ describe('V) Eiweiß-Zusatz in g/kg/d als zweite Eingabeform (v3.5)', () => {
         const doc = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8')).window.document;
         const sel = doc.getElementById('input-protein-add-unit');
         expect(sel).toBeTruthy();
-        expect([...sel.options].map(o => o.value)).toEqual(['per100', 'gkg']);
+        // 31.10.2026 (Wunsch des Neonatologen, REGELWERK 10.10): zusätzlich Dosis je Mahlzeit (g Pulver, ml Eiweißlösung).
+        // Geprüft bleibt, was V5 sichern soll: g/100 ml ist die Hauptform (zuerst, Standard), g/kg/d ist die zweite Form.
+        expect([...sel.options].map(o => o.value).slice(0, 2)).toEqual(['per100', 'gkg']);
+        expect([...sel.options].map(o => o.value)).toEqual(['per100', 'gkg', 'powdermeal', 'solmeal']);
         expect(sel.value).toBe('per100');
         for (let n = sel; n && n !== doc.body; n = n.parentElement) {
             expect(/display:\s*none/.test((n.getAttribute && n.getAttribute('style')) || '')).toBe(false);
@@ -2818,5 +2821,131 @@ describe('AK-UI) Einheiten-Auswahl an den Mengenfeldern (v3.6.13)', () => {
         const w = await boot({ 'input-tfi-unit': 'h', 'input-enteral-unit': 'meal', 'input-carrier-unit': 'd' });
         w.loadSimulation('elbw');
         for (const id of ['input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit']) expect(w.document.getElementById(id).value, id).toBe('kgd');
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AL — FM85 und Eiweiß-Zusatz aus der Verordnung (Dosis je Mahlzeit) (v3.6.14)
+ * Anlass: Die Verordnung nennt nur Mengen je Mahlzeit (0,24 ml FM85-50-%-Lösung, 0,05 g Aptamil Eiweiß+ je 12 ml),
+ * die aktuelle Konzentration war nicht erkennbar.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AL) Anreicherung aus der Verordnung (v3.6.14)', () => {
+    it('AL1: 0,24 ml 50-%-Lösung bzw. 0,12 g Pulver je 12-ml-Mahlzeit sind 1 % FM85', () => {
+        expect(calc.fm85PercentFromDose(0.24, 'solml', 12)).toBe(1);
+        expect(calc.fm85PercentFromDose(0.12, 'g', 12)).toBe(1);
+        expect(calc.fm85PercentFromDose(4, 'pct', 12)).toBe(4);
+        expect(calc.fm85PercentFromDose(0.48, 'solml', 12)).toBe(2);
+        expect(calc.fm85PercentFromDose(0.3, 'solml', 10)).toBe(1.5);
+    });
+
+    it('AL2: 0,05 g Aptamil Eiweiß+ je 12-ml-Mahlzeit sind 0,34 g Eiweiß je 100 ml (Eiweißlösung: 0,04 ml → 0,33)', () => {
+        expect(calc.proteinAddPer100mlFromDose(0.05, 'powdermeal', 12)).toBe(0.34);
+        expect(calc.proteinAddPer100mlFromDose(0.04, 'solmeal', 12)).toBe(0.33);
+        expect(calc.proteinAddPer100mlFromDose(0.5, 'per100', 12)).toBe(0.5);
+    });
+
+    it('AL3: Ohne Mahlzeitenvolumen, Zahl oder bekannte Einheit keine Umrechnung (null)', () => {
+        expect(calc.fm85PercentFromDose(0.24, 'solml', 0)).toBeNull();
+        expect(calc.fm85PercentFromDose('', 'solml', 12)).toBeNull();
+        expect(calc.fm85PercentFromDose(1, 'Tropfen', 12)).toBeNull();
+        expect(calc.proteinAddPer100mlFromDose(0.05, 'powdermeal', 0)).toBeNull();
+        expect(calc.proteinAddPer100mlFromDose('abc', 'solmeal', 12)).toBeNull();
+        expect(calc.proteinAddPer100mlFromDose(1, 'Eimer', 12)).toBeNull();
+    });
+
+    it('AL4: Zubereitung nennt die 50-%-Lösung (Verordnung: 0,24 ml je Mahlzeit, 2,88 ml/d), Energie und den Spielraum bis zur Eiweiß-Obergrenze', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 730, currentWeight: 800, postnatalAge: 1, mealFrequency: 12, tfi: 180, enteralVolume: 180,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, fm85Percent: 1, proteinAddPer100ml: 0.34 }));
+        const p = r.results.preparation;
+        expect(p.mealVolumeMl).toBe(12);
+        expect(p.fm85SolutionMlPerMeal).toBe(0.24);
+        expect(p.fm85SolutionMlPerDay).toBe(2.88);
+        expect(p.proteinPowderPerMeal).toBe(0.05);
+        expect(p.kcalPer100mlFinal).toBeGreaterThan(70);
+        // Spielraum = Obergrenze 4,5 − aktuelle Gesamtzufuhr; in Konzentration und FM85-Prozent umgerechnet
+        expect(p.proteinHeadroomGKg).toBeCloseTo(4.5 - r.results.proteinTotalGPerKg, 1);
+        expect(p.headroomPer100ml).toBeCloseTo(p.proteinHeadroomGKg * 100 / 180, 1);
+        expect(p.headroomFm85Pct).toBeCloseTo(p.headroomPer100ml / 0.355, 0);
+    });
+
+    it('AL5: Über der Eiweiß-Obergrenze ist der Spielraum 0', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 730, currentWeight: 800, postnatalAge: 1, mealFrequency: 12, tfi: 180, enteralVolume: 180,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, fm85Percent: 4, proteinAddPer100ml: 1.5 }));
+        expect(r.results.preparation.proteinHeadroomGKg).toBe(0);
+        expect(r.results.preparation.headroomPer100ml).toBe(0);
+    });
+});
+
+describe('AL-UI) Dosis je Mahlzeit in der Oberfläche (v3.6.14)', () => {
+    async function boot(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        return w;
+    }
+    const kind = { 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 180, 'input-enteral': 180 };
+    const text = (w, id) => w.document.getElementById(id).innerText;
+
+    it('AL6: Beide Felder haben die neuen Einheiten, Standard bleibt % bzw. g/100 ml', async () => {
+        const w = await boot({});
+        expect([...w.document.querySelectorAll('#input-fm85-unit option')].map(o => o.value)).toEqual(['pct', 'solml', 'g']);
+        expect(w.document.getElementById('input-fm85-unit').value).toBe('pct');
+        expect(w.document.getElementById('input-protein-add-unit').value).toBe('per100');
+    });
+
+    it('AL7: 0,24 ml 50-%-Lösung je Mahlzeit ergeben 1 % FM85 — dieselbe Energie wie die Eingabe 1 %, mit sichtbarer Umrechnung', async () => {
+        const soll = text(await boot({ ...kind, 'input-fm85': 1 }), 'qv-kcal');
+        const w = await boot({ ...kind, 'input-fm85-unit': 'solml', 'input-fm85': 0.24 });
+        expect(text(w, 'qv-kcal')).toBe(soll);
+        expect(text(w, 'fm85-converted')).toBe('= 1 % FM85 (1 g Pulver auf 100 ml) · je Mahlzeit 0,12 g = 0,24 ml 50-%-Lösung');
+    });
+
+    it('AL8: 0,05 g Aptamil Eiweiß+ je Mahlzeit ergeben 0,34 g/100 ml, mit Umrechnung in g/kg/d und Dosis je Mahlzeit', async () => {
+        const w = await boot({ ...kind, 'input-protein-add-unit': 'powdermeal', 'input-protein-add': 0.05 });
+        const z = text(w, 'protein-add-converted');
+        expect(z).toMatch(/^= 0,34 g Eiweiß\/100 ml · 0,6\d g\/kg\/d · je Mahlzeit 0,05 g Pulver oder 0,04 ml Eiweißlösung$/);
+    });
+
+    it('AL9: Die Zubereitungs-Kachel zeigt FM85 in ml 50-%-Lösung, Energie je 100 ml und den Spielraum', async () => {
+        const w = await boot({ ...kind, 'input-fm85': 1 });
+        const rows = w.document.getElementById('prep-rows').innerHTML;
+        expect(rows).toMatch(/50-%-Lösung/);
+        expect(rows).toMatch(/0\.24 ml/);
+        const res = text(w, 'prep-result');
+        expect(res).toMatch(/Energie \d+ kcal je 100 ml/);
+        expect(res).toMatch(/Bis zur Eiweiß-Obergrenze \(4,5 g\/kg\/d\) ist noch Platz für/);
+    });
+
+    it('AL10: Der Tippfehlerschutz gilt für die umgerechnete Konzentration (3 ml Lösung je 12 ml = 12,5 % FM85 → Fehler)', async () => {
+        const w = await boot({ ...kind, 'input-fm85-unit': 'solml', 'input-fm85': 3 });
+        expect(w.document.getElementById('validation-error-message').textContent).toMatch(/FM85/);
+        expect(w.document.getElementById('qv-kcal').textContent).toBe('–');
+    });
+
+    it('AL11: Schrittweite und Obergrenze passen zur Einheit; Vorlagen stellen % und g/100 ml zurück', async () => {
+        const w = await boot({});
+        const f = w.document.getElementById('input-fm85');
+        expect(f.step).toBe('0.5');
+        w.document.getElementById('input-fm85-unit').value = 'solml';
+        w.document.getElementById('input-fm85-unit').dispatchEvent(new w.Event('change'));
+        expect(f.step).toBe('any');
+        expect(f.hasAttribute('max')).toBe(false);
+        w.document.getElementById('input-protein-add-unit').value = 'solmeal';
+        w.loadSimulation('elbw');
+        expect(w.document.getElementById('input-fm85-unit').value).toBe('pct');
+        expect(w.document.getElementById('input-protein-add-unit').value).toBe('per100');
+        expect(f.step).toBe('0.5');                       // Schrittweite folgt der zurückgestellten Einheit
+        expect(f.getAttribute('max')).toBe('5');
     });
 });

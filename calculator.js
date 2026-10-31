@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.13';
+        this.VERSION = '3.6.14';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -68,6 +68,10 @@ class NutritionCalculator {
         this.SGA = { percentile: 10, severePercentile: 3 };
         // --- Eiweißlösung (v3.5): Hausstandard 1 g Eiweiß = 1 ml Lösung ---
         this.PROTEIN_SOLUTION = { gPerMl: 1 };
+        // v3.6.14: Beba FM85 50 % Lösung der Station = 0,5 g Pulver je ml (50 g auf 100 ml). Gegenprobe aus der Verordnung:
+        // 0,24 ml je 12-ml-Mahlzeit = 0,12 g = 1 % FM85. Nicht an der Packung/Apotheke geprüft (REGELWERK 17.15).
+        this.FM85_SOLUTION = { gPerMl: 0.5 };
+        this.APTAMIL_PROTEIN_FRACTION = 0.821;   // g Eiweiß je g Aptamil Eiweiß+ Pulver
         // --- Enterale Zielvolumina (Vollnahrung) nach Reifegrad, v3.1 ---
         // Quellen: ESPGHAN CoN 2022 (Enteral Nutrition in Preterm Infants) —
         //   stabile wachsende Frühgeborene benötigen 150–180 ml/kg/d;
@@ -811,6 +815,41 @@ class NutritionCalculator {
     }
 
     /**
+     * v3.6.14: FM85-Konzentration (%) aus der Verordnung. Einheiten: 'pct' (Prozent = g Pulver je 100 ml), 'solml' (ml der
+     * 50-%-Lösung je Mahlzeit), 'g' (g Pulver je Mahlzeit). mealVolumeMl ist das Nahrungsvolumen je Mahlzeit. null, wenn nicht
+     * umrechenbar. Die Grenze 6 % (Validierung in calculate()) gilt danach für den umgerechneten Wert.
+     */
+    fm85PercentFromDose(value, unit, mealVolumeMl) {
+        const v = Number(value);
+        if (value === '' || value === null || value === undefined || !Number.isFinite(v)) return null;
+        if (unit === 'pct') return new Decimal(v).toDecimalPlaces(2).toNumber();
+        const m = Number(mealVolumeMl);
+        if (!(m > 0)) return null;
+        let grams;
+        if (unit === 'solml') grams = new Decimal(v).times(this.FM85_SOLUTION.gPerMl);
+        else if (unit === 'g') grams = new Decimal(v);
+        else return null;
+        return grams.div(m).times(100).toDecimalPlaces(2).toNumber();
+    }
+
+    /**
+     * v3.6.14: Eiweiß-Zusatz (g Eiweiß je 100 ml) aus der Verordnung. Einheiten: 'per100' (g/100 ml), 'powdermeal' (g Aptamil-
+     * Eiweiß+-Pulver je Mahlzeit, 82,1 % Eiweiß), 'solmeal' (ml Eiweißlösung je Mahlzeit, 1 ml = 1 g Eiweiß).
+     */
+    proteinAddPer100mlFromDose(value, unit, mealVolumeMl) {
+        const v = Number(value);
+        if (value === '' || value === null || value === undefined || !Number.isFinite(v)) return null;
+        if (unit === 'per100') return new Decimal(v).toDecimalPlaces(2).toNumber();
+        const m = Number(mealVolumeMl);
+        if (!(m > 0)) return null;
+        let grams;
+        if (unit === 'powdermeal') grams = new Decimal(v).times(this.APTAMIL_PROTEIN_FRACTION);
+        else if (unit === 'solmeal') grams = new Decimal(v).times(this.PROTEIN_SOLUTION.gPerMl);
+        else return null;
+        return grams.div(m).times(100).toDecimalPlaces(2).toNumber();
+    }
+
+    /**
      * v3.6.13: Rechnet eine Mengenangabe in ml/kg/d um. Einheiten: 'kgd' (ml/kg/d), 'd' (ml/Tag), 'h' (ml/h),
      * 'meal' (ml je Mahlzeit, mit ctx.mealsPerDay). ctx.weightG ist das Rechengewicht in g. Liefert eine Zahl (3 Nachkommastellen)
      * oder null, wenn nicht umgerechnet werden kann (kein Gewicht, keine Mahlzeitenzahl, keine gültige Zahl).
@@ -1532,6 +1571,18 @@ class NutritionCalculator {
         const proteinPer100mlFinal = enteralVolKg.gt(0)
             ? enteralProteinGKg.times(100).div(enteralVolKg).toDecimalPlaces(2)
             : D(0);
+        // v3.6.14: Was in der Verordnung steht und was die fertige Nahrung enthält
+        const fm85SolutionMlPerMeal = fm85GramsPerMeal.div(this.FM85_SOLUTION.gPerMl).toDecimalPlaces(2);
+        const fm85SolutionMlPerDay = fm85GramsPerDay.div(this.FM85_SOLUTION.gPerMl).toDecimalPlaces(2);
+        const kcalPer100mlFinal = enteralVolKg.gt(0)
+            ? kcalEnteralKg.times(100).div(enteralVolKg).toDecimalPlaces(0)
+            : D(0);
+        // Spielraum bis zur Eiweiß-Obergrenze (Gesamtzufuhr), ausgedrückt als zusätzliche Konzentration und als FM85-Prozent
+        const proteinHeadroomGKg = Decimal.max(0, D(this.LIMITS.PROTEIN.max).minus(proteinTotalGKg)).toDecimalPlaces(2);
+        const headroomPer100ml = enteralVolKg.gt(0)
+            ? proteinHeadroomGKg.times(100).div(enteralVolKg).toDecimalPlaces(2)
+            : D(0);
+        const headroomFm85Pct = headroomPer100ml.div(this.FM85_PER_PERCENT.protein).toDecimalPlaces(1);
 
         // --- Convert Decimals to Numbers for comparisons & output ---
         const n = {
@@ -1573,6 +1624,12 @@ class NutritionCalculator {
             proteinSolutionMlPerDay: proteinSolutionMlPerDay.toNumber(),
             proteinAddPer100ml: effProteinAddPer100ml.toNumber(),
             proteinPer100mlFinal: proteinPer100mlFinal.toNumber(),
+            fm85SolutionMlPerMeal: fm85SolutionMlPerMeal.toNumber(),
+            fm85SolutionMlPerDay: fm85SolutionMlPerDay.toNumber(),
+            kcalPer100mlFinal: kcalPer100mlFinal.toNumber(),
+            proteinHeadroomGKg: proteinHeadroomGKg.toNumber(),
+            headroomPer100ml: headroomPer100ml.toNumber(),
+            headroomFm85Pct: headroomFm85Pct.toNumber(),
             enteralVolKg: enteralVolKg.toNumber(),
             sidLight: sidLight.toNumber(),
             naClRatio: effectiveCl.gt(0) ? effectiveNa.div(effectiveCl).toDecimalPlaces(2).toNumber() : 0,
@@ -2212,7 +2269,13 @@ class NutritionCalculator {
                     proteinAddGramsPerDay: n.proteinAddGramsPerDay,
                     proteinSolutionMlPerMeal: n.proteinSolutionMlPerMeal,
                     proteinSolutionMlPerDay: n.proteinSolutionMlPerDay,
-                    proteinPer100mlFinal: n.proteinPer100mlFinal
+                    proteinPer100mlFinal: n.proteinPer100mlFinal,
+                    fm85SolutionMlPerMeal: n.fm85SolutionMlPerMeal,
+                    fm85SolutionMlPerDay: n.fm85SolutionMlPerDay,
+                    kcalPer100mlFinal: n.kcalPer100mlFinal,
+                    proteinHeadroomGKg: n.proteinHeadroomGKg,
+                    headroomPer100ml: n.headroomPer100ml,
+                    headroomFm85Pct: n.headroomFm85Pct
                 },
                 // v3.1 — enteraler Aufbau & Supplemente
                 enteralVolKg: n.enteralVolKg,
