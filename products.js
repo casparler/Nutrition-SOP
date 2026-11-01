@@ -151,12 +151,14 @@ const NeoProducts = {
         {
             id: 'ebm',
             name: 'Muttermilch (EBM)',
-            per100ml: { kcal: 71, protein: 1.13, fat: 4.03, carbs: 7.0, sodium_mg: 7, phosphorus_mg: 32 }
+            // v3.6.15: Phosphor 15,5 mg/100 ml (0,5 mmol) nach Stations-Excel 2022; vorher 32 mg (etwa doppelt so hoch). Eiweiß 1,13 g bleibt (REGELWERK 17.18).
+            per100ml: { kcal: 71, protein: 1.13, fat: 4.03, carbs: 7.0, sodium_mg: 7, phosphorus_mg: 15.5 }
         },
         {
             id: 'bebaFG1',
             name: 'Beba FG Stufe 1',
-            per100ml: { kcal: 80, protein: 2.90, fat: 4.00, carbs: 8.1, sodium_mg: 51, phosphorus_mg: 116 }
+            // v3.6.15: Excel 2022: Calcium 116 und Phosphat 77 mg/100 ml (vorher stand 116 als Phosphor, Spalten vertauscht)
+            per100ml: { kcal: 80, protein: 2.90, fat: 4.00, carbs: 8.1, sodium_mg: 51, calcium_mg: 116, phosphorus_mg: 77 }
         },
         {
             id: 'bebaFG2',
@@ -172,6 +174,23 @@ const NeoProducts = {
             id: 'hippPre',
             name: 'Hipp Pre Bio',
             per100ml: { kcal: 66, protein: 1.25, fat: 3.50, carbs: 7.3, sodium_mg: 20, phosphorus_mg: 50 }
+        },
+        // v3.6.15: aus dem Stations-Excel „FG-Plan Zeitleiste“ (2022), Blatt Tabelle2. Nicht an der Packung geprüft;
+        // Natrium, Calcium und Phosphor sind dort nicht hinterlegt (Ausnahme Aptamil AR) und zählen als 0.
+        {
+            id: 'aptamilHAPre',
+            name: 'Aptamil HA Pre (Stations-Excel)',
+            per100ml: { kcal: 66, protein: 1.5, fat: 3.4, carbs: 7.2 }
+        },
+        {
+            id: 'aptamilAR',
+            name: 'Aptamil AR Komplettnahrung (Stations-Excel)',
+            per100ml: { kcal: 66, protein: 1.6, fat: 3.5, carbs: 6.8, calcium_mg: 77, phosphorus_mg: 43 }
+        },
+        {
+            id: 'neocate',
+            name: 'Neocate (Stations-Excel)',
+            per100ml: { kcal: 67, protein: 1.8, fat: 3.4, carbs: 7.2 }
         }
     ],
 

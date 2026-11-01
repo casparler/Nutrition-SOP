@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.14';
+        this.VERSION = '3.6.15';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -182,7 +182,10 @@ class NutritionCalculator {
             bebaFG1:    { protein: 2.90, kcal: 80, name: 'Beba FG 1' },
             bebaFG2:    { protein: 2.05, kcal: 73, name: 'Beba FG 2' },
             aptamilPre: { protein: 1.30, kcal: 66, name: 'Aptamil Pre' },
-            hippPre:    { protein: 1.25, kcal: 66, name: 'Hipp Pre' }
+            hippPre:    { protein: 1.25, kcal: 66, name: 'Hipp Pre' },
+            aptamilHAPre: { protein: 1.5, kcal: 66, name: 'Aptamil HA Pre' },
+            aptamilAR:  { protein: 1.6, kcal: 66, name: 'Aptamil AR' },
+            neocate:    { protein: 1.8, kcal: 67, name: 'Neocate' }
         };
         let base = FALLBACK[id] || FALLBACK.ebm;
         if (typeof window !== 'undefined' && window.NeoProducts && window.NeoProducts.enteralProducts) {
@@ -833,13 +836,15 @@ class NutritionCalculator {
     }
 
     /**
-     * v3.6.14: Eiweiß-Zusatz (g Eiweiß je 100 ml) aus der Verordnung. Einheiten: 'per100' (g/100 ml), 'powdermeal' (g Aptamil-
+     * v3.6.14: Eiweiß-Zusatz (g Eiweiß je 100 ml) aus der Verordnung. Einheiten: 'per100' (g/100 ml), 'powder100' (g Pulver je 100 ml), 'powdermeal' (g Aptamil-
      * Eiweiß+-Pulver je Mahlzeit, 82,1 % Eiweiß), 'solmeal' (ml Eiweißlösung je Mahlzeit, 1 ml = 1 g Eiweiß).
      */
     proteinAddPer100mlFromDose(value, unit, mealVolumeMl) {
         const v = Number(value);
         if (value === '' || value === null || value === undefined || !Number.isFinite(v)) return null;
         if (unit === 'per100') return new Decimal(v).toDecimalPlaces(2).toNumber();
+        // g Aptamil-Eiweiß+-Pulver je 100 ml Milch (Schreibweise des Stations-Excels): braucht kein Mahlzeitenvolumen
+        if (unit === 'powder100') return new Decimal(v).times(this.APTAMIL_PROTEIN_FRACTION).toDecimalPlaces(3).toNumber();
         const m = Number(mealVolumeMl);
         if (!(m > 0)) return null;
         let grams;

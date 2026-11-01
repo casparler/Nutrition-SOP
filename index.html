@@ -405,6 +405,9 @@
                                 <option value="bebaFG2">Beba FG Stufe 2</option>
                                 <option value="aptamilPre">Aptamil Pre</option>
                                 <option value="hippPre">Hipp Pre Bio</option>
+                                <option value="aptamilHAPre">Aptamil HA Pre (Stations-Excel)</option>
+                                <option value="aptamilAR">Aptamil AR Komplettnahrung (Stations-Excel)</option>
+                                <option value="neocate">Neocate (Stations-Excel)</option>
                             </select>
                         </div>
                     </div>
@@ -436,6 +439,7 @@
                                         <option value="gkg">g/kg/d</option>
                                         <option value="powdermeal">g Pulver je Mahlzeit</option>
                                         <option value="solmeal">ml Eiweißlösung je Mahlzeit</option>
+                                        <option value="powder100">g Pulver/100 ml</option>
                                     </select>
                                 </label>
                                 <input type="number" id="input-protein-add" step="0.1" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
@@ -1144,9 +1148,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.14"></script>
-    <script src="fenton_data.js?v=3.6.14"></script>
-    <script src="calculator.js?v=3.6.14"></script>
+    <script src="products.js?v=3.6.15"></script>
+    <script src="fenton_data.js?v=3.6.15"></script>
+    <script src="calculator.js?v=3.6.15"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1420,7 +1424,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.14';
+            const EXPECTED_CALC_VERSION = '3.6.15';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1904,7 +1908,7 @@
                 }
                 const p = document.getElementById('input-protein-add');
                 const pu = document.getElementById('input-protein-add-unit');
-                if (p && pu) p.step = (pu.value === 'per100' || pu.value === 'gkg') ? '0.1' : 'any';
+                if (p && pu) p.step = (pu.value === 'per100' || pu.value === 'gkg' || pu.value === 'powder100') ? '0.1' : 'any';
             }
             ['input-fm85-unit', 'input-protein-add-unit'].forEach(id => {
                 const el = document.getElementById(id);
@@ -2120,7 +2124,7 @@
                 const fm85PercentIn = fm85Unit === 'pct' ? rawOf('input-fm85')
                     : (calculator.fm85PercentFromDose(rawOf('input-fm85'), fm85Unit, mealVolumeMl) ?? 0);
                 const proteinAddUnit = (document.getElementById('input-protein-add-unit') || { value: 'per100' }).value;
-                const proteinAddPer100In = (proteinAddUnit === 'powdermeal' || proteinAddUnit === 'solmeal')
+                const proteinAddPer100In = (proteinAddUnit === 'powdermeal' || proteinAddUnit === 'solmeal' || proteinAddUnit === 'powder100')
                     ? (calculator.proteinAddPer100mlFromDose(rawOf('input-protein-add'), proteinAddUnit, mealVolumeMl) ?? 0)
                     : rawOf('input-protein-add');
                 const secRateMlH = parseFloat(document.getElementById('input-secondary-rate').value) || 0;

@@ -1905,7 +1905,7 @@ describe('V) Eiweiß-Zusatz in g/kg/d als zweite Eingabeform (v3.5)', () => {
         // 31.10.2026 (Wunsch des Neonatologen, REGELWERK 10.10): zusätzlich Dosis je Mahlzeit (g Pulver, ml Eiweißlösung).
         // Geprüft bleibt, was V5 sichern soll: g/100 ml ist die Hauptform (zuerst, Standard), g/kg/d ist die zweite Form.
         expect([...sel.options].map(o => o.value).slice(0, 2)).toEqual(['per100', 'gkg']);
-        expect([...sel.options].map(o => o.value)).toEqual(['per100', 'gkg', 'powdermeal', 'solmeal']);
+        expect([...sel.options].map(o => o.value)).toEqual(['per100', 'gkg', 'powdermeal', 'solmeal', 'powder100']);   // 01.11.2026: g Pulver/100 ml (Schreibweise des Stations-Excels) ergänzt
         expect(sel.value).toBe('per100');
         for (let n = sel; n && n !== doc.body; n = n.parentElement) {
             expect(/display:\s*none/.test((n.getAttribute && n.getAttribute('style')) || '')).toBe(false);
@@ -2947,5 +2947,81 @@ describe('AL-UI) Dosis je Mahlzeit in der Oberfläche (v3.6.14)', () => {
         expect(w.document.getElementById('input-protein-add-unit').value).toBe('per100');
         expect(f.step).toBe('0.5');                       // Schrittweite folgt der zurückgestellten Einheit
         expect(f.getAttribute('max')).toBe('5');
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AM — Daten aus dem Stations-Excel „FG-Plan Zeitleiste“ (v3.6.15)
+ * Blatt Tabelle2 (2022): zusätzliche Nahrungen, korrigierte Mineralstoffe, Eingabe wie im Excel (g Pulver je 100 ml).
+ * ────────────────────────────────────────────────────────────────*/
+describe('AM) Stations-Excel: Produkte und Einheit (v3.6.15)', () => {
+    const NP = require('../products.js');
+    const prod = id => NP.enteralProducts.find(p => p.id === id);
+
+    it('AM1: Aptamil HA Pre, Aptamil AR und Neocate stehen mit den Excel-Werten in den Produktdaten', () => {
+        expect(prod('aptamilHAPre').per100ml).toMatchObject({ kcal: 66, protein: 1.5, fat: 3.4, carbs: 7.2 });
+        expect(prod('aptamilAR').per100ml).toMatchObject({ kcal: 66, protein: 1.6, fat: 3.5, carbs: 6.8, calcium_mg: 77, phosphorus_mg: 43 });
+        expect(prod('neocate').per100ml).toMatchObject({ kcal: 67, protein: 1.8, fat: 3.4, carbs: 7.2 });
+        expect(NP.enteralProducts.some(p => /Primergen/i.test(p.name))).toBe(false);   // Eiweiß 0,7 g/100 ml im Excel unplausibel, nicht übernommen
+    });
+
+    it('AM2: Die Fallback-Tabelle der Zielvolumen-Kopplung stimmt mit den Produktdaten überein (Eiweiß, Energie)', () => {
+        for (const id of ['aptamilHAPre', 'aptamilAR', 'neocate', 'ebm', 'bebaFG1', 'bebaFG2', 'aptamilPre', 'hippPre']) {
+            const d = calc._enteralDensity({ selectedEnteralProduct: id, fm85Percent: 0 });
+            expect(d.proteinPer100, id).toBe(prod(id).per100ml.protein);
+            expect(d.kcalPer100, id).toBe(prod(id).per100ml.kcal);
+        }
+    });
+
+    it('AM3: Mineralstoffe korrigiert — Muttermilch 15,5 mg Phosphor (vorher 32), Beba FG 1 Calcium 116 und Phosphor 77 (vorher 116 als Phosphor)', () => {
+        expect(prod('ebm').per100ml.phosphorus_mg).toBe(15.5);
+        expect(prod('bebaFG1').per100ml.calcium_mg).toBe(116);
+        expect(prod('bebaFG1').per100ml.phosphorus_mg).toBe(77);
+    });
+
+    it('AM4: g Pulver je 100 ml → Eiweiß je 100 ml (82,1 %), ohne Mahlzeitenvolumen; 1 g/100 ml ist 0,821 g Eiweiß/100 ml', () => {
+        expect(calc.proteinAddPer100mlFromDose(1, 'powder100', 0)).toBe(0.821);
+        expect(calc.proteinAddPer100mlFromDose(0.5, 'powder100', null)).toBe(0.411);
+    });
+});
+
+describe('AM-UI) Neue Nahrungen und Einheit in der Oberfläche (v3.6.15)', () => {
+    async function boot(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        return w;
+    }
+    const kind = { 'birth-weight': 800, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 180, 'input-enteral': 180 };
+
+    it('AM5: Alle Nahrungen aus den Produktdaten sind in der Auswahl wählbar', async () => {
+        const w = await boot({});
+        const opts = [...w.document.querySelectorAll('#input-enteral-product option')].map(o => o.value);
+        const NP = require('../products.js');
+        NP.enteralProducts.filter(p => !/Primergen/i.test(p.name)).forEach(p => expect(opts, p.id).toContain(p.id));
+    });
+
+    it('AM6: Neocate bei 180 ml/kg/d: 120,6 kcal/kg/d und 3,24 g Eiweiß/kg/d', async () => {
+        const w = await boot({ ...kind, 'input-enteral-product': 'neocate' });
+        expect(w.document.getElementById('qv-kcal').innerText).toBe('120.6');
+        expect(String(w.document.getElementById('res-protein-total-gkg').innerText)).toMatch(/3[.,]24/);
+    });
+
+    it('AM7: 1 g Aptamil-Pulver je 100 ml Milch (wie im Excel) ergeben 0,821 g Eiweiß/100 ml — dasselbe wie die direkte Eingabe', async () => {
+        const w1 = await boot({ ...kind, 'input-protein-add-unit': 'powder100', 'input-protein-add': 1 });
+        const w2 = await boot({ ...kind, 'input-protein-add': 0.821 });
+        expect(String(w1.document.getElementById('res-protein-total-gkg').innerText)).toBe(String(w2.document.getElementById('res-protein-total-gkg').innerText));
+        expect(w1.document.getElementById('protein-add-converted').innerText).toMatch(/^= 0,82 g Eiweiß\/100 ml/);
     });
 });
