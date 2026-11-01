@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 01.11.2026, Version v3.6.17, 285 Tests.
+Stand: 01.11.2026, Version v3.6.17, 285 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -18,6 +18,8 @@ Arbeitsschritt nachgezogen. Das steht auch in `AGENTS.md`.
 | **Leitlinie** | aus einer Leitlinie übernommen (Quelle genannt) |
 | **Technisch** | Tippfehlerschutz oder Rechenkonvention ohne klinische Aussage |
 | **Offen** | noch nicht entschieden, siehe Abschnitt 17 |
+
+**Quellen:** Welche Regel durch welche Literatur belegt ist (und welche nicht), steht in [QUELLEN.md](./QUELLEN.md).
 
 Spalte *Code*: Funktion bzw. Konstante in `calculator.js`. Spalte *Test*: ID in
 `tests/calculator.test.js`; „–“ heißt, es gibt keinen eigenen Test.
@@ -262,7 +264,7 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
-| 13.1 | Physiologischer Verlust rund 3 %/Tag, kumulativ 7–15 %; Rückkehr zum Geburtsgewicht bis Tag 14 | Leitlinie | `WEIGHT_COURSE` | Q8–Q12 |
+| 13.1 | Physiologischer Verlust rund 3 %/Tag, kumulativ 7–15 %; Rückkehr zum Geburtsgewicht bis Tag 14 | Haus, **Quelle fehlt** (vorher „Leitlinie“ ohne Beleg, QUELLEN.md) | `WEIGHT_COURSE` | Q8–Q12 |
 | 13.2 | Tag 3–7, Verlust < 2 % und TFI am oberen Zielrand → Hinweis (Überwässerung, PDA) | Haus | `calculate` | Q8–Q12 |
 | 13.3 | Verlust > 15 % → Warnung; nach Tag 14 Geburtsgewicht nicht erreicht → Hinweis | Haus | `calculate` | Q8–Q12 |
 | 13.4 | Gewichtsregeln laufen nur, wenn ein aktuelles Gewicht eingegeben wurde | Entscheidung (v3.4) | `calculate` | Q12 |
@@ -284,7 +286,7 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
-| 15.1 | Kumuliertes Energiedefizit > 150 kcal/kg über ≥ 3 Tage → Hinweis | Leitlinie (Embleton 2001) | `_analyzeEnergyGap`, `calculateEnergyGapIndex` | K1–K5, I* |
+| 15.1 | Kumuliertes Energiedefizit > 150 kcal/kg über ≥ 3 Tage → Hinweis | Haus; Konzept Embleton 2001, **die Schwelle steht dort nicht** (QUELLEN.md) | `_analyzeEnergyGap`, `calculateEnergyGapIndex` | K1–K5, I* |
 | 15.2 | Natrium-Trend siehe 9.3 | Haus | `_analyzeSodiumTrend` | I* |
 
 ## 16. Versorgungsphasen
@@ -344,6 +346,8 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 
 ## 18. Quellenlage dieser Sitzung (02.10.2026)
 
+*Seit 01.11.2026 geführt in [QUELLEN.md](./QUELLEN.md); dieser Abschnitt bleibt als Stand vom 02.10.2026.*
+
 Volltexte der Leitlinien waren nicht abrufbar (Zugriff gesperrt). Die genannten Werte stammen aus
 Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft werden:
 
@@ -385,3 +389,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 01.11.2026 | Aus dem Stations-Excel nur Neocate übernommen, alles andere bleibt offen (Regel 10.11, Version 3.6.15) |
 | 01.11.2026 | Keine Anreicherungs-Empfehlung mehr, wenn die Energie bei rein enteraler Ernährung an der Obergrenze liegt (Regel 10.12, Version 3.6.16) |
 | 01.11.2026 | Energieobergrenze ab Tag 4 von 135 auf 140 kcal/kg/d angehoben (ESPGHAN 2022: 115–140), Muttermilch-Eiweiß 1,13 g/100 ml beibehalten, Beleg fehlt (Regel 5.1, Punkt 17.18, Version 3.6.17). Tests O2, AN1–AN6 mit Begründung angepasst |
+| 01.11.2026 | Quellenverzeichnis QUELLEN.md angelegt. Befunde: Schwelle 150 kcal/kg (15.1) steht nicht in Embleton 2001, Gewichtsverlust-Prozentwerte (13.1) ohne Quelle, J-Perinatol-Zitat (Regel 4) unvollständig; ESPGHAN-Volltexte nicht abrufbar, Leitlinienzahlen deshalb ungeprüft |

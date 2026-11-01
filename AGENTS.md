@@ -81,7 +81,7 @@ Tests **N11–N14** sichern das Verhalten ab.
 - `_analyzeEnergyGap()` und `_analyzeSodiumTrend()` in [calculator.js](./calculator.js) liefern **ausschließlich diagnostische Hinweise**, niemals ein Stop-Signal oder eine harte Dosis-Sperre.
 - Ergebnisse landen in `res.predictive` und werden als `res.assessment.predictiveHints` (separates Array, **außerhalb** des 5er-Bullet-Caps) ausgegeben — damit Kern-Safety-Bullets nie verdrängt werden.
 - Schwellwerte sind klinisch begründet und dürfen nur mit Quelle + Datum geändert werden:
-  - **Energy-Gap:** kumulatives Defizit **> 150 kcal/kg** über **≥ 3 Tage** → Hinweis (Embleton 2001, konservativer Trigger).
+  - **Energy-Gap:** kumulatives Defizit **> 150 kcal/kg** über **≥ 3 Tage** → Hinweis (Hausfestlegung; das Konzept stützt Embleton 2001, die Schwelle selbst steht dort nicht, siehe [QUELLEN.md](./QUELLEN.md)).
   - **Sodium-Trend:** Anstieg der Na-**Zufuhr** **Δ > 5 mmol/kg/d in 48 h** → Hinweis „Serum-Natrium kontrollieren".
 - Die History wird optional über `input.history` übergeben (Tag-Keys `"1"`, `"2"`, … mit Feldern `_kcal-kg`, `_kcal-min`, `input-sodium`). Fehlt sie, geben beide Funktionen `null` zurück — kein Fehler.
 
