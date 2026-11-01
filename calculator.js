@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.16';
+        this.VERSION = '3.6.17';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -238,7 +238,7 @@ class NutritionCalculator {
         if (effectiveDay === 1) { energyMin = 45; energyMax = 60; energyDay = 1; }
         else if (effectiveDay === 2) { energyMin = 60; energyMax = 80; energyDay = 2; }
         else if (effectiveDay === 3) { energyMin = 80; energyMax = 100; energyDay = 3; }
-        else { energyMin = 110; energyMax = 135; energyDay = '4+'; }
+        else { energyMin = 110; energyMax = 140; energyDay = '4+'; }
 
         // --- Lipid targets ---
         const lipidDayKey = Math.min(effectiveDay, 4);

@@ -152,10 +152,11 @@ Resultierende Matrix (ELBW, spontan atmend, EBM):
 | FM85 | Ziel | limitiert durch |
 |------|------|-----------------|
 | 0 % | 160–180 | — |
-| 2 % | 145–165 | Energie |
-| 4 % | 130–150 | Energie |
+| 2 % | 155–175 | Energie |
+| 4 % | 135–155 | Energie |
 
-*(Stand v3.6.2 mit den Packungswerten von FM85; bis v3.6.1 stand hier „2 %: 150–170 Energie, 4 %: 130–150 Protein“,
+*(Stand v3.6.17: Energieobergrenze 140 statt 135 kcal/kg/d; vorher 2 %: 145–165, 4 %: 130–150.
+Stand v3.6.2 mit den Packungswerten von FM85; bis v3.6.1 stand hier „2 %: 150–170 Energie, 4 %: 130–150 Protein“,
 weil das Eiweiß von FM85 um rund 30 % zu hoch gerechnet wurde. Den Fall „durch Protein begrenzt“ deckt jetzt
 Test O2b mit eiweißreicher Formelnahrung ab.)*
 
@@ -534,6 +535,8 @@ git push -u origin feature/{name}-v{X.Y}
 | v3.6.15 | `claude/zen-babbage-vjgke2` | Aus dem Stations-Excel nur Neocate als Nahrung übernommen (Entscheidung des Neonatologen). → Tests AM1–AM4, V5 unverändert. **285 Tests total** | in Arbeit |
 
 | v3.6.16 | `claude/zen-babbage-vjgke2` | Keine Anreicherungs-Empfehlung (FM85, Fortifizierung) mehr, wenn die Energie bei rein enteraler Ernährung an der Obergrenze liegt; stattdessen Hinweis auf die Energie. → Tests AN1–AN6. **285 Tests total** | in Arbeit |
+
+| v3.6.17 | `claude/zen-babbage-vjgke2` | Energieobergrenze ab Tag 4 von 135 auf 140 kcal/kg/d (Entscheidung des Neonatologen 01.11.2026, ESPGHAN 2022: 115–140); Zielvolumen bei Anreicherung entsprechend (4 % FM85: 135–155 statt 130–150). Muttermilch-Eiweiß 1,13 g/100 ml bleibt, Beleg offen (REGELWERK 17.18). → Tests O2, AN1–AN6 mit Begründung angepasst. **285 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```

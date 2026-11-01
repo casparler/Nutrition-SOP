@@ -1037,14 +1037,16 @@ describe('O) Zielkonflikt Enteral-Ziel ↔ Nährstoffgrenzen', () => {
 
     // v3.6.2 — klinisch begründete Anpassung (Packungsangabe FM85, 20.10.2026): Je 100 g Pulver
     // 35,5 g Eiweiß und 435 kcal. EBM + 4 % ergibt damit 2,55 g Eiweiß und 88,4 kcal je 100 ml
-    // (vorher 3,0 g und 85 kcal). Bei 4 % begrenzt jetzt die Energie (135 kcal/kg/d) das Volumen
-    // auf 150 ml/kg/d, nicht mehr das Eiweiß. Die Begrenzung durch Eiweiß prüft O2b.
+    // (vorher 3,0 g und 85 kcal). Bei 4 % begrenzt jetzt die Energie das Volumen, nicht mehr das Eiweiß.
+    // v3.6.17 — klinisch begründete Anpassung (Entscheidung des Neonatologen 01.11.2026): Energieobergrenze
+    // 135 → 140 kcal/kg/d (ESPGHAN 2022: 115–140). Damit liegt der Deckel bei 4 % jetzt bei 155 statt 150 ml/kg/d.
+    // Die Begrenzung durch Eiweiß prüft O2b.
     it('O2: EBM + FM85 4 % → Ziel wird durch die Energie-Obergrenze gedeckelt', () => {
         const t = calc.getTargets(baseInput({
             birthWeight: 900, ssw: 26, postnatalAge: 25, fm85Percent: 4
         }));
-        // 71 + 4×4,35 = 88,4 kcal/100 ml → 135 kcal/kg/d bei höchstens 150 ml/kg/d
-        expect(t.enteralTarget.max).toBe(150);
+        // 71 + 4×4,35 = 88,4 kcal/100 ml → 140 kcal/kg/d bei höchstens 158,4 → abgerundet auf 155 ml/kg/d
+        expect(t.enteralTarget.max).toBe(155);
         expect(t.enteralTarget.limitedBy).toBe('energy');
         expect(t.enteralTarget.unlimited.max).toBe(180);
     });
@@ -3008,7 +3010,7 @@ describe('AM-UI) Neocate in der Oberfläche (v3.6.15)', () => {
 
 /* ────────────────────────────────────────────────────────────────
  * SECTION AN — Keine Anreicherungs-Empfehlung bei erreichter Energieobergrenze (v3.6.16)
- * Anlass: Kind mit 195 ml/kg/d (156 ml/d bei 800 g), FM85 1 % und Eiweiß-Zusatz: 149 kcal/kg/d bei Ziel 110–135, und die App
+ * Anlass: Kind mit 195 ml/kg/d (156 ml/d bei 800 g), FM85 1 % und Eiweiß-Zusatz: 149 kcal/kg/d bei Ziel damals 110–135 (seit v3.6.17 110–140), und die App
  * empfahl gleichzeitig „vorrangig Anreicherung statt Volumen steigern“ und „Überernährung prüfen“.
  * ────────────────────────────────────────────────────────────────*/
 describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () => {
@@ -3022,7 +3024,7 @@ describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () =>
 
     it('AN1: 195 ml/kg/d, FM85 1 %: Energie über der Obergrenze → der Hinweis „oberhalb des Zielkorridors“ nennt die Energie statt Anreicherung zu empfehlen', () => {
         const r = kind({ tfi: 195, enteralVolume: 195, fm85Percent: 1, proteinAddPer100ml: 0.29 });
-        expect(r.results.kcalPerKg).toBeGreaterThan(135);
+        expect(r.results.kcalPerKg).toBeGreaterThan(140);
         const h = r.warnings.find(w => /^Hinweis: Enteral 195 ml\/kg\/d oberhalb des Zielkorridors/.test(w));
         expect(h).toBeTruthy();
         expect(h).toMatch(/Die Energie liegt bereits an der Obergrenze/);
@@ -3033,13 +3035,15 @@ describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () =>
 
     it('AN2: Über dem Zielkorridor, aber Energie unter der Obergrenze → die bisherige Empfehlung bleibt', () => {
         const r = kind({ tfi: 185, enteralVolume: 185 });                  // 131 kcal/kg/d
-        expect(r.results.kcalPerKg).toBeLessThan(135);
+        expect(r.results.kcalPerKg).toBeLessThan(140);
         const h = r.warnings.find(w => /oberhalb des Zielkorridors/.test(w));
         expect(h).toMatch(/vorrangig Anreicherung statt Volumen steigern/);
     });
 
     it('AN3: FM85-Start-Erinnerung und Fazit-Zeile entfallen bei Energie an der Obergrenze, bleiben sonst bestehen', () => {
-        const hoch = kind({ tfi: 195, enteralVolume: 195 });               // nur Milch: 138,5 kcal/kg/d
+        // v3.6.17 — Anpassung wegen Obergrenze 140 (vorher 135): 195 ml/kg/d Milch allein = 138,5 kcal/kg/d liegen jetzt
+        // darunter, deshalb 200 ml/kg/d (142 kcal/kg/d) als Fall „an der Obergrenze“.
+        const hoch = kind({ tfi: 200, enteralVolume: 200 });               // nur Milch: 142 kcal/kg/d
         expect(anrText(hoch).filter(t => /FM85/.test(t))).toEqual([]);
         const normal = kind({ tfi: 150, enteralVolume: 150 });             // 106,5 kcal/kg/d
         expect(anrText(normal).some(t => /FM85 Start-Kriterium/.test(t))).toBe(true);
@@ -3059,9 +3063,9 @@ describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () =>
     });
 
     it('AN6: _energyAtLimit — erst ab Lebenstag 4, an der Obergrenze eingeschlossen, ohne Ziele nie', () => {
-        const t = { energy: { min: 110, max: 135 } };
-        expect(calc._energyAtLimit(135, t, 10)).toBe(true);
-        expect(calc._energyAtLimit(134.9, t, 10)).toBe(false);
+        const t = { energy: { min: 110, max: 140 } };
+        expect(calc._energyAtLimit(140, t, 10)).toBe(true);
+        expect(calc._energyAtLimit(139.9, t, 10)).toBe(false);
         expect(calc._energyAtLimit(150, t, 3)).toBe(false);
         expect(calc._energyAtLimit(150, null, 10)).toBe(false);
     });
