@@ -1037,14 +1037,16 @@ describe('O) Zielkonflikt Enteral-Ziel ↔ Nährstoffgrenzen', () => {
 
     // v3.6.2 — klinisch begründete Anpassung (Packungsangabe FM85, 20.10.2026): Je 100 g Pulver
     // 35,5 g Eiweiß und 435 kcal. EBM + 4 % ergibt damit 2,55 g Eiweiß und 88,4 kcal je 100 ml
-    // (vorher 3,0 g und 85 kcal). Bei 4 % begrenzt jetzt die Energie (135 kcal/kg/d) das Volumen
-    // auf 150 ml/kg/d, nicht mehr das Eiweiß. Die Begrenzung durch Eiweiß prüft O2b.
+    // (vorher 3,0 g und 85 kcal). Bei 4 % begrenzt jetzt die Energie das Volumen, nicht mehr das Eiweiß.
+    // v3.6.17 — klinisch begründete Anpassung (Entscheidung des Neonatologen 01.11.2026): Energieobergrenze
+    // 135 → 140 kcal/kg/d (ESPGHAN 2022: 115–140). Damit liegt der Deckel bei 4 % jetzt bei 155 statt 150 ml/kg/d.
+    // Die Begrenzung durch Eiweiß prüft O2b.
     it('O2: EBM + FM85 4 % → Ziel wird durch die Energie-Obergrenze gedeckelt', () => {
         const t = calc.getTargets(baseInput({
             birthWeight: 900, ssw: 26, postnatalAge: 25, fm85Percent: 4
         }));
-        // 71 + 4×4,35 = 88,4 kcal/100 ml → 135 kcal/kg/d bei höchstens 150 ml/kg/d
-        expect(t.enteralTarget.max).toBe(150);
+        // 71 + 4×4,35 = 88,4 kcal/100 ml → 140 kcal/kg/d bei höchstens 158,4 → abgerundet auf 155 ml/kg/d
+        expect(t.enteralTarget.max).toBe(155);
         expect(t.enteralTarget.limitedBy).toBe('energy');
         expect(t.enteralTarget.unlimited.max).toBe(180);
     });
@@ -2947,5 +2949,124 @@ describe('AL-UI) Dosis je Mahlzeit in der Oberfläche (v3.6.14)', () => {
         expect(w.document.getElementById('input-protein-add-unit').value).toBe('per100');
         expect(f.step).toBe('0.5');                       // Schrittweite folgt der zurückgestellten Einheit
         expect(f.getAttribute('max')).toBe('5');
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AM — Daten aus dem Stations-Excel „FG-Plan Zeitleiste“ (v3.6.15)
+ * Blatt Tabelle2 (2022): zusätzliche Nahrungen, korrigierte Mineralstoffe, Eingabe wie im Excel (g Pulver je 100 ml).
+ * ────────────────────────────────────────────────────────────────*/
+describe('AM) Stations-Excel: Neocate (v3.6.15)', () => {
+    const NP = require('../products.js');
+    const prod = id => NP.enteralProducts.find(p => p.id === id);
+
+    it('AM1: Neocate steht mit den Excel-Werten in den Produktdaten; andere Excel-Produkte sind nicht übernommen (Entscheidung 01.11.2026)', () => {
+        expect(prod('neocate').per100ml).toMatchObject({ kcal: 67, protein: 1.8, fat: 3.4, carbs: 7.2 });
+        for (const id of ['aptamilHAPre', 'aptamilAR']) expect(prod(id), id).toBeUndefined();
+        expect(NP.enteralProducts.some(p => /Primergen/i.test(p.name))).toBe(false);
+    });
+
+    it('AM2: Die Fallback-Tabelle der Zielvolumen-Kopplung stimmt mit den Produktdaten überein (Eiweiß, Energie)', () => {
+        for (const id of ['neocate', 'ebm', 'bebaFG1', 'bebaFG2', 'aptamilPre', 'hippPre']) {
+            const d = calc._enteralDensity({ selectedEnteralProduct: id, fm85Percent: 0 });
+            expect(d.proteinPer100, id).toBe(prod(id).per100ml.protein);
+            expect(d.kcalPer100, id).toBe(prod(id).per100ml.kcal);
+        }
+    });
+});
+
+describe('AM-UI) Neocate in der Oberfläche (v3.6.15)', () => {
+    async function boot(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        return w;
+    }
+    const kind = { 'birth-weight': 800, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 180, 'input-enteral': 180 };
+
+    it('AM3: Alle Nahrungen aus den Produktdaten sind in der Auswahl wählbar', async () => {
+        const w = await boot({});
+        const opts = [...w.document.querySelectorAll('#input-enteral-product option')].map(o => o.value);
+        require('../products.js').enteralProducts.forEach(p => expect(opts, p.id).toContain(p.id));
+    });
+
+    it('AM4: Neocate bei 180 ml/kg/d: 120,6 kcal/kg/d und 3,24 g Eiweiß/kg/d', async () => {
+        const w = await boot({ ...kind, 'input-enteral-product': 'neocate' });
+        expect(w.document.getElementById('qv-kcal').innerText).toBe('120.6');
+        expect(String(w.document.getElementById('res-protein-total-gkg').innerText)).toMatch(/3[.,]24/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AN — Keine Anreicherungs-Empfehlung bei erreichter Energieobergrenze (v3.6.16)
+ * Anlass: Kind mit 195 ml/kg/d (156 ml/d bei 800 g), FM85 1 % und Eiweiß-Zusatz: 149 kcal/kg/d bei Ziel damals 110–135 (seit v3.6.17 110–140), und die App
+ * empfahl gleichzeitig „vorrangig Anreicherung statt Volumen steigern“ und „Überernährung prüfen“.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () => {
+    const kind = o => calc.calculate(baseInput({
+        birthWeight: 730, currentWeight: 800, ssw: 28, postnatalAge: 15, mealFrequency: 12,
+        gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0,
+        selectedEnteralProduct: 'ebm', fm85Percent: 0, ...o
+    }));
+    const alle = r => [...r.warnings, ...r.reminders, ...(r.assessment.fazit || [])];
+    const anrText = r => alle(r).filter(t => /Anreicherung statt Volumen|FM85 Start-Kriterium|auf 4% empfohlen|Fortifizierung prüfen|FM85-Fortifizierung starten/.test(t));
+
+    it('AN1: 195 ml/kg/d, FM85 1 %: Energie über der Obergrenze → der Hinweis „oberhalb des Zielkorridors“ nennt die Energie statt Anreicherung zu empfehlen', () => {
+        const r = kind({ tfi: 195, enteralVolume: 195, fm85Percent: 1, proteinAddPer100ml: 0.29 });
+        expect(r.results.kcalPerKg).toBeGreaterThan(140);
+        const h = r.warnings.find(w => /^Hinweis: Enteral 195 ml\/kg\/d oberhalb des Zielkorridors/.test(w));
+        expect(h).toBeTruthy();
+        expect(h).toMatch(/Die Energie liegt bereits an der Obergrenze/);
+        expect(h).toMatch(/keine weitere Anreicherung/);
+        expect(h).not.toMatch(/vorrangig Anreicherung statt Volumen steigern/);
+        expect(r.warnings.some(w => /Energie .* über Zielbereich/.test(w))).toBe(true);   // die Energie-Warnung bleibt
+    });
+
+    it('AN2: Über dem Zielkorridor, aber Energie unter der Obergrenze → die bisherige Empfehlung bleibt', () => {
+        const r = kind({ tfi: 185, enteralVolume: 185 });                  // 131 kcal/kg/d
+        expect(r.results.kcalPerKg).toBeLessThan(140);
+        const h = r.warnings.find(w => /oberhalb des Zielkorridors/.test(w));
+        expect(h).toMatch(/vorrangig Anreicherung statt Volumen steigern/);
+    });
+
+    it('AN3: FM85-Start-Erinnerung und Fazit-Zeile entfallen bei Energie an der Obergrenze, bleiben sonst bestehen', () => {
+        // v3.6.17 — Anpassung wegen Obergrenze 140 (vorher 135): 195 ml/kg/d Milch allein = 138,5 kcal/kg/d liegen jetzt
+        // darunter, deshalb 200 ml/kg/d (142 kcal/kg/d) als Fall „an der Obergrenze“.
+        const hoch = kind({ tfi: 200, enteralVolume: 200 });               // nur Milch: 142 kcal/kg/d
+        expect(anrText(hoch).filter(t => /FM85/.test(t))).toEqual([]);
+        const normal = kind({ tfi: 150, enteralVolume: 150 });             // 106,5 kcal/kg/d
+        expect(anrText(normal).some(t => /FM85 Start-Kriterium/.test(t))).toBe(true);
+    });
+
+    it('AN4: „Fortifizierung auf 4 % empfohlen“ ab Monat 2 entfällt bei Energie an der Obergrenze', () => {
+        const hoch = kind({ postnatalAge: 30, tfi: 195, enteralVolume: 195, fm85Percent: 2 });      // 155 kcal/kg/d
+        expect(hoch.warnings.some(w => /auf 4% empfohlen/.test(w))).toBe(false);
+        const normal = kind({ postnatalAge: 30, tfi: 150, enteralVolume: 150, fm85Percent: 2 });    // 119,6 kcal/kg/d
+        expect(normal.warnings.some(w => /auf 4% empfohlen/.test(w))).toBe(true);
+    });
+
+    it('AN5: Läuft noch PN, bleiben die Empfehlungen (die PN-Energie sinkt beim Ausschleichen)', () => {
+        const r = kind({ tfi: 195, enteralVolume: 110, gir: 8, protein: 3, lipids: 3, calcium: 40, phosphate: 30 });
+        expect(r.results.kcalParenteralKg).toBeGreaterThan(0);
+        expect(calc._energyAtLimit(r.results.kcalPerKg, r.targets, 15, r.results.kcalParenteralKg)).toBe(false);
+    });
+
+    it('AN6: _energyAtLimit — erst ab Lebenstag 4, an der Obergrenze eingeschlossen, ohne Ziele nie', () => {
+        const t = { energy: { min: 110, max: 140 } };
+        expect(calc._energyAtLimit(140, t, 10)).toBe(true);
+        expect(calc._energyAtLimit(139.9, t, 10)).toBe(false);
+        expect(calc._energyAtLimit(150, t, 3)).toBe(false);
+        expect(calc._energyAtLimit(150, null, 10)).toBe(false);
     });
 });

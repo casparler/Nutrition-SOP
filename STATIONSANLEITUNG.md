@@ -61,7 +61,7 @@ gedacht und kann eingeklappt bleiben.
 | Anzeige | Zielbereich | Bedeutung bei Abweichung |
 |---|---|---|
 | Sicherheitsstatus | grün | Rot bedeutet, dass mindestens ein harter Grenzwert überschritten ist. Vor dem Verlassen der Maske klären. |
-| Gesamtenergie | Tag 1: 45–60, Tag 2: 60–80, Tag 3: 80–100, ab Tag 4: 110–135 kcal/kg/d | Anhaltendes Defizit führt zu postnataler Wachstumsrestriktion. |
+| Gesamtenergie | Tag 1: 45–60, Tag 2: 60–80, Tag 3: 80–100, ab Tag 4: 110–140 kcal/kg/d | Anhaltendes Defizit führt zu postnataler Wachstumsrestriktion. |
 | Wachstumsrate | 15–20 g/kg/d | Unter 15 g/kg/d Fortifizierung und Energiezufuhr prüfen. Über 25 g/kg/d an Ödeme denken. |
 | Enteraler Aufbau | Kachel im enteralen Abschnitt | Zeigt aktuelles Volumen, Zielvolumen und den Korridor für den heutigen Lebenstag. |
 
@@ -107,15 +107,15 @@ Enterokolitis und eine stabile Kreislaufsituation voraus.
 
 Das Zielvolumen richtet sich nach Reifegrad und wird zusätzlich durch die
 Nährstoffdichte der eingestellten Nahrung begrenzt. Der Grund: bei hoher Anreicherung
-ist die Proteinobergrenze von 4,5 g/kg/d vor dem Volumenziel erreicht. Für
+ist die Energieobergrenze (140 kcal/kg/d) oder die Proteinobergrenze (4,5 g/kg/d) vor dem Volumenziel erreicht. Für
 Muttermilch bei einem sehr kleinen Frühgeborenen ergibt sich daraus:
 
 | FM85 | Zielvolumen | begrenzt durch |
 |---|---|---|
 | 0 bis 1 Prozent | 160–180 ml/kg/d | nicht begrenzt |
-| 2 Prozent | 150–170 ml/kg/d | Energieziel |
+| 2 Prozent | 155–175 ml/kg/d | Energieziel |
 | 3 Prozent | 145–165 ml/kg/d | Energieziel |
-| 4 Prozent | 130–150 ml/kg/d | Proteinobergrenze |
+| 4 Prozent | 135–155 ml/kg/d | Energieziel |
 
 Bei invasiver Beatmung gilt zusätzlich die Grenze von 140 ml/kg/d. Zeigt die Kachel eine
 Begrenzung an, nennt sie den maßgeblichen Grund.

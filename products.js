@@ -172,6 +172,13 @@ const NeoProducts = {
             id: 'hippPre',
             name: 'Hipp Pre Bio',
             per100ml: { kcal: 66, protein: 1.25, fat: 3.50, carbs: 7.3, sodium_mg: 20, phosphorus_mg: 50 }
+        },
+        // v3.6.15: aus dem Stations-Excel „FG-Plan Zeitleiste“ (2022), Blatt Tabelle2. Nicht an der Packung geprüft;
+        // Natrium, Calcium und Phosphor sind dort nicht hinterlegt und zählen als 0.
+        {
+            id: 'neocate',
+            name: 'Neocate (Stations-Excel)',
+            per100ml: { kcal: 67, protein: 1.8, fat: 3.4, carbs: 7.2 }
         }
     ],
 

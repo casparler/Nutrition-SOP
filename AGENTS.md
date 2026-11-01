@@ -3,7 +3,7 @@
 > **Verbindliche Leitlinien für alle KI-Agenten und Entwickler, die an diesem Projekt arbeiten.**
 > Dies ist eine **klinische Safety-First-Applikation**. Verstöße gegen die folgenden Regeln können zu Patientengefährdung führen.
 >
-> **Aktueller Stand:** v3.6 (übersichtlichere Meldungen) auf v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **275/275 grün** (Sektionen A–Z und AA–AL).
+> **Aktueller Stand:** v3.6 (übersichtlichere Meldungen) auf v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **285/285 grün** (Sektionen A–Z und AA–AN).
 > CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) führt `npm test` bei jedem Push/PR aus.
 
 ---
@@ -12,7 +12,7 @@
 
 ### 1. Test-Suite (Vitest) — ALLE Tests müssen IMMER zu 100 % grün sein
 
-- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 275 klinische Tests** (Sektionen A–Z und AA–AD; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
+- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 285 klinische Tests** (Sektionen A–Z und AA–AD; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
 - Die Anzahl darf wachsen, aber **nie schrumpfen**. Neue Tests gerne — alte nur mit klinischer Begründung anpassen.
 - **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — ALLE Tests müssen bestanden sein.**
 - **Nach JEDER Änderung an `calculator.js` muss `npm test` erneut grün sein, bevor die Aufgabe als abgeschlossen gilt.**
@@ -20,7 +20,7 @@
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
 
 ```bash
-npm test    # MUSS 275 passed, 0 failed zeigen
+npm test    # MUSS 285 passed, 0 failed zeigen
 ```
 
 ### 2. ELBW-Klassengrenze bei exakt 1000 g — SAKROSANKT
@@ -152,10 +152,11 @@ Resultierende Matrix (ELBW, spontan atmend, EBM):
 | FM85 | Ziel | limitiert durch |
 |------|------|-----------------|
 | 0 % | 160–180 | — |
-| 2 % | 145–165 | Energie |
-| 4 % | 130–150 | Energie |
+| 2 % | 155–175 | Energie |
+| 4 % | 135–155 | Energie |
 
-*(Stand v3.6.2 mit den Packungswerten von FM85; bis v3.6.1 stand hier „2 %: 150–170 Energie, 4 %: 130–150 Protein“,
+*(Stand v3.6.17: Energieobergrenze 140 statt 135 kcal/kg/d; vorher 2 %: 145–165, 4 %: 130–150.
+Stand v3.6.2 mit den Packungswerten von FM85; bis v3.6.1 stand hier „2 %: 150–170 Energie, 4 %: 130–150 Protein“,
 weil das Eiweiß von FM85 um rund 30 % zu hoch gerechnet wurde. Den Fall „durch Protein begrenzt“ deckt jetzt
 Test O2b mit eiweißreicher Formelnahrung ab.)*
 
@@ -402,10 +403,10 @@ Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende ver
 
 ## 📋 Standard-Workflow für jede Änderung an `calculator.js`
 
-1. **Vor der Änderung:** `npm test` ausführen → muss 275/275 grün sein. Sonst zuerst Bestand reparieren.
+1. **Vor der Änderung:** `npm test` ausführen → muss 285/285 grün sein. Sonst zuerst Bestand reparieren.
 2. **Während der Änderung:** Keine der drei Invarianten oben antasten.
-3. **Nach der Änderung:** `npm test` erneut ausführen → muss 275/275 grün sein.
-4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 275/275 wieder grün sind.
+3. **Nach der Änderung:** `npm test` erneut ausführen → muss 285/285 grün sein.
+4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 285/285 wieder grün sind.
 
 ---
 
@@ -416,7 +417,7 @@ Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende ver
 | [REGELWERK.md](./REGELWERK.md) | Manuskript aller Regeln mit Herkunft, Entscheidungsdatum und Tests |
 | [calculator.js](./calculator.js) | Safety Core Engine — Decimal.js, Validierung, Targets, Warnings |
 | [index.html](./index.html) | UI inkl. try-catch um `calculate()` und Error-Banner |
-| [tests/calculator.test.js](./tests/calculator.test.js) | 275 klinische Vitest-Tests (Sektionen A–Z und AA–AL) |
+| [tests/calculator.test.js](./tests/calculator.test.js) | 285 klinische Vitest-Tests (Sektionen A–Z und AA–AN) |
 | [NICU_NUTRITION_MASTER_PROTOCOL.md](./NICU_NUTRITION_MASTER_PROTOCOL.md) | Klinische Spezifikation (Single Source of Truth) |
 | [NEO_NUTRITION_MASTER_LOGIC.md](./NEO_NUTRITION_MASTER_LOGIC.md) | Logik-Spezifikation V11 |
 
@@ -457,7 +458,7 @@ cp index.html      _Archiv/backups/backup_index_v{X.Y}.html
 cp calculator.js   _Archiv/backups/backup_calculator_v{X.Y}.js
 cp AGENTS.md       _Archiv/backups/backup_AGENTS_v{X.Y}.md
 
-# 2. Tests müssen 275/275 grün sein
+# 2. Tests müssen 285/285 grün sein
 npm test    # im Obsidian-Ordner
 
 # 3. Repo frisch in /tmp klonen (wenn nicht schon vorhanden)
@@ -515,21 +516,27 @@ git push -u origin feature/{name}-v{X.Y}
 
 | v3.6.1–3.6.2 | `claude/zen-babbage-vjgke2` | P:AA-Warnung entfällt, Beschriftungen auf Deutsch, FM85 nach Packungsangabe gerechnet (35,5 g Eiweiß und 435 kcal je 100 g statt 0,4675 g je 1 %). → Tests AA1–AA2, AB1–AB4, O2/Q21/Q22/S8/C4 mit Begründung angepasst. **205 Tests total** | in Arbeit |
 
-| v3.6.3 | `claude/zen-babbage-vjgke2` | Sterofundin ISO als Sekundärinfusion (Na, Cl, K, Ca); **Fehlerkorrektur:** NaCl 0,9 % und 0,45 % rechneten mit zehnfachem Natrium. → Tests AC1–AC9, AD1–AD4. Danach: PN-Osmolarität und Glukosekonzentration nur aus dem PN-Beutel, Eigenosmolarität der Sekundärlösung, Ursachenzeile bei zu kleinem PN-Volumen (AE1–AE7). **275 Tests total** | in Arbeit |
+| v3.6.3 | `claude/zen-babbage-vjgke2` | Sterofundin ISO als Sekundärinfusion (Na, Cl, K, Ca); **Fehlerkorrektur:** NaCl 0,9 % und 0,45 % rechneten mit zehnfachem Natrium. → Tests AC1–AC9, AD1–AD4. Danach: PN-Osmolarität und Glukosekonzentration nur aus dem PN-Beutel, Eigenosmolarität der Sekundärlösung, Ursachenzeile bei zu kleinem PN-Volumen (AE1–AE7). **285 Tests total** | in Arbeit |
 
 | v3.6.4 | `claude/zen-babbage-vjgke2` | Auswahl „Keine parenterale Ernährung“: leert und sperrt GIR, Aminosäuren, Ca, P, Na und K selbst (Lipide bleiben einstellbar, v3.6.5), stellt sie bei anderer Auswahl wieder her. → Tests AF1–AF6. **231 Tests total** | in Arbeit |
 
-| v3.6.5–3.6.8 | `claude/zen-babbage-vjgke2` | Keine-PN-Auswahl lässt Lipide unberührt; NPC/P-Warnungen (unter 20, über 40) nur bei laufender PN, Muttermilch allein meldet kein „Verfettungsrisiko“ mehr, und die Obergrenze „Verfettungsrisiko“ (NPC/P über 40) entfällt, weil kein belegter Schwellenwert (nur „zu knapp“ unter 20 bei PN bleibt). → Tests AF6, AG1–AG5. **275 Tests total** | in Arbeit |
+| v3.6.5–3.6.8 | `claude/zen-babbage-vjgke2` | Keine-PN-Auswahl lässt Lipide unberührt; NPC/P-Warnungen (unter 20, über 40) nur bei laufender PN, Muttermilch allein meldet kein „Verfettungsrisiko“ mehr, und die Obergrenze „Verfettungsrisiko“ (NPC/P über 40) entfällt, weil kein belegter Schwellenwert (nur „zu knapp“ unter 20 bei PN bleibt). → Tests AF6, AG1–AG5. **285 Tests total** | in Arbeit |
 
-| v3.6.9–3.6.10 | `claude/zen-babbage-vjgke2` | Lipid-Anteil an NPC bezieht sich auf die Gesamtenergie (parenteral + enteral); die Regel 25–50 % gilt nur bei vollständiger PN (enteral unter 25 ml/kg/d), so die ESPGHAN-Leitlinie 2018; Anzeige mit Gesamtwerten. → Tests AH1–AH7. **275 Tests total** | in Arbeit |
+| v3.6.9–3.6.10 | `claude/zen-babbage-vjgke2` | Lipid-Anteil an NPC bezieht sich auf die Gesamtenergie (parenteral + enteral); die Regel 25–50 % gilt nur bei vollständiger PN (enteral unter 25 ml/kg/d), so die ESPGHAN-Leitlinie 2018; Anzeige mit Gesamtwerten. → Tests AH1–AH7. **285 Tests total** | in Arbeit |
 
-| v3.6.11 | `claude/zen-babbage-vjgke2` | Triglyzerid-Kontrollhinweis (nie ein Stopp): Lipide i. v. über 3 g/kg/d, bei Geburtsgewicht bis 1000 g ab 2 g/kg/d, ohne eingetragenen Triglyzerid-Wert. → Tests AI1–AI5. **275 Tests total** | in Arbeit |
+| v3.6.11 | `claude/zen-babbage-vjgke2` | Triglyzerid-Kontrollhinweis (nie ein Stopp): Lipide i. v. über 3 g/kg/d, bei Geburtsgewicht bis 1000 g ab 2 g/kg/d, ohne eingetragenen Triglyzerid-Wert. → Tests AI1–AI5. **285 Tests total** | in Arbeit |
 
-| v3.6.12 | `claude/zen-babbage-vjgke2` | Enterales Volumen: Umrechnung (ml/d, ml je Mahlzeit, Rechengewicht) unter dem Eingabefeld; Lipide ohne frei verfügbares Volumen zählen nicht mehr still zur Energie, stattdessen Hinweis. → Tests AJ1–AJ6. **275 Tests total** | in Arbeit |
+| v3.6.12 | `claude/zen-babbage-vjgke2` | Enterales Volumen: Umrechnung (ml/d, ml je Mahlzeit, Rechengewicht) unter dem Eingabefeld; Lipide ohne frei verfügbares Volumen zählen nicht mehr still zur Energie, stattdessen Hinweis. → Tests AJ1–AJ6. **285 Tests total** | in Arbeit |
 
-| v3.6.13 | `claude/zen-babbage-vjgke2` | Mengen direkt eintragen: Einheiten-Auswahl (ml/kg/d, ml/Tag, ml/h, ml je Mahlzeit) für Gesamtflüssigkeit, enterale Ernährung und Spülflüssigkeit; Umrechnung mit dem gemeinsamen Rechengewicht (`getCalculationWeightG`, `volumeToMlKg`), Sekundärinfusion rechnet ebenfalls damit. → Tests AK1–AK10. **275 Tests total** | in Arbeit |
+| v3.6.13 | `claude/zen-babbage-vjgke2` | Mengen direkt eintragen: Einheiten-Auswahl (ml/kg/d, ml/Tag, ml/h, ml je Mahlzeit) für Gesamtflüssigkeit, enterale Ernährung und Spülflüssigkeit; Umrechnung mit dem gemeinsamen Rechengewicht (`getCalculationWeightG`, `volumeToMlKg`), Sekundärinfusion rechnet ebenfalls damit. → Tests AK1–AK10. **285 Tests total** | in Arbeit |
 
-| v3.6.14 | `claude/zen-babbage-vjgke2` | Anreicherung aus der Verordnung: FM85 und Eiweiß-Zusatz als Dosis je Mahlzeit eingebbar (ml 50-%-Lösung, g Pulver, ml Eiweißlösung), Umrechnung unter den Feldern, Zubereitung mit ml Lösung, Energie je 100 ml und Spielraum bis zur Eiweiß-Obergrenze. → Tests AL1–AL11, V5 mit Begründung angepasst. **275 Tests total** | in Arbeit |
+| v3.6.14 | `claude/zen-babbage-vjgke2` | Anreicherung aus der Verordnung: FM85 und Eiweiß-Zusatz als Dosis je Mahlzeit eingebbar (ml 50-%-Lösung, g Pulver, ml Eiweißlösung), Umrechnung unter den Feldern, Zubereitung mit ml Lösung, Energie je 100 ml und Spielraum bis zur Eiweiß-Obergrenze. → Tests AL1–AL11, V5 mit Begründung angepasst. **285 Tests total** | in Arbeit |
+
+| v3.6.15 | `claude/zen-babbage-vjgke2` | Aus dem Stations-Excel nur Neocate als Nahrung übernommen (Entscheidung des Neonatologen). → Tests AM1–AM4, V5 unverändert. **285 Tests total** | in Arbeit |
+
+| v3.6.16 | `claude/zen-babbage-vjgke2` | Keine Anreicherungs-Empfehlung (FM85, Fortifizierung) mehr, wenn die Energie bei rein enteraler Ernährung an der Obergrenze liegt; stattdessen Hinweis auf die Energie. → Tests AN1–AN6. **285 Tests total** | in Arbeit |
+
+| v3.6.17 | `claude/zen-babbage-vjgke2` | Energieobergrenze ab Tag 4 von 135 auf 140 kcal/kg/d (Entscheidung des Neonatologen 01.11.2026, ESPGHAN 2022: 115–140); Zielvolumen bei Anreicherung entsprechend (4 % FM85: 135–155 statt 130–150). Muttermilch-Eiweiß 1,13 g/100 ml bleibt, Beleg offen (REGELWERK 17.18). → Tests O2, AN1–AN6 mit Begründung angepasst. **285 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```
