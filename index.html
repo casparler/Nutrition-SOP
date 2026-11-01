@@ -424,19 +424,23 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">FM85 <span class="text-gray-400 font-normal">(%)</span></label>
+                                <label class="block text-sm font-medium text-gray-700">FM85 <select id="input-fm85-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit FM85"><option value="pct" selected>%</option><option value="solml">ml 50-%-Lösung je Mahlzeit</option><option value="g">g Pulver je Mahlzeit</option></select></label>
                                 <input type="number" id="input-fm85" step="0.5" min="0" max="5" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 <p class="text-[10px] text-gray-500 mt-1">1 % = 1 g auf 100 ml</p>
+                                <p id="fm85-converted" class="text-[10px] text-sky-700 mt-0.5"></p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Eiweiß-Zusatz
                                     <select id="input-protein-add-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Eiweiß-Zusatz">
                                         <option value="per100" selected>g/100 ml</option>
                                         <option value="gkg">g/kg/d</option>
+                                        <option value="powdermeal">g Pulver je Mahlzeit</option>
+                                        <option value="solmeal">ml Eiweißlösung je Mahlzeit</option>
                                     </select>
                                 </label>
                                 <input type="number" id="input-protein-add" step="0.1" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 <p class="text-[10px] text-gray-500 mt-1">Eiweißlösung 1 ml = 1 g Eiweiß; Pulver Aptamil Eiweiß+ 82,1 g/100 g</p>
+                                <p id="protein-add-converted" class="text-[10px] text-sky-700 mt-0.5"></p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Liquigen <span class="text-gray-400 font-normal">(ml/kg/d)</span></label>
@@ -1140,9 +1144,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.13"></script>
-    <script src="fenton_data.js?v=3.6.13"></script>
-    <script src="calculator.js?v=3.6.13"></script>
+    <script src="products.js?v=3.6.14"></script>
+    <script src="fenton_data.js?v=3.6.14"></script>
+    <script src="calculator.js?v=3.6.14"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1324,6 +1328,12 @@
                 const u = document.getElementById(uid);
                 if (u) u.value = 'kgd';
             });
+            // Vorlagen enthalten FM85 in % und Eiweiß-Zusatz in g/100 ml
+            [['input-fm85-unit', 'pct'], ['input-protein-add-unit', 'per100']].forEach(([uid, v]) => {
+                const u = document.getElementById(uid);
+                if (u) u.value = v;
+            });
+            if (typeof window.syncDoseSteps === 'function') window.syncDoseSteps();
 
             // Eine Vorlage überschreibt auch die PN-Felder: gespeicherte Werte der Auswahl „Keine PN“ verwerfen
             if (typeof window.discardNoPN === 'function') window.discardNoPN();
@@ -1410,7 +1420,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.13';
+            const EXPECTED_CALC_VERSION = '3.6.14';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1849,7 +1859,7 @@
                 'input-length', 'input-head', 'input-triglycerides',
                 'input-ssw', 'input-day', 'input-invasive-ventilation',
                 'input-solution', 'input-secondary-solution', 'input-secondary-rate',
-                'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit',
+                'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit', 'input-fm85-unit',
                 'input-birth-date', 'input-ssw-days'
             ];
 
@@ -1883,11 +1893,31 @@
                 sync();
             })();
 
+            // v3.6.14: Schrittweite und Obergrenze der Felder passen zur gewählten Einheit
+            // (% in 0,5er-Schritten, Dosen je Mahlzeit frei)
+            function syncDoseSteps() {
+                const f = document.getElementById('input-fm85');
+                const fu = document.getElementById('input-fm85-unit');
+                if (f && fu) {
+                    f.step = fu.value === 'pct' ? '0.5' : 'any';
+                    if (fu.value === 'pct') f.setAttribute('max', '5'); else f.removeAttribute('max');
+                }
+                const p = document.getElementById('input-protein-add');
+                const pu = document.getElementById('input-protein-add-unit');
+                if (p && pu) p.step = (pu.value === 'per100' || pu.value === 'gkg') ? '0.1' : 'any';
+            }
+            ['input-fm85-unit', 'input-protein-add-unit'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', syncDoseSteps);
+            });
+            syncDoseSteps();
+            window.syncDoseSteps = syncDoseSteps;
+
             // Bind listeners
             const selectIds = ['input-invasive-ventilation', 'input-ssw', 'input-ssw-days', 'input-birth-date', 'input-enteral-product',
                                'input-meal-frequency', 'input-lipid-infusion', 'input-access', 'input-solution', 'input-secondary-solution',
                                'input-feeding-paused', 'input-feeding-pause-reason',
-                               'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit'];
+                               'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit', 'input-fm85-unit'];
             inputs.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -2081,6 +2111,18 @@
                     const v = calculator.volumeToMlKg(raw, unit, { weightG: volWeightG, mealsPerDay: volMeals });
                     return v === null ? '' : v;   // ohne Gewicht keine Umrechnung; calculate() meldet das fehlende Gewicht
                 };
+                // v3.6.14: FM85 und Eiweiß-Zusatz können als Dosis je Mahlzeit eingegeben werden (so steht es in der Verordnung).
+                // Die Konzentration ergibt sich aus dem Nahrungsvolumen je Mahlzeit; calculate() erhält weiter % bzw. g/100 ml.
+                const volEnteralMlKg = parseFloat(volMlKg('input-enteral')) || 0;
+                const mealVolumeMl = volMeals > 0 && volWeightG > 0 ? volEnteralMlKg * (volWeightG / 1000) / volMeals : 0;
+                const rawOf = id => (document.getElementById(id) || {}).value;
+                const fm85Unit = (document.getElementById('input-fm85-unit') || { value: 'pct' }).value;
+                const fm85PercentIn = fm85Unit === 'pct' ? rawOf('input-fm85')
+                    : (calculator.fm85PercentFromDose(rawOf('input-fm85'), fm85Unit, mealVolumeMl) ?? 0);
+                const proteinAddUnit = (document.getElementById('input-protein-add-unit') || { value: 'per100' }).value;
+                const proteinAddPer100In = (proteinAddUnit === 'powdermeal' || proteinAddUnit === 'solmeal')
+                    ? (calculator.proteinAddPer100mlFromDose(rawOf('input-protein-add'), proteinAddUnit, mealVolumeMl) ?? 0)
+                    : rawOf('input-protein-add');
                 const secRateMlH = parseFloat(document.getElementById('input-secondary-rate').value) || 0;
                 const secRateKgD = calculator.volumeToMlKg(secRateMlH, 'h', { weightG: volWeightG }) || 0;
                 const secConvEl = document.getElementById('secondary-rate-converted');
@@ -2091,14 +2133,12 @@
                     previousWeight: previousWeight,
                     tfi: parseFloat(volMlKg('input-tfi')) || 0,
                     enteralVolume: volMlKg('input-enteral') || 0,
-                    fm85Percent: document.getElementById('input-fm85').value || 0,
+                    fm85Percent: fm85PercentIn || 0,
                     liquigenMlKg: (document.getElementById('input-liquigen') || {}).value || 0,
                     aptamilProteinGKg: (document.getElementById('input-aptamil-protein') || {}).value || 0,
                     // v3.5: Eine Eingabe, Einheit per Auswahl: g/100 ml (Hauptform) oder g/kg/d
-                    proteinAddPer100ml: ((document.getElementById('input-protein-add-unit') || {}).value === 'gkg')
-                        ? 0 : ((document.getElementById('input-protein-add') || {}).value || 0),
-                    proteinAddGKg: ((document.getElementById('input-protein-add-unit') || {}).value === 'gkg')
-                        ? ((document.getElementById('input-protein-add') || {}).value || 0) : 0,
+                    proteinAddPer100ml: proteinAddUnit === 'gkg' ? 0 : (proteinAddPer100In || 0),
+                    proteinAddGKg: proteinAddUnit === 'gkg' ? ((document.getElementById('input-protein-add') || {}).value || 0) : 0,
                     feedingPaused: !!(document.getElementById('input-feeding-paused') || {}).checked,
                     feedingPauseReason: (document.getElementById('input-feeding-pause-reason') || {}).value || 'other',
                     carrierVolume: volMlKg('input-carrier') || 0,
@@ -2354,6 +2394,8 @@
                             if (nz(prep.fm85Percent)) {
                                 html += line(`FM85 ${prep.fm85Percent} %`,
                                              `${prep.fm85GramsPerMeal} g`, `${prep.fm85GramsPerDay} g`);
+                                html += line(`FM85 als 50-%-Lösung (1 ml = 0,5 g Pulver)`,
+                                             `${prep.fm85SolutionMlPerMeal} ml`, `${prep.fm85SolutionMlPerDay} ml`);
                             }
                             if (nz(prep.proteinAddPer100ml)) {
                                 html += line(`Eiweißlösung (1 ml = 1 g Eiweiß), Zusatz ${prep.proteinAddPer100ml} g/100 ml`,
@@ -2368,7 +2410,14 @@
                             resEl.innerText = prep.proteinPer100mlFinal > 0
                                 ? `Ergibt ${prep.proteinPer100mlFinal} g Eiweiß je 100 ml. `
                                   + `Enteral ${r.enteralProteinGKg} g/kg/d, zusammen mit der parenteralen Zufuhr `
-                                  + `${r.proteinTotalGPerKg} g/kg/d.`
+                                  + `${r.proteinTotalGPerKg} g/kg/d. `
+                                  + (prep.kcalPer100mlFinal > 0 ? `Energie ${prep.kcalPer100mlFinal} kcal je 100 ml. ` : '')
+                                  + (prep.dailyVolumeMl > 0
+                                      ? (prep.proteinHeadroomGKg > 0
+                                          ? `Bis zur Eiweiß-Obergrenze (4,5 g/kg/d) ist noch Platz für ${String(prep.proteinHeadroomGKg).replace('.', ',')} g/kg/d, `
+                                            + `das wären ${String(prep.headroomPer100ml).replace('.', ',')} g Eiweiß je 100 ml mehr oder ${String(prep.headroomFm85Pct).replace('.', ',')} % FM85 mehr.`
+                                          : 'Die Eiweiß-Obergrenze (4,5 g/kg/d) ist erreicht.')
+                                      : '')
                                 : '';
                         }
                     }
@@ -2385,6 +2434,25 @@
                 // Length and Head Z-Scores
                 document.getElementById('res-length-zscore').innerText = r.lengthZScore !== null && r.lengthZScore !== undefined ? `${r.lengthZScore}` : '–';
                 document.getElementById('res-head-zscore').innerText = r.headZScore !== null && r.headZScore !== undefined ? `${r.headZScore}` : '–';
+
+                // v3.6.14: Was die Eingabe in der Verordnung bedeutet (Konzentration, Dosis je Mahlzeit)
+                {
+                    const k2 = x => String(Math.round(x * 100) / 100).replace('.', ',');
+                    const fmEl = document.getElementById('fm85-converted');
+                    const pr = r.preparation;
+                    if (fmEl) {
+                        fmEl.innerText = pr && pr.fm85Percent > 0
+                            ? `= ${k2(pr.fm85Percent)} % FM85 (${k2(pr.fm85Percent)} g Pulver auf 100 ml) · je Mahlzeit ${k2(pr.fm85GramsPerMeal)} g = ${k2(pr.fm85SolutionMlPerMeal)} ml 50-%-Lösung`
+                            : '';
+                    }
+                    const prEl = document.getElementById('protein-add-converted');
+                    if (prEl) {
+                        const kgW = r.calculationWeightG / 1000;
+                        prEl.innerText = pr && pr.proteinAddPer100ml > 0
+                            ? `= ${k2(pr.proteinAddPer100ml)} g Eiweiß/100 ml · ${k2(kgW > 0 ? pr.proteinAddGramsPerDay / kgW : 0)} g/kg/d · je Mahlzeit ${k2(pr.proteinPowderPerMeal)} g Pulver oder ${k2(pr.proteinSolutionMlPerMeal)} ml Eiweißlösung`
+                            : '';
+                    }
+                }
 
                 // FM85 disclaimer visibility
                 const fm85Disc = document.getElementById('fm85-disclaimer');
