@@ -3,7 +3,7 @@
 > **Verbindliche Leitlinien für alle KI-Agenten und Entwickler, die an diesem Projekt arbeiten.**
 > Dies ist eine **klinische Safety-First-Applikation**. Verstöße gegen die folgenden Regeln können zu Patientengefährdung führen.
 >
-> **Aktueller Stand:** v3.6 (übersichtlichere Meldungen) auf v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **285/285 grün** (Sektionen A–Z und AA–AN).
+> **Aktueller Stand:** v3.6 (übersichtlichere Meldungen) auf v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **292/292 grün** (Sektionen A–Z und AA–AO).
 > CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) führt `npm test` bei jedem Push/PR aus.
 
 ---
@@ -12,7 +12,7 @@
 
 ### 1. Test-Suite (Vitest) — ALLE Tests müssen IMMER zu 100 % grün sein
 
-- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 285 klinische Tests** (Sektionen A–Z und AA–AD; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
+- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 292 klinische Tests** (Sektionen A–Z und AA–AD; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
 - Die Anzahl darf wachsen, aber **nie schrumpfen**. Neue Tests gerne — alte nur mit klinischer Begründung anpassen.
 - **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — ALLE Tests müssen bestanden sein.**
 - **Nach JEDER Änderung an `calculator.js` muss `npm test` erneut grün sein, bevor die Aufgabe als abgeschlossen gilt.**
@@ -20,7 +20,7 @@
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
 
 ```bash
-npm test    # MUSS 285 passed, 0 failed zeigen
+npm test    # MUSS 292 passed, 0 failed zeigen
 ```
 
 ### 2. ELBW-Klassengrenze bei exakt 1000 g — SAKROSANKT
@@ -81,7 +81,7 @@ Tests **N11–N14** sichern das Verhalten ab.
 - `_analyzeEnergyGap()` und `_analyzeSodiumTrend()` in [calculator.js](./calculator.js) liefern **ausschließlich diagnostische Hinweise**, niemals ein Stop-Signal oder eine harte Dosis-Sperre.
 - Ergebnisse landen in `res.predictive` und werden als `res.assessment.predictiveHints` (separates Array, **außerhalb** des 5er-Bullet-Caps) ausgegeben — damit Kern-Safety-Bullets nie verdrängt werden.
 - Schwellwerte sind klinisch begründet und dürfen nur mit Quelle + Datum geändert werden:
-  - **Energy-Gap:** kumulatives Defizit **> 150 kcal/kg** über **≥ 3 Tage** → Hinweis (Embleton 2001, konservativer Trigger).
+  - **Energy-Gap:** kumulatives Defizit **> 150 kcal/kg** über **≥ 3 Tage** → Hinweis (Hausfestlegung; das Konzept stützt Embleton 2001, die Schwelle selbst steht dort nicht, siehe [QUELLEN.md](./QUELLEN.md)).
   - **Sodium-Trend:** Anstieg der Na-**Zufuhr** **Δ > 5 mmol/kg/d in 48 h** → Hinweis „Serum-Natrium kontrollieren".
 - Die History wird optional über `input.history` übergeben (Tag-Keys `"1"`, `"2"`, … mit Feldern `_kcal-kg`, `_kcal-min`, `input-sodium`). Fehlt sie, geben beide Funktionen `null` zurück — kein Fehler.
 
@@ -403,10 +403,10 @@ Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende ver
 
 ## 📋 Standard-Workflow für jede Änderung an `calculator.js`
 
-1. **Vor der Änderung:** `npm test` ausführen → muss 285/285 grün sein. Sonst zuerst Bestand reparieren.
+1. **Vor der Änderung:** `npm test` ausführen → muss 292/292 grün sein. Sonst zuerst Bestand reparieren.
 2. **Während der Änderung:** Keine der drei Invarianten oben antasten.
-3. **Nach der Änderung:** `npm test` erneut ausführen → muss 285/285 grün sein.
-4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 285/285 wieder grün sind.
+3. **Nach der Änderung:** `npm test` erneut ausführen → muss 292/292 grün sein.
+4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 292/292 wieder grün sind.
 
 ---
 
@@ -417,7 +417,7 @@ Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende ver
 | [REGELWERK.md](./REGELWERK.md) | Manuskript aller Regeln mit Herkunft, Entscheidungsdatum und Tests |
 | [calculator.js](./calculator.js) | Safety Core Engine — Decimal.js, Validierung, Targets, Warnings |
 | [index.html](./index.html) | UI inkl. try-catch um `calculate()` und Error-Banner |
-| [tests/calculator.test.js](./tests/calculator.test.js) | 285 klinische Vitest-Tests (Sektionen A–Z und AA–AN) |
+| [tests/calculator.test.js](./tests/calculator.test.js) | 292 klinische Vitest-Tests (Sektionen A–Z und AA–AO) |
 | [NICU_NUTRITION_MASTER_PROTOCOL.md](./NICU_NUTRITION_MASTER_PROTOCOL.md) | Klinische Spezifikation (Single Source of Truth) |
 | [NEO_NUTRITION_MASTER_LOGIC.md](./NEO_NUTRITION_MASTER_LOGIC.md) | Logik-Spezifikation V11 |
 
@@ -458,7 +458,7 @@ cp index.html      _Archiv/backups/backup_index_v{X.Y}.html
 cp calculator.js   _Archiv/backups/backup_calculator_v{X.Y}.js
 cp AGENTS.md       _Archiv/backups/backup_AGENTS_v{X.Y}.md
 
-# 2. Tests müssen 285/285 grün sein
+# 2. Tests müssen 292/292 grün sein
 npm test    # im Obsidian-Ordner
 
 # 3. Repo frisch in /tmp klonen (wenn nicht schon vorhanden)
@@ -537,6 +537,8 @@ git push -u origin feature/{name}-v{X.Y}
 | v3.6.16 | `claude/zen-babbage-vjgke2` | Keine Anreicherungs-Empfehlung (FM85, Fortifizierung) mehr, wenn die Energie bei rein enteraler Ernährung an der Obergrenze liegt; stattdessen Hinweis auf die Energie. → Tests AN1–AN6. **285 Tests total** | in Arbeit |
 
 | v3.6.17 | `claude/zen-babbage-vjgke2` | Energieobergrenze ab Tag 4 von 135 auf 140 kcal/kg/d (Entscheidung des Neonatologen 01.11.2026, ESPGHAN 2022: 115–140); Zielvolumen bei Anreicherung entsprechend (4 % FM85: 135–155 statt 130–150). Muttermilch-Eiweiß 1,13 g/100 ml bleibt, Beleg offen (REGELWERK 17.18). → Tests O2, AN1–AN6 mit Begründung angepasst. **285 Tests total** | in Arbeit |
+
+| v3.6.18 | `claude/zen-babbage-vjgke2` | Haken „Nur enteral (keine Infusion)“: Gesamtflüssigkeit folgt der enteralen Menge, Infusionslösung „Keine PN“, Lipide, Spülflüssigkeit, Sekundärinfusion und Zusätze auf 0 und gesperrt, beim Abwählen kehren die Werte zurück. Mengenfelder (Gesamtflüssigkeit, enteral, Spülflüssigkeit) nehmen Dezimalwerte an (0,5 ml je Mahlzeit galt wegen Schrittweite 1 als ungültig). → Tests AO1–AO7. **292 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```

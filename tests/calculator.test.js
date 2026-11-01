@@ -3070,3 +3070,104 @@ describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () =>
         expect(calc._energyAtLimit(150, null, 10)).toBe(false);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AO — Haken „Nur enteral (keine Infusion)“ und Dezimalwerte bei Mengen (v3.6.18)
+ * Anlass: (1) Bei rein enteral ernährten Kindern musste dasselbe Volumen zweimal eingetragen werden
+ * (Gesamtflüssigkeit und enteral). (2) Die Mengenfelder hatten Schrittweite 1, ein Wert wie 0,5 ml je Mahlzeit
+ * galt dem Browser als ungültig.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AO) Nur enteral und Dezimalwerte (v3.6.18)', () => {
+    async function boot(values) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        return w;
+    }
+    const kind = { 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 15, 'input-meal-frequency': 12 };
+    const haken = (w, an) => {
+        const box = w.document.getElementById('input-enteral-only');
+        box.checked = an;
+        box.dispatchEvent(new w.Event('change'));
+    };
+    const $ = (w, id) => w.document.getElementById(id);
+
+    it('AO1: 0,5 ml je Mahlzeit ist ein gültiger Wert und ergibt 7,5 ml/kg/d (bei 800 g, 12 Mahlzeiten)', async () => {
+        const w = await boot({ ...kind, 'input-tfi': 80, 'input-enteral-unit': 'meal', 'input-enteral': 0.5, 'input-carrier-unit': 'd', 'input-carrier': 2.5 });
+        ['input-tfi', 'input-enteral', 'input-carrier'].forEach(id => expect($(w, id).validity.stepMismatch, id).toBe(false));
+        expect($(w, 'enteral-converted').innerText).toMatch(/^= 7,5 ml\/kg\/d · 6 ml\/d · 0,5 ml je Mahlzeit/);
+    });
+
+    it('AO2: „Nur enteral“ — Gesamtflüssigkeit folgt der enteralen Menge, Infusion und Lipide stehen auf 0, die Felder sind gesperrt', async () => {
+        const w = await boot({ ...kind, 'input-tfi': 150, 'input-lipids': 1, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
+        haken(w, true);
+        expect($(w, 'input-tfi').value).toBe('180');                 // 12 ml × 12 ÷ 0,8 kg
+        expect($(w, 'input-solution').value).toBe('keinePN');
+        expect($(w, 'input-lipids').value).toBe('0');
+        expect($(w, 'input-secondary-solution').value).toBe('none');
+        ['input-tfi', 'input-solution', 'input-lipids', 'input-carrier', 'input-secondary-rate', 'input-gir', 'input-protein']
+            .forEach(id => expect($(w, id).disabled, id).toBe(true));
+        expect($(w, 'tfi-converted').innerText).toMatch(/^= 144 ml\/d/);
+        expect($(w, 'enteral-only-note').classList.contains('hidden')).toBe(false);
+    });
+
+    it('AO3: Die Gesamtflüssigkeit folgt späteren Änderungen der enteralen Menge', async () => {
+        const w = await boot({ ...kind, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
+        haken(w, true);
+        $(w, 'input-enteral').value = 6;
+        w.updateCalculations();
+        expect($(w, 'input-tfi').value).toBe('90');
+        $(w, 'input-enteral-unit').value = 'd';
+        $(w, 'input-enteral').value = 72;
+        w.updateCalculations();
+        expect($(w, 'input-tfi').value).toBe('90');
+    });
+
+    it('AO4: Abwählen stellt Gesamtflüssigkeit, Infusionslösung, Lipide und Sperren wieder her', async () => {
+        const w = await boot({ ...kind, 'input-tfi': 150, 'input-lipids': 1.5, 'input-solution': 'basisFG', 'input-enteral': 60 });
+        w.updateSolutionUI();
+        const vorher = ['input-tfi', 'input-solution', 'input-lipids', 'input-carrier', 'input-secondary-solution'].map(id => $(w, id).value);
+        haken(w, true);
+        haken(w, false);
+        expect(['input-tfi', 'input-solution', 'input-lipids', 'input-carrier', 'input-secondary-solution'].map(id => $(w, id).value)).toEqual(vorher);
+        ['input-tfi', 'input-solution', 'input-lipids', 'input-gir'].forEach(id => expect($(w, id).disabled, id).toBe(false));
+        expect($(w, 'enteral-only-note').classList.contains('hidden')).toBe(true);
+    });
+
+    it('AO5: Stand die Auswahl „Keine PN“ schon, bleibt sie nach dem Abwählen erhalten; die PN-Werte davor kehren zurück', async () => {
+        const w = await boot({ ...kind, 'input-tfi': 150, 'input-enteral': 60, 'input-gir': 6 });
+        haken(w, true);
+        haken(w, false);
+        expect($(w, 'input-solution').value).toBe('none');
+        expect($(w, 'input-gir').value).toBe('6');
+        expect($(w, 'input-gir').disabled).toBe(false);
+    });
+
+    it('AO6: Eine Vorlage verwirft den Haken und gibt die Felder frei', async () => {
+        const w = await boot({ ...kind, 'input-enteral': 60 });
+        haken(w, true);
+        w.loadSimulation('elbw');
+        expect($(w, 'input-enteral-only').checked).toBe(false);
+        expect($(w, 'input-tfi').disabled).toBe(false);
+        expect($(w, 'input-lipids').disabled).toBe(false);
+    });
+
+    it('AO7: Mit dem Haken meldet der Rechenkern keine Volumenkonflikte (kein PN-Rest, keine CRITICAL-Meldung zu Lipid-Volumen)', async () => {
+        const w = await boot({ ...kind, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
+        haken(w, true);
+        expect(w.document.getElementById('findings-critical')).not.toBeNull();
+        const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')].map(e => e.textContent);
+        expect(kritisch.filter(t => /Lipid|Osmolarität|Glukosekonzentration|Ausfällung/.test(t))).toEqual([]);
+    });
+});
