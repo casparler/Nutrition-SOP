@@ -405,8 +405,6 @@
                                 <option value="bebaFG2">Beba FG Stufe 2</option>
                                 <option value="aptamilPre">Aptamil Pre</option>
                                 <option value="hippPre">Hipp Pre Bio</option>
-                                <option value="aptamilHAPre">Aptamil HA Pre (Stations-Excel)</option>
-                                <option value="aptamilAR">Aptamil AR Komplettnahrung (Stations-Excel)</option>
                                 <option value="neocate">Neocate (Stations-Excel)</option>
                             </select>
                         </div>
@@ -439,7 +437,6 @@
                                         <option value="gkg">g/kg/d</option>
                                         <option value="powdermeal">g Pulver je Mahlzeit</option>
                                         <option value="solmeal">ml Eiweißlösung je Mahlzeit</option>
-                                        <option value="powder100">g Pulver/100 ml</option>
                                     </select>
                                 </label>
                                 <input type="number" id="input-protein-add" step="0.1" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
@@ -1908,7 +1905,7 @@
                 }
                 const p = document.getElementById('input-protein-add');
                 const pu = document.getElementById('input-protein-add-unit');
-                if (p && pu) p.step = (pu.value === 'per100' || pu.value === 'gkg' || pu.value === 'powder100') ? '0.1' : 'any';
+                if (p && pu) p.step = (pu.value === 'per100' || pu.value === 'gkg') ? '0.1' : 'any';
             }
             ['input-fm85-unit', 'input-protein-add-unit'].forEach(id => {
                 const el = document.getElementById(id);
@@ -2124,7 +2121,7 @@
                 const fm85PercentIn = fm85Unit === 'pct' ? rawOf('input-fm85')
                     : (calculator.fm85PercentFromDose(rawOf('input-fm85'), fm85Unit, mealVolumeMl) ?? 0);
                 const proteinAddUnit = (document.getElementById('input-protein-add-unit') || { value: 'per100' }).value;
-                const proteinAddPer100In = (proteinAddUnit === 'powdermeal' || proteinAddUnit === 'solmeal' || proteinAddUnit === 'powder100')
+                const proteinAddPer100In = (proteinAddUnit === 'powdermeal' || proteinAddUnit === 'solmeal')
                     ? (calculator.proteinAddPer100mlFromDose(rawOf('input-protein-add'), proteinAddUnit, mealVolumeMl) ?? 0)
                     : rawOf('input-protein-add');
                 const secRateMlH = parseFloat(document.getElementById('input-secondary-rate').value) || 0;
