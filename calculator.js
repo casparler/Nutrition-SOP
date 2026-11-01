@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.15';
+        this.VERSION = '3.6.16';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -505,6 +505,18 @@ class NutritionCalculator {
      *
      * Quellen: ESPGHAN 2018 + NICU_NUTRITION_MASTER_PROTOCOL_V2.
      */
+    /**
+     * v3.6.16: Energie an oder über der Obergrenze des Zielbereichs (nur ab Lebenstag 4; davor ist die Tagesgrenze eine
+     * PN-Phasen-Grenze, vgl. getTargets). Dann gibt die App keine Empfehlung zu mehr Anreicherung (FM85, Fortifizierung) ab.
+     * Nur bei rein enteraler Ernährung: Läuft noch PN (parenterale Energie > 0), zählt deren Energie mit und sinkt beim
+     * Ausschleichen, dann bleibt es bei den bisherigen Empfehlungen.
+     */
+    _energyAtLimit(kcalPerKg, targets, postnatalAge, parenteralKcalPerKg = 0) {
+        const age = Math.max(1, parseInt(postnatalAge, 10) || 1);
+        if (Number(parenteralKcalPerKg) > 0) return false;
+        return age >= 4 && !!(targets && targets.energy) && Number(kcalPerKg) >= targets.energy.max;
+    }
+
     generateClinicalAssessment(res, input) {
         const r = res.results;
         const c = res.comparisons;
@@ -561,7 +573,9 @@ class NutritionCalculator {
             } else if (r.weightVelocity >= 15 && r.weightVelocity <= 25) {
                 push('positive', `Wachstumsrate ${r.weightVelocity} g/kg/d → physiologisch.`);
             } else if (r.weightVelocity < 15 && phase.id === 'C') {
-                push('warning', `Wachstumsstagnation (${r.weightVelocity} g/kg/d) — Fortifizierung prüfen.`);
+                push('warning', `Wachstumsstagnation (${r.weightVelocity} g/kg/d)` + (this._energyAtLimit(r.kcalPerKg, res.targets, input.postnatalAge, r.kcalParenteralKg)
+                    ? ` — Energie liegt bereits an der Obergrenze (${r.kcalPerKg} kcal/kg/d), keine weitere Anreicherung.`
+                    : ' — Fortifizierung prüfen.'));
             }
         }
 
@@ -1692,10 +1706,12 @@ class NutritionCalculator {
         if (fm85Percent >= 4 && urea !== null && urea < 3 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             reminders.push('💡 Empfehlung: +0.5 g/kg/d Protein (Aptamil Eiweiß+)');
         }
-        if (fortifierIndiziert && n.enteralVolKg >= 50 && n.enteralVolKg < 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+        // v3.6.16: keine Anreicherungs-Empfehlungen, wenn die Energie schon an der Obergrenze liegt
+        const energieAmLimit = this._energyAtLimit(n.kcalPerKg, targets, postnatalAge, n.kcalParenteralKg);
+        if (fortifierIndiziert && !energieAmLimit && n.enteralVolKg >= 50 && n.enteralVolKg < 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             reminders.push('💡 Fortifizierung (FM85) empfohlen ab enteralem Volumen von 50 ml/kg/d (ESPGHAN).');
         }
-        if (fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+        if (fortifierIndiziert && !energieAmLimit && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             reminders.push('💡 FM85 Start-Kriterium erfüllt (≥ 100 ml/kg/d enteral)');
         }
         if (fm85Percent > 0 && n.enteralVolKg >= 100) {
@@ -1886,9 +1902,12 @@ class NutritionCalculator {
                 );
             }
             if (entNum > et.max) {
+                // v3.6.16: Liegt die Energie schon an der Obergrenze, gibt es keine Empfehlung zu mehr Anreicherung
+                const empfehlung = this._energyAtLimit(n.kcalPerKg, targets, postnatalAge, n.kcalParenteralKg)
+                    ? `Die Energie liegt bereits an der Obergrenze (${n.kcalPerKg} kcal/kg/d, Ziel ${targets.energy.min}–${targets.energy.max}) — keine weitere Anreicherung.`
+                    : 'Bei unzureichendem Wachstum vertretbar — vorrangig Anreicherung statt Volumen steigern.';
                 warnings.push(
-                    `Hinweis: Enteral ${entNum} ml/kg/d oberhalb des Zielkorridors (${et.min}–${et.max} ml/kg/d, ${et.label}). ` +
-                    `Bei unzureichendem Wachstum vertretbar — vorrangig Anreicherung statt Volumen steigern.`
+                    `Hinweis: Enteral ${entNum} ml/kg/d oberhalb des Zielkorridors (${et.min}–${et.max} ml/kg/d, ${et.label}). ` + empfehlung
                 );
             }
         }
@@ -2027,11 +2046,13 @@ class NutritionCalculator {
         }
 
         // --- AUDIT: Growth Stagnation + Fortifier Logic (Phase C) ---
-        if (fortifierIndiziert && postnatalAge >= 28 && n.enteralVolKg >= 140 && fm85Percent < 4 && selectedEnteralProduct === 'ebm') {
+        if (fortifierIndiziert && !energieAmLimit && postnatalAge >= 28 && n.enteralVolKg >= 140 && fm85Percent < 4 && selectedEnteralProduct === 'ebm') {
             warnings.push('Hinweis: Monat 2+ bei >140 ml/kg/d enteral mit FM85 < 4% — Fortifizierung auf 4% empfohlen.');
         }
         if (postnatalAge >= 28 && weightVelocity !== 'Initial' && weightVelocity < 15 && n.enteralVolKg >= 100) {
-            warnings.push(`Hinweis: Wachstumsrate ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation. Fortifizierung prüfen.`);
+            warnings.push(`Hinweis: Wachstumsrate ${weightVelocity} g/kg/d < 15 bei Monat 2+ — Wachstumsstagnation.` + (energieAmLimit
+                ? ` Energie liegt bereits an der Obergrenze (${n.kcalPerKg} kcal/kg/d), keine weitere Anreicherung.`
+                : ' Fortifizierung prüfen.'));
         }
         if (postnatalAge >= 28 && urea !== null && urea < 3 && n.enteralVolKg >= 100 && fm85Percent >= 4 && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             warnings.push('Hinweis: BUN < 3 mmol/l trotz FM85 4% in Phase C — Aptamil Eiweiß+ Supplementierung prüfen.');
@@ -2212,7 +2233,7 @@ class NutritionCalculator {
         if (fazit.length < 3 && n.npcPerProtein > 0 && n.npcPerProtein < 20) {
             fazit.push(`NPC/Protein-Ratio zu niedrig (${n.npcPerProtein}) – Glukose- oder Lipidzufuhr steigern für optimale Proteinverwertung.`);
         }
-        if (fazit.length < 3 && fortifierIndiziert && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
+        if (fazit.length < 3 && fortifierIndiziert && !this._energyAtLimit(n.kcalPerKg, targets, postnatalAge, n.kcalParenteralKg) && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             fazit.push('FM85-Fortifizierung starten – enterales Volumen ≥ 100 ml/kg/d erreicht.');
         }
         if (fazit.length === 0) {

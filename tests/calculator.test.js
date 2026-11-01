@@ -3005,3 +3005,64 @@ describe('AM-UI) Neocate in der Oberfläche (v3.6.15)', () => {
         expect(String(w.document.getElementById('res-protein-total-gkg').innerText)).toMatch(/3[.,]24/);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AN — Keine Anreicherungs-Empfehlung bei erreichter Energieobergrenze (v3.6.16)
+ * Anlass: Kind mit 195 ml/kg/d (156 ml/d bei 800 g), FM85 1 % und Eiweiß-Zusatz: 149 kcal/kg/d bei Ziel 110–135, und die App
+ * empfahl gleichzeitig „vorrangig Anreicherung statt Volumen steigern“ und „Überernährung prüfen“.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AN) Anreicherungs-Empfehlungen bei Energieobergrenze (v3.6.16)', () => {
+    const kind = o => calc.calculate(baseInput({
+        birthWeight: 730, currentWeight: 800, ssw: 28, postnatalAge: 15, mealFrequency: 12,
+        gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0,
+        selectedEnteralProduct: 'ebm', fm85Percent: 0, ...o
+    }));
+    const alle = r => [...r.warnings, ...r.reminders, ...(r.assessment.fazit || [])];
+    const anrText = r => alle(r).filter(t => /Anreicherung statt Volumen|FM85 Start-Kriterium|auf 4% empfohlen|Fortifizierung prüfen|FM85-Fortifizierung starten/.test(t));
+
+    it('AN1: 195 ml/kg/d, FM85 1 %: Energie über der Obergrenze → der Hinweis „oberhalb des Zielkorridors“ nennt die Energie statt Anreicherung zu empfehlen', () => {
+        const r = kind({ tfi: 195, enteralVolume: 195, fm85Percent: 1, proteinAddPer100ml: 0.29 });
+        expect(r.results.kcalPerKg).toBeGreaterThan(135);
+        const h = r.warnings.find(w => /^Hinweis: Enteral 195 ml\/kg\/d oberhalb des Zielkorridors/.test(w));
+        expect(h).toBeTruthy();
+        expect(h).toMatch(/Die Energie liegt bereits an der Obergrenze/);
+        expect(h).toMatch(/keine weitere Anreicherung/);
+        expect(h).not.toMatch(/vorrangig Anreicherung statt Volumen steigern/);
+        expect(r.warnings.some(w => /Energie .* über Zielbereich/.test(w))).toBe(true);   // die Energie-Warnung bleibt
+    });
+
+    it('AN2: Über dem Zielkorridor, aber Energie unter der Obergrenze → die bisherige Empfehlung bleibt', () => {
+        const r = kind({ tfi: 185, enteralVolume: 185 });                  // 131 kcal/kg/d
+        expect(r.results.kcalPerKg).toBeLessThan(135);
+        const h = r.warnings.find(w => /oberhalb des Zielkorridors/.test(w));
+        expect(h).toMatch(/vorrangig Anreicherung statt Volumen steigern/);
+    });
+
+    it('AN3: FM85-Start-Erinnerung und Fazit-Zeile entfallen bei Energie an der Obergrenze, bleiben sonst bestehen', () => {
+        const hoch = kind({ tfi: 195, enteralVolume: 195 });               // nur Milch: 138,5 kcal/kg/d
+        expect(anrText(hoch).filter(t => /FM85/.test(t))).toEqual([]);
+        const normal = kind({ tfi: 150, enteralVolume: 150 });             // 106,5 kcal/kg/d
+        expect(anrText(normal).some(t => /FM85 Start-Kriterium/.test(t))).toBe(true);
+    });
+
+    it('AN4: „Fortifizierung auf 4 % empfohlen“ ab Monat 2 entfällt bei Energie an der Obergrenze', () => {
+        const hoch = kind({ postnatalAge: 30, tfi: 195, enteralVolume: 195, fm85Percent: 2 });      // 155 kcal/kg/d
+        expect(hoch.warnings.some(w => /auf 4% empfohlen/.test(w))).toBe(false);
+        const normal = kind({ postnatalAge: 30, tfi: 150, enteralVolume: 150, fm85Percent: 2 });    // 119,6 kcal/kg/d
+        expect(normal.warnings.some(w => /auf 4% empfohlen/.test(w))).toBe(true);
+    });
+
+    it('AN5: Läuft noch PN, bleiben die Empfehlungen (die PN-Energie sinkt beim Ausschleichen)', () => {
+        const r = kind({ tfi: 195, enteralVolume: 110, gir: 8, protein: 3, lipids: 3, calcium: 40, phosphate: 30 });
+        expect(r.results.kcalParenteralKg).toBeGreaterThan(0);
+        expect(calc._energyAtLimit(r.results.kcalPerKg, r.targets, 15, r.results.kcalParenteralKg)).toBe(false);
+    });
+
+    it('AN6: _energyAtLimit — erst ab Lebenstag 4, an der Obergrenze eingeschlossen, ohne Ziele nie', () => {
+        const t = { energy: { min: 110, max: 135 } };
+        expect(calc._energyAtLimit(135, t, 10)).toBe(true);
+        expect(calc._energyAtLimit(134.9, t, 10)).toBe(false);
+        expect(calc._energyAtLimit(150, t, 3)).toBe(false);
+        expect(calc._energyAtLimit(150, null, 10)).toBe(false);
+    });
+});
