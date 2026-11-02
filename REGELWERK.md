@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 01.11.2026, Version v3.6.18, 292 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 01.11.2026, Version v3.6.19, 299 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -90,6 +90,7 @@ Zielspannen in ml/kg/d (`TFI_TARGETS`). ELBW und VLBW liegen **bewusst 10 ml unt
 | 4.4 | TFI unter Zielminimum → Hinweis „restriktive Flüssigkeit“ | Haus | `calculate` | – |
 | 4.5 | Enterales Volumen größer als TFI → Warnung | Technisch | `calculate` | – |
 | 4.6 | Plateau ab Tag 5 statt Rampe | Entscheidung 28.09.2026 | `TFI_TARGETS` | Q1–Q6 |
+| 4.7 | **Tatsächliche Gesamtmenge:** Die Gesamtflüssigkeit (TFI) ist die Summe aus Infusion und Teilen, die enterale Nahrung steckt darin und kommt nicht dazu. Übersteigt die Summe aus enteraler Nahrung, Spülflüssigkeit, Sekundärinfusion und Mikro-Zufuhr den eingetragenen Wert, prüfen **Beatmungs-CRITICAL (> 140 ml/kg/d), TFI-Hinweise (unter Zielbereich, über 180, über 200), ELBW-IWL-Hinweis (unter 100) und Gewichtsverlauf (Zielrand)** mit der Summe. Die Meldung heißt dann „Gesamtmenge“ und nennt die eingetragene Gesamtflüssigkeit. Die CRITICAL-Meldung „TFI überschritten“ nennt die Summe der Teile statt nur Sekundärinfusionen. Unter dem Feld steht die Aufteilung (davon enteral, Rest für Infusion). Anlass: intubiertes Kind, Gesamtflüssigkeit 2,5 ml/h (75 ml/kg/d), enteral gesteigert, Beatmungsgrenze blieb stumm | Entscheidung 02.11.2026 (Neonatologe: „Punkt 1 umsetzen“) | `calculate` (`tfiEffective`), `index.html` (`tfi-converted`) | AP1–AP7, AK6 |
 
 ## 5. Energie
 
@@ -392,3 +393,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 01.11.2026 | Energieobergrenze ab Tag 4 von 135 auf 140 kcal/kg/d angehoben (ESPGHAN 2022: 115–140), Muttermilch-Eiweiß 1,13 g/100 ml beibehalten, Beleg fehlt (Regel 5.1, Punkt 17.18, Version 3.6.17). Tests O2, AN1–AN6 mit Begründung angepasst |
 | 01.11.2026 | Quellenverzeichnis QUELLEN.md angelegt. Befunde: Schwelle 150 kcal/kg (15.1) steht nicht in Embleton 2001, Gewichtsverlust-Prozentwerte (13.1) ohne Quelle, J-Perinatol-Zitat (Regel 4) unvollständig; ESPGHAN-Volltexte nicht abrufbar, Leitlinienzahlen deshalb ungeprüft |
 | 01.11.2026 | Haken „Nur enteral (keine Infusion)“ (Gesamtflüssigkeit folgt der enteralen Menge, Lipide und Infusionen auf 0) und Dezimalwerte bei den Mengenfeldern (Regel 10.13, Version 3.6.18) |
+| 02.11.2026 | Beatmungs-CRITICAL und TFI-Hinweise prüfen die tatsächliche Gesamtmenge (Summe der Teile), Beschriftung „Gesamtflüssigkeit (TFI, inkl. enteral)“ und Anzeige der Aufteilung (Regel 4.7, Version 3.6.19). Test AK6 mit Begründung angepasst |

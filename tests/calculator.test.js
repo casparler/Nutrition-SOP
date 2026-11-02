@@ -2798,7 +2798,9 @@ describe('AK-UI) Einheiten-Auswahl an den Mengenfeldern (v3.6.13)', () => {
         const w2 = await boot({ ...kind, 'input-tfi-unit': 'd', 'input-tfi': 144, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
         expect(text(w2, 'qv-kcal')).toBe(soll);
         expect(text(w2, 'enteral-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 12 ml je Mahlzeit (12×), Rechengewicht 800 g');
-        expect(text(w2, 'tfi-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 6 ml/h');
+        // v3.6.19 — klinisch begründete Anpassung: Die Zeile nennt zusätzlich die Aufteilung der Gesamtflüssigkeit
+        // (davon enteral, Rest für Infusion), weil die enterale Nahrung in der Gesamtflüssigkeit steckt und nicht dazukommt.
+        expect(text(w2, 'tfi-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 6 ml/h · davon enteral 144 ml/d, Rest 0 ml/d (0 ml/h) für Infusion, Spülflüssigkeit und Zusätze');
     });
 
     it('AK7: Spülflüssigkeit in ml/h wird umgerechnet und angezeigt', async () => {
@@ -3169,5 +3171,77 @@ describe('AO) Nur enteral und Dezimalwerte (v3.6.18)', () => {
         expect(w.document.getElementById('findings-critical')).not.toBeNull();
         const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')].map(e => e.textContent);
         expect(kritisch.filter(t => /Lipid|Osmolarität|Glukosekonzentration|Ausfällung/.test(t))).toEqual([]);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AP — Prüfung gegen die tatsächliche Gesamtmenge (v3.6.19)
+ * Anlass: Intubiertes Kind, Gesamtflüssigkeit mit 2,5 ml/h (= 75 ml/kg/d bei 800 g) eingetragen, enterale Nahrung gesteigert.
+ * Die enterale Nahrung steckt in der Gesamtflüssigkeit; die Beatmungsgrenze prüfte nur den eingetragenen Wert und blieb stumm,
+ * obwohl die Summe der Teile über 140 ml/kg/d lag.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AP) Tatsächliche Gesamtmenge bei Beatmung und TFI-Hinweisen (v3.6.19)', () => {
+    const kind = o => calc.calculate(baseInput({
+        birthWeight: 730, currentWeight: 800, ssw: 28, postnatalAge: 5, mealFrequency: 8, ventilationStatus: 'invasive',
+        tfi: 75, enteralVolume: 0, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0,
+        selectedEnteralProduct: 'ebm', ...o
+    }));
+    const kritisch = r => r.warnings.filter(w => /^CRITICAL/.test(w));
+
+    it('AP1: Intubiert, Gesamtflüssigkeit 75, enteral 150 → CRITICAL nennt die Gesamtmenge und den eingetragenen Wert', () => {
+        const k = kritisch(kind({ enteralVolume: 150 })).find(w => /bei invasiver Beatmung/.test(w));
+        expect(k).toBeTruthy();
+        expect(k).toMatch(/Gesamtmenge 150 ml\/kg\/d/);
+        expect(k).toMatch(/Eingetragene Gesamtflüssigkeit: 75 ml\/kg\/d/);
+    });
+
+    it('AP2: Die Teile zählen zusammen (enteral + Spülflüssigkeit + Sekundärinfusion + Mikro)', () => {
+        const k = kritisch(kind({ enteralVolume: 100, carrierVolume: 30, secondaryRateKg: 20 })).find(w => /bei invasiver Beatmung/.test(w));
+        expect(k).toMatch(/Gesamtmenge 150 ml\/kg\/d/);
+    });
+
+    it('AP3: Liegt die Summe der Teile unter 140 und unter der Gesamtflüssigkeit, bleibt es ohne Beatmungs-CRITICAL', () => {
+        const r = kind({ enteralVolume: 60 });
+        expect(kritisch(r).filter(w => /Beatmung/.test(w))).toEqual([]);
+    });
+
+    it('AP4: Ist die eingetragene Gesamtflüssigkeit selbst über 140, bleibt der bisherige Wortlaut', () => {
+        const r = kind({ tfi: 150, enteralVolume: 100 });
+        expect(r.warnings).toContain('CRITICAL: TFI > 140 ml/kg/d bei invasiver Beatmung!');
+    });
+
+    it('AP5: Spontan atmend: Summe über 180 ergibt den TFI-Hinweis mit dem Wort „Gesamtmenge“', () => {
+        const r = kind({ ventilationStatus: 'spontaneous', enteralVolume: 190 });
+        expect(r.warnings.some(w => /^Hinweis: Gesamtmenge 190 ml\/kg\/d oberhalb des üblichen Korridors/.test(w))).toBe(true);
+        expect(r.warnings.some(w => /^Hinweis: TFI 75 ml\/kg\/d unter Zielbereich/.test(w))).toBe(false);
+    });
+
+    it('AP6: Die CRITICAL-Meldung „TFI überschritten“ nennt die Summe und die eingetragene Gesamtflüssigkeit statt nur Sekundärinfusionen', () => {
+        const k = kritisch(kind({ enteralVolume: 150 })).find(w => /^CRITICAL: TFI überschritten/.test(w));
+        expect(k).toMatch(/Summe aus enteraler Nahrung, Spülflüssigkeit, Sekundärinfusion und Mikro-Zufuhr \(150 ml\/kg\/d\)/);
+        expect(k).toMatch(/eingetragenen Gesamtflüssigkeit \(75 ml\/kg\/d\)/);
+        expect(k).not.toMatch(/Sekundärinfusionen reduzieren/);
+    });
+
+    it('AP7: In der Oberfläche steht die Aufteilung der Gesamtflüssigkeit unter dem Feld (2,5 ml/h, davon enteral 40 ml/kg/d)', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        const set = (id, v) => { w.document.getElementById(id).value = v; };
+        Object.entries({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 5, 'input-meal-frequency': 8,
+            'input-tfi-unit': 'h', 'input-tfi': 2.5, 'input-enteral': 40 }).forEach(([k, v]) => set(k, v));
+        w.updateCalculations();
+        const text = String(w.document.getElementById('tfi-converted').innerText);
+        expect(text).toMatch(/^= 75 ml\/kg\/d · 60 ml\/d · 2,5 ml\/h · davon enteral 32 ml\/d, Rest 28 ml\/d \(1,2 ml\/h\)/);
+        expect(w.document.body.textContent).toMatch(/Gesamtflüssigkeit \(TFI, inkl\. enteral\)/);
     });
 });

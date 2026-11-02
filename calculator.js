@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.18';
+        this.VERSION = '3.6.19';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1245,6 +1245,13 @@ class NutritionCalculator {
         // R-07: Secondary infusion subtracts from available PN capacity
         const pnDailyGrossRaw = totalDailyFluid.minus(enteralDaily).minus(carrierDaily).minus(secondaryDaily).minus(microDaily);
         const pnVolumeOverflow = pnDailyGrossRaw.lt(0);
+        // v3.6.18: Tatsächliche Gesamtmenge. Die Gesamtflüssigkeit (TFI) ist die Summe aus Infusion und Teilen; die Teile
+        // (enteral, Spülflüssigkeit, Sekundärinfusion, Mikro) stecken darin. Übersteigt ihre Summe den eingetragenen Wert,
+        // prüfen Beatmungs-CRITICAL und TFI-Hinweise mit der Summe, damit eine zu knapp eingetragene Gesamtflüssigkeit
+        // die Beatmungsgrenze nicht verdeckt.
+        const partsKg = enteralVolKg.plus(carrierVolKg).plus(secondaryRateKg).plus(microVolKg).toDecimalPlaces(3);
+        const tfiEffective = Decimal.max(tfi, partsKg);
+        const tfiFromParts = partsKg.gt(tfi);
         const pnDailyGross = Decimal.max(0, pnDailyGrossRaw).toDecimalPlaces(1);
         // R-04: PN-Netto = Gross PN minus lipid volume
         const pnDaily = Decimal.max(0, pnDailyGross.minus(lipidVolDaily)).toDecimalPlaces(1);
@@ -1766,11 +1773,13 @@ class NutritionCalculator {
         if (n.lipidsPNKg > this.LIMITS.LIPIDS.max) {
             warnings.push(`CRITICAL: Lipide ${n.lipidsPNKg} g/kg/d überschreitet Maximum (${this.LIMITS.LIPIDS.max}).`);
         }
-        if (ventilationStatus === 'invasive' && tfi.gt(140)) {
-            warnings.push('CRITICAL: TFI > 140 ml/kg/d bei invasiver Beatmung!');
+        if (ventilationStatus === 'invasive' && tfiEffective.gt(140)) {
+            warnings.push(tfi.gt(140)
+                ? 'CRITICAL: TFI > 140 ml/kg/d bei invasiver Beatmung!'
+                : `CRITICAL: Gesamtmenge ${this._round(partsKg.toNumber(), 1)} ml/kg/d (Summe aus enteraler Nahrung, Spülflüssigkeit, Sekundärinfusion und Mikro-Zufuhr) > 140 ml/kg/d bei invasiver Beatmung! Eingetragene Gesamtflüssigkeit: ${tfi.toNumber()} ml/kg/d.`);
         }
         if (pnVolumeOverflow) {
-            warnings.push('CRITICAL: TFI überschritten! Sekundärinfusionen reduzieren.');
+            warnings.push(`CRITICAL: TFI überschritten! Die Summe aus enteraler Nahrung, Spülflüssigkeit, Sekundärinfusion und Mikro-Zufuhr (${this._round(partsKg.toNumber(), 1)} ml/kg/d) liegt über der eingetragenen Gesamtflüssigkeit (${tfi.toNumber()} ml/kg/d) — Gesamtflüssigkeit oder Teilmengen anpassen.`);
         }
         if (triglycerides !== null && triglycerides > 250) {
             warnings.push('CRITICAL: Triglyzeride > 250 mg/dl – Hypertriglyceridämie! Lipidzufuhr auf 0,5–1,0 g/kg/d reduzieren (ESPGHAN).');
@@ -1835,8 +1844,8 @@ class NutritionCalculator {
         }
 
         // BLIND-6: TFI below target minimum
-        if (tfi.gt(0) && tfi.lt(targets.tfi.min)) {
-            warnings.push(`Hinweis: TFI ${tfi.toNumber()} ml/kg/d unter Zielbereich (${targets.tfi.min}–${targets.tfi.max}) – restriktive Flüssigkeit.`);
+        if (tfiEffective.gt(0) && tfiEffective.lt(targets.tfi.min)) {
+            warnings.push(`Hinweis: TFI ${tfiEffective.toNumber()} ml/kg/d unter Zielbereich (${targets.tfi.min}–${targets.tfi.max}) – restriktive Flüssigkeit.`);
         }
 
         // BLIND-7: Enteral volume exceeds TFI
@@ -1848,15 +1857,16 @@ class NutritionCalculator {
         // Der harte Abbruch liegt jetzt bei 400 ml/kg/d (reiner Fat-Finger-Schutz).
         // Klinisch relevante Zwischenstufen werden als Hinweis/Warnung ausgegeben,
         // damit die polyure Phase des Frühgeborenen abbildbar bleibt.
-        const tfiNum = tfi.toNumber();
+        const tfiNum = tfiEffective.toNumber();
+        const tfiWort = tfiFromParts ? 'Gesamtmenge' : 'TFI';
         if (tfiNum > this.LIMITS.TFI.warn) {
             warnings.push(
-                `Warnung: TFI ${tfiNum} ml/kg/d ist sehr hoch. Plausibel nur bei polyurer Phase, ` +
+                `Warnung: ${tfiWort} ${tfiNum} ml/kg/d ist sehr hoch. Plausibel nur bei polyurer Phase, ` +
                 `hohem renalem oder insensiblem Verlust. Ein-/Ausfuhrbilanz, Serum-Natrium und Gewichtsverlauf engmaschig kontrollieren.`
             );
         } else if (tfiNum > this.LIMITS.TFI.hint) {
             warnings.push(
-                `Hinweis: TFI ${tfiNum} ml/kg/d oberhalb des üblichen Korridors. ` +
+                `Hinweis: ${tfiWort} ${tfiNum} ml/kg/d oberhalb des üblichen Korridors. ` +
                 `Bei polyurer Phase adäquat — sonst Volumenbedarf und BPD-/PDA-Risiko prüfen.`
             );
         }
@@ -2029,7 +2039,7 @@ class NutritionCalculator {
         // --- AUDIT: IWL / Hypernatriämie-Risiko (Phase A) ---
         // Master-Protokoll: ELBW-Klassengrenze inklusiv bei 1000g (v3.5: vorher lt(1000))
         if (birthWeightG.lte(1000) && postnatalAge <= 7) {
-            if (tfi.lt(100) && postnatalAge >= 2) {
+            if (tfiEffective.lt(100) && postnatalAge >= 2) {
                 warnings.push('Hinweis: ELBW Tag 2–7 mit TFI < 100 ml/kg/d — IWL-bedingte Hypernatriämie-Gefahr. Na-Kontrolle empfohlen.');
             }
             if (n.totalNaMmolKg > 5) {
@@ -2078,7 +2088,7 @@ class NutritionCalculator {
             const WC = this.WEIGHT_COURSE;
 
             if (postnatalAge >= 3 && postnatalAge <= 7
-                && verlust < WC.minLossPercentByDay3 && tfi.gte(targets.tfi.max)) {
+                && verlust < WC.minLossPercentByDay3 && tfiEffective.gte(targets.tfi.max)) {
                 warnings.push(
                     `Hinweis: Gewichtsverlust bisher nur ${this._round(Math.max(0, verlust), 1)} % ` +
                     `an Lebenstag ${postnatalAge} bei TFI ${tfi.toNumber()} ml/kg/d (oberer Zielbereich). ` +
