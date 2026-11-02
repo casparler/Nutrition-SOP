@@ -3354,3 +3354,109 @@ describe('AQ) Infusion gesamt plus enteral (v3.6.20)', () => {
         expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 160 ml\/kg\/d/);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AR — Infusion aus Laufraten berechnen (v3.6.21)
+ * Anlass: Auf der Station sind die Laufraten der einzelnen Pumpen bekannt (PN-Lösung, Lipide, Spül- und Sekundärlösung). Neben der
+ * Summe aller Infusionen kann die Infusion jetzt aus diesen Raten berechnet werden. Gesamtflüssigkeit = Infusion + enteral.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AR) Infusion aus Laufraten (v3.6.21)', () => {
+    async function boot(values, vorab = {}) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        Object.entries(vorab).forEach(([k, v]) => w.localStorage.setItem(k, v));
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        const modus = w.document.getElementById('input-infusion-mode');
+        modus.dispatchEvent(new w.Event('change'));
+        w.updateCalculations();
+        return w;
+    }
+    const $ = (w, id) => w.document.getElementById(id);
+    const kind = { 'birth-weight': 430, 'current-weight': 430, 'input-ssw': 26, 'input-day': 2, 'input-meal-frequency': 8,
+        'input-enteral-unit': 'd', 'input-enteral': 12, 'input-lipids': 2 };
+    const rate = { ...kind, 'input-infusion-mode': 'rates', 'input-pn-rate-unit': 'd', 'input-pn-rate': 43.7 };
+
+    it('AR1: PN 43,7 ml/Tag + Lipide 2 g/kg/d + enteral 12 ml/d ergeben dieselben 60 ml/d wie im Praxisfall (139,5 ml/kg/d)', async () => {
+        const w = await boot(rate);
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 139,5 ml\/kg\/d · 60 ml\/d · 2,5 ml\/h$/);
+        expect($(w, 'infusion-rates-converted').innerText).toBe('= PN-Lösung 1,8 ml/h + Lipide 0,2 ml/h + Spülflüssigkeit 0 ml/h + Sekundärinfusion 0 ml/h');
+    });
+
+    it('AR2: Summe und Laufraten ergeben dasselbe, wenn die Infusion gleich ist (48 ml/d = 43,7 PN + 4,3 Lipide)', async () => {
+        const rates = await boot(rate);
+        const summe = await boot({ ...kind, 'input-infusion-mode': 'sum', 'input-tfi-unit': 'd', 'input-tfi': 48 });
+        const gesamt = w => String($(w, 'tfi-converted').innerText).match(/Gesamtflüssigkeit [^=]*$/)[0];
+        expect(gesamt(rates)).toBe(gesamt(summe));
+        expect($(rates, 'qv-kcal').textContent).toBe($(summe, 'qv-kcal').textContent);
+    });
+
+    it('AR3: Spülflüssigkeit und Sekundärinfusion zählen mit ihren eingetragenen Raten zur Infusion', async () => {
+        const w = await boot({ ...kind, 'input-lipids': 0, 'input-infusion-mode': 'rates', 'input-pn-rate-unit': 'h', 'input-pn-rate': 1,
+            'input-carrier-unit': 'h', 'input-carrier': 0.5, 'input-secondary-solution': 'nacl09', 'input-secondary-rate': 0.3 });
+        expect($(w, 'infusion-rates-converted').innerText).toBe('= PN-Lösung 1 ml/h + Lipide 0 ml/h + Spülflüssigkeit 0,5 ml/h + Sekundärinfusion 0,3 ml/h');
+        // (1 + 0,5 + 0,3) ml/h × 24 = 43,2 ml/d Infusion + 12 ml/d enteral = 55,2 ml/d
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit [\d,]+ ml\/kg\/d · 55,2 ml\/d/);
+    });
+
+    it('AR4: Eine negative Laufrate bricht ab (wird nicht durch die anderen Teile verdeckt)', async () => {
+        const w = await boot({ ...rate, 'input-pn-rate-unit': 'kgd', 'input-pn-rate': -50, 'input-carrier-unit': 'kgd', 'input-carrier': 100 });
+        expect($(w, 'validation-error-message').textContent).toMatch(/TFI|Gesamtfl|negativ|0/);
+        expect($(w, 'qv-kcal').textContent).toBe('–');
+    });
+
+    it('AR5: Die Eingabeart schaltet die Blöcke um und wird gemerkt', async () => {
+        const w = await boot({ ...kind, 'input-infusion-mode': 'rates' });
+        expect($(w, 'infusion-rates-block').classList.contains('hidden')).toBe(false);
+        expect($(w, 'infusion-sum-block').classList.contains('hidden')).toBe(true);
+        expect(w.localStorage.getItem('input-infusion-mode')).toBe('rates');
+        const w2 = await boot({ ...kind, 'input-infusion-mode': 'sum' });
+        expect($(w2, 'infusion-rates-block').classList.contains('hidden')).toBe(true);
+        expect($(w2, 'infusion-sum-block').classList.contains('hidden')).toBe(false);
+        // beim nächsten Start wird die gespeicherte Eingabeart geladen
+        const w3 = await boot({}, { 'input-infusion-mode': 'rates' });
+        expect($(w3, 'infusion-rates-block').classList.contains('hidden')).toBe(false);
+    });
+
+    it('AR6: „Nur enteral“ setzt auch die PN-Laufrate auf 0 und sperrt sie; Abwählen stellt sie wieder her', async () => {
+        const w = await boot({ ...rate });
+        const box = $(w, 'input-enteral-only');
+        box.checked = true; box.dispatchEvent(new w.Event('change'));
+        expect($(w, 'input-pn-rate').value).toBe('0');
+        expect($(w, 'input-pn-rate').disabled).toBe(true);
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 27,9 ml\/kg\/d · 12 ml\/d/);
+        box.checked = false; box.dispatchEvent(new w.Event('change'));
+        expect($(w, 'input-pn-rate').value).toBe('43.7');
+        expect($(w, 'input-pn-rate').disabled).toBe(false);
+    });
+
+    it('AR7: Der Vorschlag „Gesamtflüssigkeit“ setzt bei Laufraten die PN-Lösung auf Vorschlag minus enteral, Lipide, Spül- und Sekundärlösung', async () => {
+        const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3, 'input-meal-frequency': 8,
+            'input-enteral': 40, 'input-lipids': 0, 'input-infusion-mode': 'rates' });
+        const vorschlag = parseFloat(String($(w, 'sd-tfi').textContent).replace(',', '.'));
+        w.applySmartDefault('input-tfi', 'sdTfi');
+        expect($(w, 'input-pn-rate-unit').value).toBe('kgd');
+        expect(parseFloat($(w, 'input-pn-rate').value)).toBeCloseTo(vorschlag - 40, 1);
+        expect($(w, 'tfi-converted').innerText).toMatch(new RegExp(`Gesamtflüssigkeit ${String(vorschlag).replace('.', ',')} ml/kg/d`));
+    });
+
+    it('AR8: Eine Vorlage stellt die Eingabeart auf Summe zurück', async () => {
+        const w = await boot({ ...rate });
+        w.loadSimulation('transition');
+        expect($(w, 'input-infusion-mode').value).toBe('sum');
+        expect($(w, 'infusion-sum-block').classList.contains('hidden')).toBe(false);
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 140 ml\/kg\/d/);
+    });
+});
