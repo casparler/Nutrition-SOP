@@ -388,9 +388,11 @@
                     <div class="p-4 space-y-4">
                         <div>
                             <label class="flex items-center gap-2 text-sm text-gray-700 mb-2 cursor-pointer"><input type="checkbox" id="input-enteral-only" class="rounded border-gray-300"> Nur enteral (keine Infusion)</label>
-                            <p id="enteral-only-note" class="hidden text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-2 mb-2">Nur enteral: Die Gesamtflüssigkeit entspricht der enteralen Menge. Infusionslösung, Lipide, Spülflüssigkeit und Sekundärinfusion stehen auf 0. Beim Abwählen kehren die bisherigen Werte zurück.</p>
-                            <label class="block text-sm font-medium text-gray-700">Gesamtflüssigkeit (TFI, inkl. enteral) <select id="input-tfi-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Gesamtflüssigkeit"><option value="kgd" selected>ml/kg/d</option><option value="d">ml/Tag</option><option value="h">ml/h</option></select></label>
+                            <p id="enteral-only-note" class="hidden text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-2 mb-2">Nur enteral: Die Infusion steht auf 0, die Gesamtflüssigkeit entspricht der enteralen Menge. Infusionslösung, Lipide, Spülflüssigkeit und Sekundärinfusion stehen auf 0. Beim Abwählen kehren die bisherigen Werte zurück.</p>
+                            <p id="tfi-semantics-note" class="hidden text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2 mb-2">Neu: Das Feld heißt jetzt „Infusion gesamt“, die enterale Nahrung kommt dazu. Der früher gespeicherte Wert (damals Gesamtflüssigkeit) wurde nicht übernommen. Bitte die Infusion neu eintragen.</p>
+                            <label class="block text-sm font-medium text-gray-700">Infusion gesamt <select id="input-tfi-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Infusion gesamt"><option value="kgd" selected>ml/kg/d</option><option value="d">ml/Tag</option><option value="h">ml/h</option></select></label>
                             <input type="number" id="input-tfi" step="any" min="0" value="80" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <p class="text-[10px] text-gray-500 mt-1">Alle Infusionen zusammen (PN, Lipide, Spül- und Sekundärlösung). Die enterale Nahrung kommt dazu.</p>
                             <p id="tfi-converted" class="text-[10px] text-gray-500 mt-1"></p>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
@@ -734,7 +736,7 @@
                   </div>
                   <div class="grid grid-cols-3 gap-2 mt-2 text-center">
                       <button type="button" onclick="applySmartDefault('input-tfi','sdTfi')" class="bg-white/70 hover:bg-white rounded-lg p-2 transition">
-                          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">TFI</p>
+                          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Gesamtflüssigkeit</p>
                           <p id="sd-tfi" class="text-lg font-extrabold text-indigo-700 tabular-nums">–</p>
                           <p class="text-[9px] text-slate-400">ml/kg/d · tippen</p>
                       </button>
@@ -1147,9 +1149,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.19"></script>
-    <script src="fenton_data.js?v=3.6.19"></script>
-    <script src="calculator.js?v=3.6.19"></script>
+    <script src="products.js?v=3.6.20"></script>
+    <script src="fenton_data.js?v=3.6.20"></script>
+    <script src="calculator.js?v=3.6.20"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1259,7 +1261,7 @@
                     'input-ssw': '28',
                     'input-day': '5',
                     'input-invasive-ventilation': false,
-                    'input-tfi': '140',
+                    'input-tfi': '80',
                     'input-enteral': '60',
                     'input-enteral-product': 'ebm',
                     'input-fm85': '2',
@@ -1294,7 +1296,7 @@
                     'input-ssw': '34',
                     'input-day': '14',
                     'input-invasive-ventilation': false,
-                    'input-tfi': '160',
+                    'input-tfi': '10',
                     'input-enteral': '150',
                     'input-enteral-product': 'ebm',
                     'input-fm85': '4',
@@ -1424,7 +1426,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.19';
+            const EXPECTED_CALC_VERSION = '3.6.20';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1734,7 +1736,17 @@
                     unitEl.value = 'kgd';
                     unitEl.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-                el.value = val;
+                let wert = val;
+                if (inputId === 'input-tfi') {
+                    // v3.6.20: Der Vorschlag ist die Gesamtflüssigkeit, das Feld ist die Infusion: enterale Menge abziehen
+                    const w = calculator.getCalculationWeightG(document.getElementById('birth-weight').value,
+                        document.getElementById('current-weight').value, parseInt(document.getElementById('input-day').value) || 1);
+                    const eUnit = (document.getElementById('input-enteral-unit') || { value: 'kgd' }).value;
+                    const eKgd = calculator.volumeToMlKg(document.getElementById('input-enteral').value, eUnit,
+                        { weightG: w, mealsPerDay: parseInt(document.getElementById('input-meal-frequency').value) || 0 }) || 0;
+                    wert = Math.max(0, Math.round((val - eKgd) * 10) / 10);
+                }
+                el.value = wert;
                 el.dispatchEvent(new Event('input', { bubbles: true })); // triggert Persistenz + Recalc
             }
 
@@ -1873,8 +1885,16 @@
 
             const history = JSON.parse(localStorage.getItem('neo-history') || '{}');
 
-            // Restore saved values
+            // v3.6.20: Das Feld „input-tfi“ bedeutete früher Gesamtflüssigkeit, jetzt Infusion (enteral kommt dazu).
+            // Ein früher gespeicherter Wert wird nicht übernommen (er würde sonst die Gesamtmenge still um die enterale Menge erhöhen).
+            let tfiAlteBedeutung = false;
+            try {
+                if (localStorage.getItem('neo-tfi-semantics') !== 'infusion') {
+                    tfiAlteBedeutung = localStorage.getItem('input-tfi') !== null;
+                }
+            } catch (e) { /* ohne Speicher: nichts zu migrieren */ }
             inputs.forEach(id => {
+                if (tfiAlteBedeutung && (id === 'input-tfi' || id === 'input-tfi-unit')) return;
                 const val = localStorage.getItem(id);
                 if (val !== null) {
                     const el = document.getElementById(id);
@@ -1886,6 +1906,11 @@
                     }
                 }
             });
+
+            if (tfiAlteBedeutung) {
+                const hinweis = document.getElementById('tfi-semantics-note');
+                if (hinweis) hinweis.classList.remove('hidden');
+            }
 
             // v3.2: Pausen-Grund nur aktivierbar, wenn Nahrungspause gesetzt ist
             (function bindFeedingPause() {
@@ -1929,6 +1954,11 @@
                 el.addEventListener(eventName, () => {
                     const storedValue = id === 'input-invasive-ventilation' ? el.checked : el.value;
                     localStorage.setItem(id, storedValue);
+                    if (id === 'input-tfi' || id === 'input-tfi-unit') {
+                        localStorage.setItem('neo-tfi-semantics', 'infusion');
+                        const hinweis = document.getElementById('tfi-semantics-note');
+                        if (hinweis) hinweis.classList.add('hidden');
+                    }
 
                     const currentDay = document.getElementById('input-day').value;
                     if (!history[currentDay]) history[currentDay] = {};
@@ -2169,7 +2199,7 @@
                 const volEnteralMlKg = parseFloat(volMlKg('input-enteral')) || 0;
                 // v3.6.18: „Nur enteral“ — Gesamtflüssigkeit = enterale Menge (ml/kg/d)
                 const enteralOnlyBox = document.getElementById('input-enteral-only');
-                if (enteralOnlyBox && enteralOnlyBox.checked) document.getElementById('input-tfi').value = volEnteralMlKg;
+                if (enteralOnlyBox && enteralOnlyBox.checked) document.getElementById('input-tfi').value = 0;
                 const mealVolumeMl = volMeals > 0 && volWeightG > 0 ? volEnteralMlKg * (volWeightG / 1000) / volMeals : 0;
                 const rawOf = id => (document.getElementById(id) || {}).value;
                 const fm85Unit = (document.getElementById('input-fm85-unit') || { value: 'pct' }).value;
@@ -2187,7 +2217,12 @@
                 const data = {
                     currentWeight: currentWeight,
                     previousWeight: previousWeight,
-                    tfi: parseFloat(volMlKg('input-tfi')) || 0,
+                    // v3.6.20: Eingegeben wird die Infusion; die Gesamtflüssigkeit (TFI) ist Infusion + enteral.
+                    // Eine negative Infusion wird unverändert durchgereicht, damit calculate() sie abweist (Invariante 3).
+                    tfi: (() => {
+                        const inf = parseFloat(volMlKg('input-tfi')) || 0;
+                        return inf < 0 ? inf : Math.round((inf + volEnteralMlKg) * 1000) / 1000;
+                    })(),
                     enteralVolume: volMlKg('input-enteral') || 0,
                     fm85Percent: fm85PercentIn || 0,
                     liquigenMlKg: (document.getElementById('input-liquigen') || {}).value || 0,
@@ -2304,14 +2339,12 @@
                 }
                 const tfiConv = document.getElementById('tfi-converted');
                 if (tfiConv) {
-                    tfiConv.innerText = unitOf('input-tfi') !== 'kgd'
-                        ? `= ${komma(data.tfi)} ml/kg/d · ${komma(r.totalDailyFluid)} ml/d · ${komma(r.totalDailyFluid / 24)} ml/h`
-                        : `= ${komma(r.totalDailyFluid)} ml/d · ${komma(r.totalDailyFluid / 24)} ml/h`;
-                    // v3.6.19: Die enterale Nahrung steckt in der Gesamtflüssigkeit; hier steht, wie sie sich aufteilt
-                    if (r.enteralDaily > 0) {
-                        const rest = Math.max(0, r.totalDailyFluid - r.enteralDaily);
-                        tfiConv.innerText += ` · davon enteral ${komma(r.enteralDaily)} ml/d, Rest ${komma(rest)} ml/d (${komma(rest / 24)} ml/h) für Infusion, Spülflüssigkeit und Zusätze`;
-                    }
+                    // v3.6.20: Aufteilung — Infusion + enteral = Gesamtflüssigkeit
+                    const infD = Math.max(0, r.totalDailyFluid - r.enteralDaily);
+                    const infKgd = r.calculationWeightG > 0 ? infD / (r.calculationWeightG / 1000) : 0;
+                    tfiConv.innerText = `= Infusion ${komma(infKgd)} ml/kg/d (${komma(infD)} ml/d, ${komma(infD / 24)} ml/h)`
+                        + ` + enteral ${komma(r.enteralVolKg)} ml/kg/d (${komma(r.enteralDaily)} ml/d)`
+                        + ` = Gesamtflüssigkeit ${komma(data.tfi)} ml/kg/d · ${komma(r.totalDailyFluid)} ml/d · ${komma(r.totalDailyFluid / 24)} ml/h`;
                 }
                 const carConv = document.getElementById('carrier-converted');
                 if (carConv) {

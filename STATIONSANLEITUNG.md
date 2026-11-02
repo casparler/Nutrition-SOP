@@ -36,7 +36,7 @@ benötigt; fehlt es, entfällt diese Anzeige.
 Rechner die Gesamtflüssigkeit auf 140 ml/kg/d und deckelt entsprechend auch das
 enterale Zielvolumen.
 
-**Schritt 3: Gesamtflüssigkeit.** Gesamtflüssigkeitszufuhr in ml/kg/d.
+**Schritt 3: Infusion gesamt.** Alle Infusionen zusammen (PN, Lipide, Spül- und Sekundärlösung) in ml/kg/d, ml/Tag oder ml/h. Die enterale Nahrung kommt dazu: Der Rechner bildet daraus die Gesamtflüssigkeit (Infusion + enteral) und zeigt sie unter dem Feld an. Beatmungsgrenze und Zielbereiche werden mit dieser Summe geprüft. Bei einem Kind ohne Infusion den Haken „Nur enteral (keine Infusion)“ setzen.
 
 **Schritt 4: Enterale Ernährung.** Volumen in ml/kg/d, Nahrungsart, bei Muttermilch die
 FM85-Stufe, Anzahl der Mahlzeiten. Enterale Supplemente (Liquigen, Aptamil Eiweiß+)
