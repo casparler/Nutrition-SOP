@@ -812,20 +812,20 @@ describe('M) Frontend-Integration v3.0 — Teaching, EGI, Smart Defaults, Histor
         expect(doc.getElementById('edu-modal-algo')).not.toBeNull();
     });
 
-    it('M2: Smart-Defaults-Box existiert mit TFI/Protein/Lipide-Slots + Apply-Buttons', () => {
-        expect(doc.getElementById('smart-defaults-box')).not.toBeNull();
-        expect(doc.getElementById('sd-tfi')).not.toBeNull();
-        expect(doc.getElementById('sd-protein')).not.toBeNull();
-        expect(doc.getElementById('sd-lipids')).not.toBeNull();
-        // Inline-Handler vorhanden
-        expect(html).toMatch(/onclick="applySmartDefaults\(\)"/);
-        expect(html).toMatch(/onclick="applySmartDefault\('input-tfi'/);
+    it('M2: Startwerte-Box und Simulationsbereich gibt es in der Oberfläche nicht mehr; der Rechenkern liefert weiter getSmartDefaults()', () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        expect(doc.getElementById('smart-defaults-box')).toBeNull();
+        expect(doc.getElementById('sd-tfi')).toBeNull();
+        expect(doc.getElementById('simulator-section')).toBeNull();
+        expect(doc.getElementById('validation-box')).toBeNull();
+        expect(html).not.toMatch(/applySmartDefault|loadSimulation|renderSmartDefaults/);
+        expect(typeof calc.getSmartDefaults).toBe('function');     // Backend bleibt (Tests L1–L5)
     });
 
     it('M3: Inline-onclick-Handler sind global exponiert (sonst ReferenceError am Inkubator)', () => {
         expect(html).toMatch(/window\.openEduModal\s*=\s*openEduModal/);
-        expect(html).toMatch(/window\.applySmartDefault\s*=\s*applySmartDefault/);
-        expect(html).toMatch(/window\.applySmartDefaults\s*=\s*applySmartDefaults/);
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        expect(html).not.toMatch(/window\.applySmartDefault/);
     });
 
     it('M4: Energy-Gap-Index-Kachel existiert und wird in displayResults gerendert', () => {
@@ -841,7 +841,8 @@ describe('M) Frontend-Integration v3.0 — Teaching, EGI, Smart Defaults, Histor
     it('M5: History wird an calculate() übergeben + _kcal-min pro Tag persistiert (EGI-Datenbasis)', () => {
         expect(html).toMatch(/history:\s*history/);            // history in data-Objekt
         expect(html).toMatch(/\['_kcal-min'\]\s*=/);           // Ziel-Minimum wird gespeichert
-        expect(html).toMatch(/renderSmartDefaults\(res\)/);    // Smart Defaults werden gerendert
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        expect(html).not.toMatch(/renderSmartDefaults\(res\)/);    // Smart Defaults werden nicht mehr gerendert
     });
 
     it('M6: Patienten-Datenschutz — kein Name/Geburtsdatum-Klartextfeld wird in history-Keys persistiert', () => {
@@ -2444,12 +2445,14 @@ describe('AF) Keine parenterale Ernährung (v3.6.4, Lipide ausgenommen v3.6.5)',
         expect(kritisch.map(e => e.textContent)).toEqual([]);
     });
 
-    it('AF5: Eine Vorlage überschreibt die PN-Felder auch bei aktiver Auswahl „Keine PN“', async () => {
+    it('AF5: Es gibt keine Vorlagen mehr; beim Wechsel von „Keine PN“ auf „Manuelle Eingabe“ sind die PN-Felder wieder frei', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
         const w = await boot();
         set(w, kind);
         choose(w, 'keinePN');
-        w.loadSimulation('elbw');
-        expect(sel(w).value).not.toBe('keinePN');
+        expect(typeof w.loadSimulation).toBe('undefined');
+        choose(w, 'none');
+        expect(sel(w).value).toBe('none');
         PN.forEach(id => expect(w.document.getElementById(id).disabled, id).toBe(false));
         expect(w.document.getElementById('no-pn-note').classList.contains('hidden')).toBe(true);
     });
@@ -2824,10 +2827,14 @@ describe('AK-UI) Einheiten-Auswahl an den Mengenfeldern (v3.6.13)', () => {
         expect(text(w, 'secondary-rate-converted')).toBe('= 28.2 ml/kg/d');      // 24 ml/d ÷ 0,85 kg
     });
 
-    it('AK10: Eine Vorlage stellt die Einheiten der Mengenfelder auf ml/kg/d zurück', async () => {
-        const w = await boot({ 'input-tfi-unit': 'h', 'input-enteral-unit': 'meal', 'input-carrier-unit': 'd' });
-        w.loadSimulation('elbw');
+    it('AK10: Die Einheiten der Mengenfelder starten auf ml/kg/d und die gewählte Einheit wird gemerkt', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        const w = await boot({});
         for (const id of ['input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit']) expect(w.document.getElementById(id).value, id).toBe('kgd');
+        const u = w.document.getElementById('input-enteral-unit');
+        u.value = 'meal';
+        u.dispatchEvent(new w.Event('change', { bubbles: true }));
+        expect(w.localStorage.getItem('input-enteral-unit')).toBe('meal');
     });
 });
 
@@ -2942,7 +2949,7 @@ describe('AL-UI) Dosis je Mahlzeit in der Oberfläche (v3.6.14)', () => {
         expect(w.document.getElementById('qv-kcal').textContent).toBe('–');
     });
 
-    it('AL11: Schrittweite und Obergrenze passen zur Einheit; Vorlagen stellen % und g/100 ml zurück', async () => {
+    it('AL11: Schrittweite und Obergrenze passen zur Einheit und folgen der Rückstellung auf %', async () => {
         const w = await boot({});
         const f = w.document.getElementById('input-fm85');
         expect(f.step).toBe('0.5');
@@ -2951,9 +2958,9 @@ describe('AL-UI) Dosis je Mahlzeit in der Oberfläche (v3.6.14)', () => {
         expect(f.step).toBe('any');
         expect(f.hasAttribute('max')).toBe(false);
         w.document.getElementById('input-protein-add-unit').value = 'solmeal';
-        w.loadSimulation('elbw');
-        expect(w.document.getElementById('input-fm85-unit').value).toBe('pct');
-        expect(w.document.getElementById('input-protein-add-unit').value).toBe('per100');
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        w.document.getElementById('input-fm85-unit').value = 'pct';
+        w.document.getElementById('input-fm85-unit').dispatchEvent(new w.Event('change'));
         expect(f.step).toBe('0.5');                       // Schrittweite folgt der zurückgestellten Einheit
         expect(f.getAttribute('max')).toBe('5');
     });
@@ -3165,13 +3172,13 @@ describe('AO) Nur enteral und Dezimalwerte (v3.6.18)', () => {
         expect($(w, 'input-gir').disabled).toBe(false);
     });
 
-    it('AO6: Eine Vorlage verwirft den Haken und gibt die Felder frei', async () => {
+    it('AO6: Der Haken selbst wird nicht gespeichert, und die gesperrten Werte landen nicht im Speicher', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
         const w = await boot({ ...kind, 'input-enteral': 60 });
         haken(w, true);
-        w.loadSimulation('elbw');
-        expect($(w, 'input-enteral-only').checked).toBe(false);
-        expect($(w, 'input-tfi').disabled).toBe(false);
-        expect($(w, 'input-lipids').disabled).toBe(false);
+        expect(w.localStorage.getItem('input-enteral-only')).toBeNull();
+        expect(w.localStorage.getItem('input-lipids')).not.toBe('0');
+        expect(typeof w.loadSimulation).toBe('undefined');
     });
 
     it('AO7: Mit dem Haken meldet der Rechenkern keine Volumenkonflikte (kein PN-Rest, keine CRITICAL-Meldung zu Lipid-Volumen)', async () => {
@@ -3336,22 +3343,20 @@ describe('AQ) Infusion gesamt plus enteral (v3.6.20)', () => {
         expect($(w2, 'tfi-semantics-note').classList.contains('hidden')).toBe(true);
     });
 
-    it('AQ7: Der Vorschlag „Gesamtflüssigkeit“ (Smart Default) übernimmt Infusion = Vorschlag minus enterale Menge', async () => {
+    it('AQ7: Es gibt keinen Vorschlag „Gesamtflüssigkeit“ (Startwerte) mehr; die Infusion bleibt, wie eingetragen', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
         const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3, 'input-meal-frequency': 8,
-            'input-enteral': 40 });
-        const vorschlag = parseFloat(String($(w, 'sd-tfi').textContent).replace(',', '.'));
-        expect(vorschlag).toBeGreaterThan(40);
-        w.applySmartDefault('input-tfi', 'sdTfi');
-        expect(parseFloat($(w, 'input-tfi').value)).toBeCloseTo(vorschlag - 40, 1);
-        expect($(w, 'tfi-converted').innerText).toMatch(new RegExp(`Gesamtflüssigkeit ${String(vorschlag).replace('.', ',')} ml/kg/d`));
+            'input-enteral': 40, 'input-tfi': 90 });
+        expect($(w, 'sd-tfi')).toBeNull();
+        expect(typeof w.applySmartDefault).toBe('undefined');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 130 ml\/kg\/d/);   // 90 Infusion + 40 enteral
     });
 
-    it('AQ8: Die Vorlagen behalten ihre Gesamtflüssigkeit (140 bzw. 160 ml/kg/d) bei neuer Bedeutung des Feldes', async () => {
-        const w = await boot({});
-        w.loadSimulation('transition');
-        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 140 ml\/kg\/d/);
-        w.loadSimulation('fullEnteral');
-        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 160 ml\/kg\/d/);
+    it('AQ8: Es gibt keine Vorlagen mehr; die Standardwerte ergeben 80 ml/kg/d Gesamtflüssigkeit bei Infusion 80 ohne enterale Nahrung', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3 });
+        expect(typeof w.loadSimulation).toBe('undefined');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 80 ml\/kg\/d/);
     });
 });
 
@@ -3442,21 +3447,112 @@ describe('AR) Infusion aus Laufraten (v3.6.21)', () => {
         expect($(w, 'input-pn-rate').disabled).toBe(false);
     });
 
-    it('AR7: Der Vorschlag „Gesamtflüssigkeit“ setzt bei Laufraten die PN-Lösung auf Vorschlag minus enteral, Lipide, Spül- und Sekundärlösung', async () => {
+    it('AR7: Bei Laufraten bleibt die PN-Lösung, wie eingetragen; es gibt keine Übernahme von Vorschlägen mehr', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
         const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3, 'input-meal-frequency': 8,
-            'input-enteral': 40, 'input-lipids': 0, 'input-infusion-mode': 'rates' });
-        const vorschlag = parseFloat(String($(w, 'sd-tfi').textContent).replace(',', '.'));
-        w.applySmartDefault('input-tfi', 'sdTfi');
-        expect($(w, 'input-pn-rate-unit').value).toBe('kgd');
-        expect(parseFloat($(w, 'input-pn-rate').value)).toBeCloseTo(vorschlag - 40, 1);
-        expect($(w, 'tfi-converted').innerText).toMatch(new RegExp(`Gesamtflüssigkeit ${String(vorschlag).replace('.', ',')} ml/kg/d`));
+            'input-enteral': 40, 'input-lipids': 0, 'input-infusion-mode': 'rates', 'input-pn-rate-unit': 'kgd', 'input-pn-rate': 70 });
+        expect(typeof w.applySmartDefault).toBe('undefined');
+        expect($(w, 'input-pn-rate').value).toBe('70');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 110 ml\/kg\/d/);   // 70 PN + 40 enteral
     });
 
-    it('AR8: Eine Vorlage stellt die Eingabeart auf Summe zurück', async () => {
-        const w = await boot({ ...rate });
-        w.loadSimulation('transition');
+    it('AR8: Die Eingabeart startet auf „Summe“, und der Laufraten-Block ist ausgeblendet', async () => {
+        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
+        const w = await boot({});
         expect($(w, 'input-infusion-mode').value).toBe('sum');
         expect($(w, 'infusion-sum-block').classList.contains('hidden')).toBe(false);
-        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 140 ml\/kg\/d/);
+        expect($(w, 'infusion-rates-block').classList.contains('hidden')).toBe(true);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AS — Lipidrate in ml/h, große Gesamtflüssigkeit, schlankere Seite (v3.6.22)
+ * Anlass: (1) Auf der Station ist die Lipidrate in ml/h bekannt, nicht die Dosis in g/kg/d. (2) Die berechnete Gesamtflüssigkeit soll
+ * auf einen Blick lesbar sein. (3) Startwerte und Simulationspatienten überladen die Seite und sind entfernt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AS) Lipidrate, Gesamtflüssigkeit groß, schlankere Seite (v3.6.22)', () => {
+    async function boot(values, vorab = {}) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        Object.entries(vorab).forEach(([k, v]) => w.localStorage.setItem(k, v));
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        w.document.getElementById('input-infusion-mode').dispatchEvent(new w.Event('change'));
+        w.updateCalculations();
+        return w;
+    }
+    const $ = (w, id) => w.document.getElementById(id);
+    const kind = { 'birth-weight': 430, 'current-weight': 430, 'input-ssw': 26, 'input-day': 2, 'input-meal-frequency': 8,
+        'input-enteral-unit': 'd', 'input-enteral': 12, 'input-tfi-unit': 'h', 'input-tfi': 2.5 };
+
+    it('AS1: Lipide 0,2 ml/h bei 430 g sind 2,23 g/kg/d und rechnen dieselbe Energie wie die Dosis 2,233 g/kg/d', async () => {
+        const rate = await boot({ ...kind, 'input-lipids-unit': 'mlh', 'input-lipids': 0.2 });
+        expect($(rate, 'lipids-converted').innerText).toBe('= 2,23 g/kg/d');
+        const dosis = await boot({ ...kind, 'input-lipids-unit': 'gkg', 'input-lipids': 2.233 });
+        expect($(rate, 'qv-kcal').textContent).toBe($(dosis, 'qv-kcal').textContent);
+    });
+
+    it('AS2: Bei Eingabe in g/kg/d zeigt die Zeile darunter die Laufrate (2 g/kg/d bei 430 g = 0,2 ml/h, 0,86 g/d)', async () => {
+        const w = await boot({ ...kind, 'input-lipids': 2 });
+        expect($(w, 'lipids-converted').innerText).toBe('= 0,2 ml/h · 0,86 g/d');
+    });
+
+    it('AS3: Die Grenzen gelten für die umgerechnete Dosis (5 ml/h bei 430 g sind über 50 g/kg/d → Fehler), negative Raten brechen ab', async () => {
+        const hoch = await boot({ ...kind, 'input-lipids-unit': 'mlh', 'input-lipids': 5 });
+        expect($(hoch, 'validation-error-message').textContent).toMatch(/Lipid/i);
+        expect($(hoch, 'qv-kcal').textContent).toBe('–');
+        const neg = await boot({ ...kind, 'input-lipids-unit': 'mlh', 'input-lipids': -1 });
+        expect($(neg, 'qv-kcal').textContent).toBe('–');
+    });
+
+    it('AS4: Bei Laufraten zählt die Lipidrate in ml/h direkt zur Infusion (PN 43,7 ml/Tag + Lipide 0,2 ml/h + enteral 12 ml/Tag = 60,5 ml/d)', async () => {
+        const w = await boot({ ...kind, 'input-infusion-mode': 'rates', 'input-pn-rate-unit': 'd', 'input-pn-rate': 43.7,
+            'input-lipids-unit': 'mlh', 'input-lipids': 0.2 });
+        expect($(w, 'infusion-rates-converted').innerText).toBe('= PN-Lösung 1,8 ml/h + Lipide 0,2 ml/h + Spülflüssigkeit 0 ml/h + Sekundärinfusion 0 ml/h');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 140,7 ml\/kg\/d · 60,5 ml\/d/);
+    });
+
+    it('AS5: Die Einheit der Lipide wird gemerkt, und „Nur enteral“ sperrt sie mit dem Feld', async () => {
+        const w = await boot({ ...kind });
+        const u = $(w, 'input-lipids-unit');
+        u.value = 'mlh';
+        u.dispatchEvent(new w.Event('change', { bubbles: true }));
+        expect(w.localStorage.getItem('input-lipids-unit')).toBe('mlh');
+        const box = $(w, 'input-enteral-only');
+        box.checked = true; box.dispatchEvent(new w.Event('change'));
+        expect($(w, 'input-lipids-unit').disabled).toBe(true);
+        expect($(w, 'input-lipids').value).toBe('0');
+    });
+
+    it('AS6: Die Gesamtflüssigkeit steht groß über der Zeile (167,4 ml/kg/d), mit ml/d und ml/h; bei einem Eingabefehler steht „–“', async () => {
+        const w = await boot({ ...kind, 'input-lipids': 2 });
+        expect($(w, 'tfi-total-value').textContent).toBe('167,4');
+        expect($(w, 'tfi-total-value').className).toMatch(/text-3xl/);
+        expect($(w, 'tfi-total-sub').textContent).toBe('Infusion + enteral · 72 ml/d · 3 ml/h');
+        $(w, 'input-tfi-unit').value = 'kgd';
+        $(w, 'input-tfi').value = 450;
+        w.updateCalculations();
+        expect($(w, 'tfi-total-value').textContent).toBe('–');
+    });
+
+    it('AS7: Startwerte und Simulationspatienten gibt es in der Oberfläche nicht mehr', async () => {
+        const w = await boot({ ...kind });
+        ['smart-defaults-box', 'simulator-section', 'sim-section-content', 'sim-mode-badge', 'validation-box', 'validation-kpis']
+            .forEach(id => expect($(w, id), id).toBeNull());
+        expect(w.document.body.textContent).not.toMatch(/Startwerte|Simulation|Virtuelle NICU/);
+        expect(typeof w.loadSimulation).toBe('undefined');
+        expect(typeof w.applySmartDefaults).toBe('undefined');
     });
 });
