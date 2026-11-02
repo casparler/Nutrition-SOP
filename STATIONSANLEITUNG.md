@@ -36,7 +36,7 @@ benötigt; fehlt es, entfällt diese Anzeige.
 Rechner die Gesamtflüssigkeit auf 140 ml/kg/d und deckelt entsprechend auch das
 enterale Zielvolumen.
 
-**Schritt 3: Infusion gesamt.** Alle Infusionen zusammen (PN, Lipide, Spül- und Sekundärlösung) in ml/kg/d, ml/Tag oder ml/h. Die enterale Nahrung kommt dazu: Der Rechner bildet daraus die Gesamtflüssigkeit (Infusion + enteral) und zeigt sie unter dem Feld an. Beatmungsgrenze und Zielbereiche werden mit dieser Summe geprüft. Bei einem Kind ohne Infusion den Haken „Nur enteral (keine Infusion)“ setzen.
+**Schritt 3: Infusion gesamt.** Alle Infusionen zusammen (PN, Lipide, Spül- und Sekundärlösung) in ml/kg/d, ml/Tag oder ml/h. Die enterale Nahrung kommt dazu: Der Rechner bildet daraus die Gesamtflüssigkeit (Infusion + enteral) und zeigt sie unter dem Feld an. Beatmungsgrenze und Zielbereiche werden mit dieser Summe geprüft. Alternativ über „Infusion eingeben als: Laufraten einzeln“ die Raten eintragen: PN-Lösung (ml/h), dazu zählen die Lipide (aus der Dosis in g/kg/d), die Spülflüssigkeit und die Sekundärinfusion mit ihren dort eingetragenen Raten. Die Summe der Raten ergibt die Infusion, die App zeigt sie als ml/h je Pumpe an. Bei einem Kind ohne Infusion den Haken „Nur enteral (keine Infusion)“ setzen.
 
 **Schritt 4: Enterale Ernährung.** Volumen in ml/kg/d, Nahrungsart, bei Muttermilch die
 FM85-Stufe, Anzahl der Mahlzeiten. Enterale Supplemente (Liquigen, Aptamil Eiweiß+)
