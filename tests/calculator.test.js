@@ -2793,14 +2793,17 @@ describe('AK-UI) Einheiten-Auswahl an den Mengenfeldern (v3.6.13)', () => {
     });
 
     it('AK6: 12 ml je Mahlzeit und 144 ml/Tag Gesamtflüssigkeit ergeben dasselbe wie 180 ml/kg/d, mit sichtbarer Umrechnung', async () => {
-        const w = await boot({ ...kind, 'input-tfi': 180, 'input-enteral': 180 });
+        // v3.6.20 — klinisch begründete Anpassung: Das Feld ist die Infusion; die Gesamtflüssigkeit ergibt sich aus Infusion + enteral.
+        // Gleiche Gesamtmenge wie 180 ml/kg/d: Infusion 0, enteral 12 ml je Mahlzeit; mit Infusion 144 ml/Tag kommen 180 ml/kg/d dazu.
+        const w = await boot({ ...kind, 'input-tfi': 0, 'input-enteral': 180 });
         const soll = text(w, 'qv-kcal');
-        const w2 = await boot({ ...kind, 'input-tfi-unit': 'd', 'input-tfi': 144, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
+        const w2 = await boot({ ...kind, 'input-tfi-unit': 'd', 'input-tfi': 0, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
         expect(text(w2, 'qv-kcal')).toBe(soll);
         expect(text(w2, 'enteral-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 12 ml je Mahlzeit (12×), Rechengewicht 800 g');
-        // v3.6.19 — klinisch begründete Anpassung: Die Zeile nennt zusätzlich die Aufteilung der Gesamtflüssigkeit
-        // (davon enteral, Rest für Infusion), weil die enterale Nahrung in der Gesamtflüssigkeit steckt und nicht dazukommt.
-        expect(text(w2, 'tfi-converted')).toBe('= 180 ml/kg/d · 144 ml/d · 6 ml/h · davon enteral 144 ml/d, Rest 0 ml/d (0 ml/h) für Infusion, Spülflüssigkeit und Zusätze');
+        expect(text(w2, 'tfi-converted')).toBe('= Infusion 0 ml/kg/d (0 ml/d, 0 ml/h) + enteral 180 ml/kg/d (144 ml/d) = Gesamtflüssigkeit 180 ml/kg/d · 144 ml/d · 6 ml/h');
+        // Infusion 144 ml/Tag kommt zur enteralen Nahrung dazu: 288 ml/d = 360 ml/kg/d
+        const w3 = await boot({ ...kind, 'input-tfi-unit': 'd', 'input-tfi': 144, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
+        expect(text(w3, 'tfi-converted')).toBe('= Infusion 180 ml/kg/d (144 ml/d, 6 ml/h) + enteral 180 ml/kg/d (144 ml/d) = Gesamtflüssigkeit 360 ml/kg/d · 288 ml/d · 12 ml/h');
     });
 
     it('AK7: Spülflüssigkeit in ml/h wird umgerechnet und angezeigt', async () => {
@@ -2898,7 +2901,9 @@ describe('AL-UI) Dosis je Mahlzeit in der Oberfläche (v3.6.14)', () => {
         w.updateCalculations();
         return w;
     }
-    const kind = { 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 180, 'input-enteral': 180 };
+    // v3.6.20 — klinisch begründete Anpassung: Das Feld „input-tfi“ ist jetzt die Infusion, die Gesamtflüssigkeit ergibt sich aus
+    // Infusion + enteral. Ein rein enteral ernährtes Kind hat Infusion 0 (vorher stand hier die Gesamtflüssigkeit 180 = enteral).
+    const kind = { 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 0, 'input-enteral': 180 };
     const text = (w, id) => w.document.getElementById(id).innerText;
 
     it('AL6: Beide Felder haben die neuen Einheiten, Standard bleibt % bzw. g/100 ml', async () => {
@@ -2995,7 +3000,8 @@ describe('AM-UI) Neocate in der Oberfläche (v3.6.15)', () => {
         w.updateCalculations();
         return w;
     }
-    const kind = { 'birth-weight': 800, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 180, 'input-enteral': 180 };
+    // v3.6.20 — klinisch begründete Anpassung: „input-tfi“ ist jetzt die Infusion (Gesamtflüssigkeit = Infusion + enteral); rein enteral = 0.
+    const kind = { 'birth-weight': 800, 'current-weight': 800, 'input-ssw': 28, 'input-day': 1, 'input-meal-frequency': 12, 'input-lipids': 0, 'input-tfi': 0, 'input-enteral': 180 };
 
     it('AM3: Alle Nahrungen aus den Produktdaten sind in der Auswahl wählbar', async () => {
         const w = await boot({});
@@ -3111,29 +3117,32 @@ describe('AO) Nur enteral und Dezimalwerte (v3.6.18)', () => {
         expect($(w, 'enteral-converted').innerText).toMatch(/^= 7,5 ml\/kg\/d · 6 ml\/d · 0,5 ml je Mahlzeit/);
     });
 
-    it('AO2: „Nur enteral“ — Gesamtflüssigkeit folgt der enteralen Menge, Infusion und Lipide stehen auf 0, die Felder sind gesperrt', async () => {
+    it('AO2: „Nur enteral“ — Infusion steht auf 0 (Gesamtflüssigkeit = enterale Menge), Lipide auf 0, die Felder sind gesperrt', async () => {
         const w = await boot({ ...kind, 'input-tfi': 150, 'input-lipids': 1, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
         haken(w, true);
-        expect($(w, 'input-tfi').value).toBe('180');                 // 12 ml × 12 ÷ 0,8 kg
+        // v3.6.20 — klinisch begründete Anpassung: Das Feld ist jetzt die Infusion (0); die Gesamtflüssigkeit ergibt sich aus Infusion + enteral.
+        expect($(w, 'input-tfi').value).toBe('0');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 180 ml\/kg\/d/);   // 12 ml × 12 ÷ 0,8 kg
         expect($(w, 'input-solution').value).toBe('keinePN');
         expect($(w, 'input-lipids').value).toBe('0');
         expect($(w, 'input-secondary-solution').value).toBe('none');
         ['input-tfi', 'input-solution', 'input-lipids', 'input-carrier', 'input-secondary-rate', 'input-gir', 'input-protein']
             .forEach(id => expect($(w, id).disabled, id).toBe(true));
-        expect($(w, 'tfi-converted').innerText).toMatch(/^= 144 ml\/d/);
         expect($(w, 'enteral-only-note').classList.contains('hidden')).toBe(false);
     });
 
-    it('AO3: Die Gesamtflüssigkeit folgt späteren Änderungen der enteralen Menge', async () => {
+    it('AO3: Die Gesamtflüssigkeit folgt späteren Änderungen der enteralen Menge (Infusion bleibt 0)', async () => {
         const w = await boot({ ...kind, 'input-enteral-unit': 'meal', 'input-enteral': 12 });
         haken(w, true);
         $(w, 'input-enteral').value = 6;
         w.updateCalculations();
-        expect($(w, 'input-tfi').value).toBe('90');
+        expect($(w, 'input-tfi').value).toBe('0');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 90 ml\/kg\/d/);
         $(w, 'input-enteral-unit').value = 'd';
         $(w, 'input-enteral').value = 72;
         w.updateCalculations();
-        expect($(w, 'input-tfi').value).toBe('90');
+        expect($(w, 'input-tfi').value).toBe('0');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 90 ml\/kg\/d/);
     });
 
     it('AO4: Abwählen stellt Gesamtflüssigkeit, Infusionslösung, Lipide und Sperren wieder her', async () => {
@@ -3223,7 +3232,7 @@ describe('AP) Tatsächliche Gesamtmenge bei Beatmung und TFI-Hinweisen (v3.6.19)
         expect(k).not.toMatch(/Sekundärinfusionen reduzieren/);
     });
 
-    it('AP7: In der Oberfläche steht die Aufteilung der Gesamtflüssigkeit unter dem Feld (2,5 ml/h, davon enteral 40 ml/kg/d)', async () => {
+    it('AP7: In der Oberfläche steht die Aufteilung unter dem Feld (Infusion 2,5 ml/h plus enteral 40 ml/kg/d)', async () => {
         const { JSDOM } = await import('jsdom');
         const fs = require('node:fs');
         const root = new URL('../', import.meta.url).pathname;
@@ -3241,7 +3250,107 @@ describe('AP) Tatsächliche Gesamtmenge bei Beatmung und TFI-Hinweisen (v3.6.19)
             'input-tfi-unit': 'h', 'input-tfi': 2.5, 'input-enteral': 40 }).forEach(([k, v]) => set(k, v));
         w.updateCalculations();
         const text = String(w.document.getElementById('tfi-converted').innerText);
-        expect(text).toMatch(/^= 75 ml\/kg\/d · 60 ml\/d · 2,5 ml\/h · davon enteral 32 ml\/d, Rest 28 ml\/d \(1,2 ml\/h\)/);
-        expect(w.document.body.textContent).toMatch(/Gesamtflüssigkeit \(TFI, inkl\. enteral\)/);
+        // v3.6.20 — klinisch begründete Anpassung: Eingegeben wird die Infusion (2,5 ml/h = 75 ml/kg/d), die enterale Nahrung kommt dazu.
+        expect(text).toBe('= Infusion 75 ml/kg/d (60 ml/d, 2,5 ml/h) + enteral 40 ml/kg/d (32 ml/d) = Gesamtflüssigkeit 115 ml/kg/d · 92 ml/d · 3,8 ml/h');
+        expect(w.document.body.textContent).toMatch(/Infusion gesamt/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AQ — Infusion gesamt + enteral = Gesamtflüssigkeit (v3.6.20)
+ * Anlass: Praxisfall 430 g, intubiert, Infusion 2,5 ml/h, enteral 0,5 ml/h. Die Station denkt „Infusion plus enteral“;
+ * die App behandelte das Feld als Gesamtflüssigkeit und zog die enterale Nahrung davon ab (Summe 3,0 statt 2,5 ml/h blieb unbemerkt).
+ * Jetzt wird die Infusion eingegeben und die Gesamtflüssigkeit daraus berechnet.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AQ) Infusion gesamt plus enteral (v3.6.20)', () => {
+    async function boot(values, vorab = {}) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        Object.entries(vorab).forEach(([k, v]) => w.localStorage.setItem(k, v));
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        w.updateCalculations();
+        return w;
+    }
+    const $ = (w, id) => w.document.getElementById(id);
+    const pdf = { 'birth-weight': 430, 'current-weight': 430, 'input-ssw': 26, 'input-day': 2, 'input-meal-frequency': 8,
+        'input-tfi-unit': 'h', 'input-tfi': 2.5, 'input-enteral-unit': 'd', 'input-enteral': 12, 'input-lipids': 2 };
+
+    it('AQ1: Praxisfall — Infusion 2,5 ml/h plus enteral 12 ml/d ergeben 167,4 ml/kg/d, intubiert → CRITICAL zur Beatmungsgrenze', async () => {
+        const w = await boot({ ...pdf, 'input-invasive-ventilation': true });
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 167,4 ml\/kg\/d · 72 ml\/d · 3 ml\/h$/);
+        const kritisch = [...w.document.querySelectorAll('#findings-critical .f-item.critical')].map(e => e.textContent).join(' ');
+        expect(kritisch).toMatch(/invasiver Beatmung/);
+        const spontan = await boot({ ...pdf, 'input-invasive-ventilation': false });
+        const k2 = [...spontan.document.querySelectorAll('#findings-critical .f-item.critical')].map(e => e.textContent).join(' ');
+        expect(k2).not.toMatch(/invasiver Beatmung/);
+    });
+
+    it('AQ2: Ohne enterale Nahrung ist die Gesamtflüssigkeit gleich der Infusion; bei Infusion 0 gleich der enteralen Menge', async () => {
+        const a = await boot({ ...pdf, 'input-enteral': 0 });
+        expect($(a, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 139,5 ml\/kg\/d · 60 ml\/d · 2,5 ml\/h$/);
+        const b = await boot({ ...pdf, 'input-tfi': 0 });
+        expect($(b, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 27,9 ml\/kg\/d · 12 ml\/d · 0,5 ml\/h$/);
+    });
+
+    it('AQ3: Eine negative Infusion wird nicht durch die enterale Menge verdeckt (Tippfehlerschutz bleibt)', async () => {
+        const w = await boot({ ...pdf, 'input-tfi-unit': 'kgd', 'input-tfi': -50, 'input-enteral-unit': 'kgd', 'input-enteral': 100 });
+        expect($(w, 'validation-error-message').textContent).toMatch(/TFI|Gesamtfl|negativ|0/);
+        expect($(w, 'qv-kcal').textContent).toBe('–');
+    });
+
+    it('AQ4: Die harte Grenze 400 ml/kg/d gilt für die Gesamtflüssigkeit (Infusion 250 + enteral 200)', async () => {
+        const w = await boot({ ...pdf, 'input-tfi-unit': 'kgd', 'input-tfi': 250, 'input-enteral-unit': 'kgd', 'input-enteral': 200 });
+        expect($(w, 'validation-error-message').textContent).toMatch(/TFI|Gesamtfl|400/);
+        expect($(w, 'qv-kcal').textContent).toBe('–');
+    });
+
+    it('AQ5: Ein früher gespeicherter Wert (damals Gesamtflüssigkeit) wird nicht als Infusion übernommen; Hinweis erscheint', async () => {
+        const w = await boot({}, { 'input-tfi': '150', 'input-enteral': '60' });
+        expect($(w, 'input-tfi').value).toBe('80');                         // Standardwert, nicht 150
+        expect($(w, 'input-enteral').value).toBe('60');                     // andere Felder bleiben erhalten
+        expect($(w, 'tfi-semantics-note').classList.contains('hidden')).toBe(false);
+    });
+
+    it('AQ6: Nach einer Eingabe im Feld ist der Hinweis weg, und der Wert wird beim nächsten Start wieder geladen', async () => {
+        const w = await boot({}, { 'input-tfi': '150' });
+        const feld = $(w, 'input-tfi');
+        feld.value = '90';
+        feld.dispatchEvent(new w.Event('input', { bubbles: true }));
+        expect($(w, 'tfi-semantics-note').classList.contains('hidden')).toBe(true);
+        expect(w.localStorage.getItem('neo-tfi-semantics')).toBe('infusion');
+        const w2 = await boot({}, { 'input-tfi': '90', 'neo-tfi-semantics': 'infusion' });
+        expect($(w2, 'input-tfi').value).toBe('90');
+        expect($(w2, 'tfi-semantics-note').classList.contains('hidden')).toBe(true);
+    });
+
+    it('AQ7: Der Vorschlag „Gesamtflüssigkeit“ (Smart Default) übernimmt Infusion = Vorschlag minus enterale Menge', async () => {
+        const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3, 'input-meal-frequency': 8,
+            'input-enteral': 40 });
+        const vorschlag = parseFloat(String($(w, 'sd-tfi').textContent).replace(',', '.'));
+        expect(vorschlag).toBeGreaterThan(40);
+        w.applySmartDefault('input-tfi', 'sdTfi');
+        expect(parseFloat($(w, 'input-tfi').value)).toBeCloseTo(vorschlag - 40, 1);
+        expect($(w, 'tfi-converted').innerText).toMatch(new RegExp(`Gesamtflüssigkeit ${String(vorschlag).replace('.', ',')} ml/kg/d`));
+    });
+
+    it('AQ8: Die Vorlagen behalten ihre Gesamtflüssigkeit (140 bzw. 160 ml/kg/d) bei neuer Bedeutung des Feldes', async () => {
+        const w = await boot({});
+        w.loadSimulation('transition');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 140 ml\/kg\/d/);
+        w.loadSimulation('fullEnteral');
+        expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 160 ml\/kg\/d/);
     });
 });

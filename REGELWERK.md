@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 01.11.2026, Version v3.6.19, 299 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 01.11.2026, Version v3.6.20, 307 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -91,6 +91,7 @@ Zielspannen in ml/kg/d (`TFI_TARGETS`). ELBW und VLBW liegen **bewusst 10 ml unt
 | 4.5 | Enterales Volumen größer als TFI → Warnung | Technisch | `calculate` | – |
 | 4.6 | Plateau ab Tag 5 statt Rampe | Entscheidung 28.09.2026 | `TFI_TARGETS` | Q1–Q6 |
 | 4.7 | **Tatsächliche Gesamtmenge:** Die Gesamtflüssigkeit (TFI) ist die Summe aus Infusion und Teilen, die enterale Nahrung steckt darin und kommt nicht dazu. Übersteigt die Summe aus enteraler Nahrung, Spülflüssigkeit, Sekundärinfusion und Mikro-Zufuhr den eingetragenen Wert, prüfen **Beatmungs-CRITICAL (> 140 ml/kg/d), TFI-Hinweise (unter Zielbereich, über 180, über 200), ELBW-IWL-Hinweis (unter 100) und Gewichtsverlauf (Zielrand)** mit der Summe. Die Meldung heißt dann „Gesamtmenge“ und nennt die eingetragene Gesamtflüssigkeit. Die CRITICAL-Meldung „TFI überschritten“ nennt die Summe der Teile statt nur Sekundärinfusionen. Unter dem Feld steht die Aufteilung (davon enteral, Rest für Infusion). Anlass: intubiertes Kind, Gesamtflüssigkeit 2,5 ml/h (75 ml/kg/d), enteral gesteigert, Beatmungsgrenze blieb stumm | Entscheidung 02.11.2026 (Neonatologe: „Punkt 1 umsetzen“) | `calculate` (`tfiEffective`), `index.html` (`tfi-converted`) | AP1–AP7, AK6 |
+| 4.8 | **Infusion gesamt + enteral = Gesamtflüssigkeit:** Das Eingabefeld heißt „Infusion gesamt“ (ml/kg/d, ml/Tag, ml/h) und enthält alle Infusionen (PN, Lipide, Spülflüssigkeit, Sekundärinfusion, Mikro-Zufuhr). Die Oberfläche addiert die enterale Nahrung und übergibt **Infusion + enteral als TFI** an `calculate()`; unter dem Feld steht die Aufteilung. Die Grenzen (Invariante 3, z. B. 400 ml/kg/d) gelten damit für die Summe; eine **negative Infusion** wird unverändert durchgereicht und bricht ab, damit die enterale Menge sie nicht verdeckt. Der Vorschlag „Gesamtflüssigkeit“ (Smart Default) setzt die Infusion auf Vorschlag minus enterale Menge. Vorlagen: Infusion 80 + enteral 60 (140) und 10 + 150 (160). **Früher gespeicherte Werte** des Feldes (damals Gesamtflüssigkeit) werden nicht übernommen (sie würden die Summe still um die enterale Menge erhöhen); ein Hinweis erscheint, bis die Infusion neu eingetragen ist. Der Haken „Nur enteral“ setzt die Infusion auf 0. Anlass: 430 g, intubiert, Infusion 2,5 ml/h plus enteral 0,5 ml/h; die App zog die enterale Menge von den 2,5 ml/h ab, die Summe 3,0 ml/h (167 ml/kg/d) blieb unbemerkt | Entscheidung 02.11.2026 (Neonatologe: „Infusion plus enteral addieren, Feld als ‚Infusion gesamt‘“) | `index.html` (`updateCalculations`, `applySmartDefault`, Migration `neo-tfi-semantics`) | AQ1–AQ8, AK6, AO2, AO3, AP7 |
 
 ## 5. Energie
 
@@ -394,3 +395,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 01.11.2026 | Quellenverzeichnis QUELLEN.md angelegt. Befunde: Schwelle 150 kcal/kg (15.1) steht nicht in Embleton 2001, Gewichtsverlust-Prozentwerte (13.1) ohne Quelle, J-Perinatol-Zitat (Regel 4) unvollständig; ESPGHAN-Volltexte nicht abrufbar, Leitlinienzahlen deshalb ungeprüft |
 | 01.11.2026 | Haken „Nur enteral (keine Infusion)“ (Gesamtflüssigkeit folgt der enteralen Menge, Lipide und Infusionen auf 0) und Dezimalwerte bei den Mengenfeldern (Regel 10.13, Version 3.6.18) |
 | 02.11.2026 | Beatmungs-CRITICAL und TFI-Hinweise prüfen die tatsächliche Gesamtmenge (Summe der Teile), Beschriftung „Gesamtflüssigkeit (TFI, inkl. enteral)“ und Anzeige der Aufteilung (Regel 4.7, Version 3.6.19). Test AK6 mit Begründung angepasst |
+| 02.11.2026 | Eingabe „Infusion gesamt“, die Gesamtflüssigkeit wird aus Infusion + enteral berechnet (Regel 4.8, Version 3.6.20). Tests AK6, AL/AM-Fixtures, AO2, AO3, AP7 mit Begründung angepasst |
