@@ -78,6 +78,8 @@
         .f-ok { margin-top:.5rem; font-size:.8rem; color:#065f46; }
         /* v3.6.23: Nach einem Eingabefehler sind die Ergebnisse nicht aktuell — sichtbar ausgegraut, nicht bedienbar */
         .results-stale > *:not(#results-stale-note) { opacity:.3; filter:grayscale(1); pointer-events:none; }
+        /* v3.6.26: Ergebnistabelle standardmäßig zugeklappt, nur die Kopfzeile bleibt sichtbar */
+        #result-card.collapsed > *:not(:first-child) { display:none !important; }
         #results-stale-note { border:2px solid #b91c1c; background:#fef2f2; color:#7f1d1d; border-radius:.5rem; padding:.6rem .8rem; font-size:.85rem; font-weight:600; }
         @media print { .f-fold:not([open]) > .f-fold-body { display:block; } }
 
@@ -811,9 +813,14 @@
               </div><!-- /.cockpit-grid -->
 
                 <!-- Main Result Card -->
-                <div id="result-card" class="bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
+                <div id="result-card" class="collapsed bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
                     <div class="bg-blue-600 text-white px-4 py-3 flex justify-between items-center">
-                        <span class="font-bold text-lg">Ergebnis-Zusammenfassung</span>
+                        <!-- v3.6.26: Die Tabelle aller Werte ist zugeklappt; das Wesentliche steht in der klinischen Beurteilung -->
+                        <button type="button" id="btn-toggle-results" aria-expanded="false" aria-controls="result-card" class="font-bold text-lg text-left flex items-center gap-2 hover:underline">
+                            <span id="result-toggle-icon" aria-hidden="true">▸</span>
+                            <span>Alle Werte im Einzelnen</span>
+                            <span id="result-toggle-hint" class="text-xs font-normal opacity-90">(anzeigen)</span>
+                        </button>
                         <span id="safety-badge" onclick="openSafetyModal()" class="bg-green-500 text-white text-xs px-2 py-1 rounded-full uppercase font-bold cursor-pointer hover:scale-105 transition-transform" title="Klicken für Sicherheits-Details">Sicher</span>
                     </div>
 
@@ -2606,6 +2613,26 @@
 
                 doc.save(`Nutrition_${pId.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
             });
+
+            // v3.6.26: Ergebnistabelle auf- und zuklappen; die Wahl wird für dieses Gerät gemerkt
+            (function () {
+                const card = document.getElementById('result-card');
+                const btn = document.getElementById('btn-toggle-results');
+                const setOpen = open => {
+                    card.classList.toggle('collapsed', !open);
+                    btn.setAttribute('aria-expanded', String(open));
+                    document.getElementById('result-toggle-icon').textContent = open ? '▾' : '▸';
+                    document.getElementById('result-toggle-hint').textContent = open ? '(ausblenden)' : '(anzeigen)';
+                };
+                let offen = false;
+                try { offen = localStorage.getItem('neo-results-open') === 'true'; } catch (e) { /* ohne Speicher: zugeklappt */ }
+                setOpen(offen);
+                btn.addEventListener('click', () => {
+                    const open = card.classList.contains('collapsed');
+                    setOpen(open);
+                    try { localStorage.setItem('neo-results-open', String(open)); } catch (e) { /* nicht speicherbar */ }
+                });
+            })();
 
             // Reset / Neues Kind (v3.6.23: zweiter Knopf oben bei den Patientendaten)
             const resetAll = () => {

@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 18.11.2026, Version v3.6.26, 352 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 18.11.2026, Version v3.6.26, 353 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -327,6 +327,7 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 | 14.8 | **Doku-Text:** „AS“ nennt die Aminosäuren der Infusion; „Eiweiß gesamt“ steht immer, getrennt nach Infusion und enteral; FM85 und Eiweiß-Zusatz mit Menge je Mahlzeit; Lipide i. v. nur, wenn sie laufen; Volumen ohne Glukose und Aminosäuren heißt „Infusion … ohne eingetragenen Inhalt“ (Tests AT12, AT13) | Fehlerkorrektur 17.11.2026 | `generateDocumentationString` |
 | 14.9 | Haken werden als angehakt/nicht angehakt gespeichert; die **Nahrungspause bleibt nach dem Neuladen** gesetzt (Test AT8) | Fehlerkorrektur 17.11.2026 | `index.html` (Speichern/Laden) |
 | 14.10 | **Die Karte „7-Tage-Trend“ ist entfallen** (es wird kein Verlauf über 7 Tage erhoben; die App soll überschaubar bleiben). Eine Natrium-Meldung ab fester Schwelle wird nicht eingeführt (BGA fast täglich) (Test AW2) | Entscheidung 18.11.2026 | `index.html` |
+| 14.11 | **Die Tabelle aller Werte („Alle Werte im Einzelnen“, früher „Ergebnis-Zusammenfassung“) ist zugeklappt** und wird bei Bedarf aufgeklappt; die Wahl wird je Gerät gemerkt. Das Wesentliche steht in der klinischen Beurteilung. Die Sicherheits-Anzeige in der Kopfzeile bleibt sichtbar (Test AW4) | Entscheidung 18.11.2026 | `index.html` (`btn-toggle-results`) |
 
 ## 15. Vorhersagehinweise (nur Hinweis, nie Sperre)
 
@@ -450,4 +451,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 17.11.2026 | Kritische Prüfung mit Szenarien. **Hauslösungen nach der Stations-Verordnungstabelle 09/2023 korrigiert** (Abschnitt 8a; vorher 30–53 % zu niedrig). Vortagsgewicht optional und auf Plausibilität geprüft, Verlauf je Kind, Knopf „Neues Kind“, Nahrungspause bleibt nach dem Neuladen, Ergebnisse nach Eingabefehler als nicht aktuell gekennzeichnet, Doku-Text korrigiert, Lipidziel i. v. nur bei laufender Infusion, Zusammenfassung nennt die Abweichungen, FM85-Hinweis zieht Aminosäuren i. v. ab (Regeln 7.7, 8a, 11.14c, 13.8–13.10, 14.6–14.9, 16a.13, Version 3.6.23). Tests F1, M4, M5 mit Begründung angepasst, neu AT1–AT19. Neue offene Punkte 17.23–17.27 |
 | 17.11.2026 | Entscheidungen des Neonatologen: Eiweiß- und Energieziel bei Reifgeborenen nicht bewerten (5.1a, 6.1a), FM85 frühestens ab 100 ml/kg/d, Erinnerung „ab 50“ entfällt (11.12), FG-Mix ab Tag 3 mit Wechsel-Erinnerung und Phosphat-/Kalium-Hinweis (12.2). Version 3.6.24, Tests AU1–AU4, AT14 auf ein Frühgeborenes umgestellt |
 | 18.11.2026 | Stations-Tabelle als aktuell bestätigt; Basislösung FG ist Standard ab Lebenstag 3 (12.2); Chlorid der Hauslösungen bleibt außen vor (17.24); NG-Mix und vier weitere Sekundärlösungen aufgenommen (8a.6, 8a.7); Eingabefelder starten leer (8a.8). Version 3.6.25, Tests AV1–AV4, AQ5/AQ8/AU4 mit Begründung angepasst |
-| 18.11.2026 | Leitgedanke: Die App soll überschaubar bleiben. Chlorid-Meldungen gestrichen (9.8), Karte „7-Tage-Trend“ entfernt (14.10), keine zusätzliche Natrium-Meldung; Rezeptur der Basislösung FG bestätigt (17.23). Beschriftung des Zugangs: „Zentral (ZVK, ESK, NVK)“ statt „ZVK/PDK“. Version 3.6.26, Tests AW1–AW3 |
+| 18.11.2026 | Leitgedanke: Die App soll überschaubar bleiben. Chlorid-Meldungen gestrichen (9.8), Karte „7-Tage-Trend“ entfernt (14.10), keine zusätzliche Natrium-Meldung; Rezeptur der Basislösung FG bestätigt (17.23). Beschriftung des Zugangs: „Zentral (ZVK, ESK, NVK)“ statt „ZVK/PDK“. Tabelle aller Werte zugeklappt (14.11). Version 3.6.26, Tests AW1–AW4 |

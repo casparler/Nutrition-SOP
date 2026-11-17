@@ -4006,4 +4006,39 @@ describe('AW) Keine Chlorid-Meldungen, kein 7-Tage-Trend (v3.6.26)', () => {
         const r = calc.calculate(baseInput({ access: 'central', gir: 8, protein: 3 }));
         expect(r.documentation).toMatch(/\(manuell, zentral\)/);
     });
+
+    it('AW4: Die Tabelle aller Werte ist zugeklappt und lässt sich aufklappen; die Wahl wird gemerkt, die Sicherheits-Anzeige bleibt sichtbar', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const start = vorab => {
+            const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+            Object.entries(vorab).forEach(([k, v]) => w.localStorage.setItem(k, v));
+            w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+            for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+            w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+            w.HTMLElement.prototype.scrollIntoView = () => {};
+            [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+            w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+            return w;
+        };
+        const w = start({});
+        const card = w.document.getElementById('result-card');
+        const btn = w.document.getElementById('btn-toggle-results');
+        expect(card.classList.contains('collapsed')).toBe(true);
+        expect(btn.getAttribute('aria-expanded')).toBe('false');
+        expect(btn.textContent).toMatch(/Alle Werte im Einzelnen\s*\(anzeigen\)/);
+        // Kopfzeile mit Sicherheits-Anzeige ist das erste Kind und bleibt sichtbar; alles andere ist per Stylesheet ausgeblendet
+        expect(card.firstElementChild.contains(w.document.getElementById('safety-badge'))).toBe(true);
+        const css = [...w.document.querySelectorAll('style')].map(s => s.textContent).join('\n');
+        expect(css).toMatch(/#result-card\.collapsed > \*:not\(:first-child\)\s*\{\s*display:none/);
+        // Die klinische Beurteilung liegt nicht in der zugeklappten Karte
+        expect(card.contains(w.document.getElementById('findings-critical'))).toBe(false);
+        btn.click();
+        expect(card.classList.contains('collapsed')).toBe(false);
+        expect(btn.getAttribute('aria-expanded')).toBe('true');
+        expect(w.localStorage.getItem('neo-results-open')).toBe('true');
+        expect(start({ 'neo-results-open': 'true' }).document.getElementById('result-card').classList.contains('collapsed')).toBe(false);
+    });
 });
