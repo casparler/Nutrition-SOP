@@ -831,26 +831,20 @@ describe('M) Frontend-Integration v3.0 — Teaching, EGI, Smart Defaults, Histor
         expect(html).not.toMatch(/window\.applySmartDefault/);
     });
 
-    it('M4: Energy-Gap-Index-Kachel existiert und wird in displayResults gerendert', () => {
-        expect(doc.getElementById('egi-card')).not.toBeNull();
-        expect(doc.getElementById('egi-value')).not.toBeNull();
-        expect(doc.getElementById('egi-bar')).not.toBeNull();
-        expect(doc.getElementById('egi-severity')).not.toBeNull();
-        // renderEGI muss aufgerufen werden.
-        // v3.6.23 — Anpassung mit klinischer Begründung: Die Kachel bekommt nur noch den Verlauf DESSELBEN Kindes
-        // (childHistory()). Vorher mischte sie am selben Gerät die Tage zweier Kinder (Test AT10).
-        expect(html).toMatch(/renderEGI\(childHistory\(\)\)/);
-        expect(html).toMatch(/function renderEGI/);
+    // v3.6.27 — Entscheidung des Neonatologen 18.11.2026: Der Energiedefizit-Index entfällt in der Oberfläche, weil kein
+    // Verlauf über mehrere Tage erhoben wird (die App soll überschaubar bleiben). M4 und M5 prüfen jetzt das Gegenteil;
+    // die Berechnung im Rechenkern bleibt bestehen (Tests K1–K5, I1–I4).
+    it('M4: Die Energiedefizit-Kachel gibt es in der Oberfläche nicht mehr', () => {
+        ['egi-card', 'egi-value', 'egi-bar', 'egi-severity'].forEach(id => expect(doc.getElementById(id), id).toBeNull());
+        expect(html).not.toMatch(/renderEGI\(childHistory\(\)\)/);
+        expect(typeof calc.calculateEnergyGapIndex).toBe('function');
     });
 
-    it('M5: History wird an calculate() übergeben + _kcal-min pro Tag persistiert (EGI-Datenbasis)', () => {
-        // v3.6.23 — Anpassung mit klinischer Begründung: Übergeben wird der Verlauf desselben Kindes (kindVerlauf =
-        // childHistory()), nicht mehr der ungefilterte Speicher. Das Prüfziel (Verlauf geht an calculate()) bleibt.
+    it('M5: Der Verlauf desselben Kindes geht an calculate(); Energiewerte je Tag werden nicht mehr gespeichert', () => {
         expect(html).toMatch(/history:\s*kindVerlauf/);       // history in data-Objekt
         expect(html).toMatch(/const kindVerlauf = childHistory\(\)/);
-        expect(html).toMatch(/\['_kcal-min'\]\s*=/);           // Ziel-Minimum wird gespeichert
-        // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
-        expect(html).not.toMatch(/renderSmartDefaults\(res\)/);    // Smart Defaults werden nicht mehr gerendert
+        expect(html).not.toMatch(/\['_kcal-min'\]\s*=/);
+        expect(html).not.toMatch(/renderSmartDefaults\(res\)/);
     });
 
     it('M6: Patienten-Datenschutz — kein Name/Geburtsdatum-Klartextfeld wird in history-Keys persistiert', () => {
@@ -1270,7 +1264,8 @@ describe('P-QV) Quick-View skaliert mit der Kachelbreite', () => {
     it('P4: Werte nutzen .qv-value statt fester Tailwind-Groessen', () => {
         const i = ui.indexOf('id="quick-view-card"');
         expect(i).toBeGreaterThan(-1);
-        const block = ui.slice(i, ui.indexOf('id="egi-card"'));
+        // v3.6.27: Die Kachel „Energiedefizit-Index“ ist entfallen; der Block endet jetzt am Ende des Cockpit-Rasters.
+        const block = ui.slice(i, ui.indexOf('<!-- /.cockpit-grid -->'));
         expect(block).toMatch(/class="qv-value/);
         expect(block).not.toMatch(/text-3xl|text-4xl/);
     });
@@ -4040,5 +4035,36 @@ describe('AW) Keine Chlorid-Meldungen, kein 7-Tage-Trend (v3.6.26)', () => {
         expect(btn.getAttribute('aria-expanded')).toBe('true');
         expect(w.localStorage.getItem('neo-results-open')).toBe('true');
         expect(start({ 'neo-results-open': 'true' }).document.getElementById('result-card').classList.contains('collapsed')).toBe(false);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AX — Energiedefizit-Index entfällt in der Oberfläche (v3.6.27, Entscheidung des Neonatologen 18.11.2026)
+ * ────────────────────────────────────────────────────────────────*/
+describe('AX) Kein Energiedefizit über mehrere Tage (v3.6.27)', () => {
+    it('AX1: Auch mit früher gespeicherten Energiewerten erscheint kein Hinweis „Kumulatives Energiedefizit“, neue werden nicht gespeichert', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        const alt = {}; for (let d = 3; d <= 8; d++) alt[d] = { 'current-weight': '800', '_kcal-kg': 40, '_kcal-min': 110, _bw: '800' };
+        w.localStorage.setItem('neo-history', JSON.stringify(alt));       // 6 Tage je 70 kcal/kg Defizit = 420 > 150
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        const C = w.NutritionCalculator.prototype; const orig = C.calculate;
+        C.calculate = function (inp) { w.__in = inp; const r = orig.call(this, inp); w.__res = r; return r; };
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries({ 'birth-weight': 800, 'current-weight': 810, 'input-ssw': 26, 'input-day': 9, 'input-tfi': 150, 'input-gir': 6, 'input-protein': 3 })) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        expect(w.__in.history['8']['_kcal-kg']).toBeUndefined();
+        expect(w.__in.history['8']['current-weight']).toBe('800');      // das Vortagsgewicht bleibt nutzbar
+        expect(w.__res.assessment.predictiveHints.some(h => /Energiedefizit/.test(h.text))).toBe(false);
+        expect(w.document.body.textContent).not.toMatch(/Kumulatives Energiedefizit/);
+        expect(JSON.parse(w.localStorage.getItem('neo-history'))['9']['_kcal-kg']).toBeUndefined();
+        expect(w.document.getElementById('quick-view-card').classList.contains('cockpit-full')).toBe(true);
     });
 });

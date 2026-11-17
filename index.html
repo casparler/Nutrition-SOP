@@ -766,7 +766,7 @@
                 </div>
 
                 <!-- Quick-View -->
-                <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden">
+                <div id="quick-view-card" class="cockpit-full bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden">
                     <p class="qv-title">Auf einen Blick</p>
                     <div class="qv-grid">
                         <div class="qv-cell">
@@ -791,21 +791,8 @@
                     </div>
                 </div>
 
-                <!-- v3.0 — ENERGY-GAP-INDEX: kumulatives Kaloriendefizit über alle Tage -->
-                <div id="egi-card" class="bg-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-4 flex flex-col">
-                    <div class="flex items-center justify-between mb-2">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">⚡ Energiedefizit-Index
-                            <span class="teach text-slate-400" tabindex="0" onclick="openEduModal('energyGap')" title="Erklärung & Algorithmus">ⓘ</span>
-                        </p>
-                        <span id="egi-severity" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">–</span>
-                    </div>
-                    <div class="flex items-baseline gap-1 justify-center my-1">
-                        <span id="egi-value" class="text-4xl font-extrabold tabular-nums text-slate-400">–</span>
-                        <span class="text-xs text-slate-400">kcal/kg kumulativ</span>
-                    </div>
-                    <div class="egi-bar-track mt-2"><div id="egi-bar" class="egi-bar-fill egi-ok" style="width:0%"></div></div>
-                    <p id="egi-meta" class="text-[11px] text-slate-500 mt-2 text-center leading-snug">Noch keine Verlaufsdaten</p>
-                </div>
+                <!-- v3.6.27: Die Kachel „Energiedefizit-Index“ ist entfallen (Entscheidung des Neonatologen 18.11.2026: ohne
+                     Verlauf über mehrere Tage nicht sinnvoll). -->
 
                 <!-- v3.6.26: Die Karte „7-Tage-Trend“ ist entfallen (Entscheidung des Neonatologen 18.11.2026: es wird kein
                      Verlauf über 7 Tage erhoben, die Seite soll überschaubar bleiben). -->
@@ -1088,9 +1075,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.26"></script>
-    <script src="fenton_data.js?v=3.6.26"></script>
-    <script src="calculator.js?v=3.6.26"></script>
+    <script src="products.js?v=3.6.27"></script>
+    <script src="fenton_data.js?v=3.6.27"></script>
+    <script src="calculator.js?v=3.6.27"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1146,7 +1133,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.26';
+            const EXPECTED_CALC_VERSION = '3.6.27';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1881,7 +1868,12 @@
                 const out = {};
                 Object.keys(history).forEach(d => {
                     const h = history[d];
-                    if (h && (h._bw === undefined || h._bw === key)) out[d] = h;
+                    if (h && (h._bw === undefined || h._bw === key)) {
+                        // v3.6.27: Früher gespeicherte Energiewerte gehen nicht mehr an den Rechenkern (kein Energiedefizit-Hinweis)
+                        const kopie = { ...h };
+                        delete kopie['_kcal-kg']; delete kopie['_kcal-min'];
+                        out[d] = kopie;
+                    }
                 });
                 return out;
             }
@@ -2493,24 +2485,9 @@
                     const curDay = parseInt(document.getElementById('input-day').value) || 1;
                     if (!history[String(curDay)]) history[String(curDay)] = {};
                     history[String(curDay)]._bw = childKey();
-                    if (typeof r.kcalPerKg === 'number' && isFinite(r.kcalPerKg)) {
-                        history[String(curDay)]['_kcal-kg'] = r.kcalPerKg;
-                    }
-                    // v3.0 — Ziel-Minimum pro Tag persistieren, damit der
-                    // Energy-Gap-Index das tägliche Defizit (min − ist) bilden kann.
-                    // v3.6.24: Bei Reifgeborenen wird das Energieziel nicht bewertet, also auch kein Defizit gezählt
-                    const eMin = res.comparisons && res.comparisons.energy && res.comparisons.energy.target
-                        && res.comparisons.energy.status !== 'neutral'
-                        ? res.comparisons.energy.target.min : null;
-                    if (typeof eMin === 'number' && isFinite(eMin)) {
-                        history[String(curDay)]['_kcal-min'] = eMin;
-                    }
+                    // v3.6.27: Energie und Energieziel je Tag werden nicht mehr gespeichert (Energiedefizit-Index entfallen)
                     localStorage.setItem('neo-history', JSON.stringify(history));
                 } catch (e) { /* localStorage quota / parse — non-blocking */ }
-                renderTrendCard();
-
-                // v3.0 — Energy-Gap-Index + Smart Defaults rendern (frische History).
-                renderEGI(childHistory());
             }
 
             // B1: Liest aus dem history-Objekt die letzten ≤7 Tage für ein bestimmtes
