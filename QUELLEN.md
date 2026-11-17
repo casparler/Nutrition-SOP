@@ -102,6 +102,8 @@ Für diese Werte gibt es keine Literaturzahl; sie bleiben als begründete Hausen
 | 12.1–12.3, 14.1–14.3, 16 | Erinnerungen, Ampeln, Phasen |
 | 13.2, 13.3 | Gewichtsverlust < 2 % bzw. > 15 %, Geburtsgewicht nach Tag 14 |
 | 15.1 | Energiedefizit-Schwelle 150 kcal/kg (Konzept: Embleton 2001) |
+| 8a | **Zusammensetzung der Hauslösungen** (FG-Mix 7,5 %, Basislösung FG, 100, 120, 150, peripher): Stations-Verordnungstabelle „IntensivVerordnung KITS PZ September 2023“, Blatt „Eingabemaske“, übermittelt am 17.11.2026. Hausrezeptur, keine Literaturquelle; Stand bitte mit der Apotheke bestätigen (REGELWERK 17.26) |
+| 13.9 | Vortagsgewicht: mehr als 15 % Abweichung an einem Tag gilt als unplausibel (Tippfehlerschutz, 17.11.2026) |
 
 ## C. Nächste Schritte zur Belegbarkeit
 

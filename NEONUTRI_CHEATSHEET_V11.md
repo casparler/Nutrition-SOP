@@ -135,15 +135,17 @@ TFI (Gesamt) = 120 ml/kg
 
 ## 📦 BASISLÖSUNGEN (Hausstandard-Werte bei Zielvolumen)
 
-| **Lösung** | Vol. | AS | Gluc | Na | K | Ca | P |
+| **Lösung** | Zielvolumen | AS | Gluc | Na | K | Ca | P |
 |------------|------|-------|------|------|-----|------|------|
-| **FG-Mix 7,5%** | 100ml | 1.75 | 5.25 | 0 | 0 | 0.70 | 0 |
-| **Basislösung FG** | 100ml | 1.40 | 2.80 | 3.11 | 2.10 | 1.08 | 1.00 |
-| **Basislösung 100** | 100ml | 2.45 | 10.50 | 3.11 | 2.10 | 1.08 | 1.00 |
-| **Basislösung 120** | 120ml | 2.04 | 8.75 | 2.59 | 1.75 | 0.90 | 0.84 |
-| **Basis peripher** | 100ml | 1.225 | 5.25 | 1.554 | 1.05 | 0.50 | 0.50 |
+| **FG-Mix 7,5%** | 100 ml/kg | 2.5 | 7.5 | 0 | 0 | 0.99 | 0 |
+| **Basislösung FG** | 100 ml/kg | 2.0 | 4.0 | 4.44 | 3.00 | 1.55 | 1.43 |
+| **Basislösung 100** | 100 ml/kg | 3.5 | 15.0 | 4.44 | 3.00 | 1.55 | 1.43 |
+| **Basislösung 120** | 120 ml/kg | 3.5 | 15.0 | 4.44 | 3.00 | 1.55 | 1.43 |
+| **Basislösung 150** | 150 ml/kg | 3.5 | 15.0 | 4.44 | 3.00 | 1.55 | 1.43 |
+| **Basis peripher** | 100 ml/kg | 1.75 | 7.5 | 2.22 | 1.50 | 0.77 | 0.72 |
 
-**Einheiten:** AS/Gluc in g/kg | Na/K/Ca/P in mmol/kg
+**Einheiten:** AS/Gluc in g/kg | Na/K/Ca/P in mmol/kg, jeweils beim Zielvolumen. Stand v3.6.23, nach der
+Stations-Verordnungstabelle 09/2023 korrigiert (vorher 30–53 % zu niedrig, siehe REGELWERK 8a).
 
 ---
 

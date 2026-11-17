@@ -403,12 +403,15 @@ describe('E) Wachstum & Velocity', () => {
 describe('F) Solution Configurator & Enterale Logik', () => {
 
     it('F1: Basislösung 100 ml/kg skaliert linear auf 50 ml/kg PN-Volumen', () => {
-        // PN gross = 50 ml/kg → AS = 2.45 × 0.5 = 1.225 g/kg
+        // v3.6.23 — klinisch begründete Anpassung (Stations-Verordnungstabelle 09/2023, übermittelt am 17.11.2026):
+        // Die Basislösung 100 enthält 35 g Aminosäuren je Liter, also 3,5 g je 100 ml. Der frühere Erwartungswert
+        // 2,45 × 0,5 = 1,225 g/kg stammte aus der Anzeige der Tabelle bei 70 ml/kg/d und war 30 % zu niedrig.
+        // PN 50 ml/kg → Aminosäuren = 3,5 × 0,5 = 1,75 g/kg. Das Prüfziel (lineare Skalierung) bleibt.
         const r = calc.calculate(baseInput({
             tfi: 50, enteralVolume: 0,
             selectedSolution: 'basis100', lipids: 0
         }));
-        expect(r.results.effectiveAS_GKg).toBeCloseTo(1.225, 1);
+        expect(r.results.effectiveAS_GKg).toBeCloseTo(1.75, 2);
     });
 
     it('F2: FM85 Reminder ab enteralem Volumen ≥ 100 ml/kg/d (EBM)', () => {
@@ -833,13 +836,18 @@ describe('M) Frontend-Integration v3.0 — Teaching, EGI, Smart Defaults, Histor
         expect(doc.getElementById('egi-value')).not.toBeNull();
         expect(doc.getElementById('egi-bar')).not.toBeNull();
         expect(doc.getElementById('egi-severity')).not.toBeNull();
-        // renderEGI muss aufgerufen werden
-        expect(html).toMatch(/renderEGI\(history\)/);
+        // renderEGI muss aufgerufen werden.
+        // v3.6.23 — Anpassung mit klinischer Begründung: Die Kachel bekommt nur noch den Verlauf DESSELBEN Kindes
+        // (childHistory()). Vorher mischte sie am selben Gerät die Tage zweier Kinder (Test AT10).
+        expect(html).toMatch(/renderEGI\(childHistory\(\)\)/);
         expect(html).toMatch(/function renderEGI/);
     });
 
     it('M5: History wird an calculate() übergeben + _kcal-min pro Tag persistiert (EGI-Datenbasis)', () => {
-        expect(html).toMatch(/history:\s*history/);            // history in data-Objekt
+        // v3.6.23 — Anpassung mit klinischer Begründung: Übergeben wird der Verlauf desselben Kindes (kindVerlauf =
+        // childHistory()), nicht mehr der ungefilterte Speicher. Das Prüfziel (Verlauf geht an calculate()) bleibt.
+        expect(html).toMatch(/history:\s*kindVerlauf/);       // history in data-Objekt
+        expect(html).toMatch(/const kindVerlauf = childHistory\(\)/);
         expect(html).toMatch(/\['_kcal-min'\]\s*=/);           // Ziel-Minimum wird gespeichert
         // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
         expect(html).not.toMatch(/renderSmartDefaults\(res\)/);    // Smart Defaults werden nicht mehr gerendert
@@ -3554,5 +3562,362 @@ describe('AS) Lipidrate, Gesamtflüssigkeit groß, schlankere Seite (v3.6.22)', 
         expect(w.document.body.textContent).not.toMatch(/Startwerte|Simulation|Virtuelle NICU/);
         expect(typeof w.loadSimulation).toBe('undefined');
         expect(typeof w.applySmartDefaults).toBe('undefined');
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AT — Korrekturen aus der kritischen Prüfung (v3.6.23)
+ * Anlass: Durchspielen klinischer Szenarien am 16./17.11.2026. Befunde: (1) Die Hauslösungen waren mit den Werten hinterlegt,
+ * die die Stations-Verordnungstabelle bei 70 ml/kg/d anzeigt, alle Nährstoffe daraus wurden 30–53 % zu niedrig gerechnet.
+ * (2) Die App brach ab, wenn am Vortag kein Gewicht eingetippt war. (3) Die Nahrungspause ging beim Neuladen verloren.
+ * (4) Nach einem Eingabefehler blieben alte Ergebnisse unverändert stehen. (5) Der Verlauf eines anderen Kindes wurde
+ * mitverwendet. (6) Der Doku-Text nannte das Gesamteiweiß als „AS“ und bewertete das Lipidziel i. v. ohne Infusion.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AT) Korrekturen aus der kritischen Prüfung (v3.6.23)', () => {
+    const NP = require('../products.js');
+    const sol = id => NP.parenteralSolutions.find(s => s.id === id);
+
+    it('AT1: Die Hauslösungen entsprechen der Stations-Verordnungstabelle (g je 100 ml)', () => {
+        // Blatt „Eingabemaske“, V5:X10 — Aminosäuren und Glukose je Liter: 35/150, 29,2/125, 23,3/100, 20/40, halbe Basis 100, 25/75
+        const soll = { basis100: [3.5, 15], basis120: [2.92, 12.5], basis150: [2.33, 10], basisFG: [2, 4], basisPeripher: [1.75, 7.5], fgMix75: [2.5, 7.5] };
+        for (const [id, [as, gluc]] of Object.entries(soll)) {
+            expect(sol(id).per100ml.aminoAcids, id).toBeCloseTo(as, 3);
+            expect(sol(id).per100ml.glucose, id).toBeCloseTo(gluc, 3);
+        }
+        // FG-Mix: Calcium 0,497 mmol je 50 ml, ohne Natrium, Kalium und Phosphat
+        expect(sol('fgMix75').per100ml.calcium).toBeCloseTo(0.994, 3);
+        ['sodium', 'potassium', 'phosphate'].forEach(k => expect(sol('fgMix75').per100ml[k], k).toBe(0));
+    });
+
+    it('AT2: Die Elektrolyte der Basislösungen ergeben sich aus dem Anteil des Elektrolyt-Konzentrats (aus der Rezeptur nachgerechnet)', () => {
+        const konz = NP.electrolyteConcentrate.per100ml;   // Na 11,1 | K 7,51 | Ca 3,863 | Mg 0,507 | Phosphat 3,58 | Cl 11,4 mmol je 100 ml
+        expect(konz).toEqual({ sodium: 11.1, potassium: 7.51, calcium: 3.863, magnesium: 0.507, phosphate: 3.58, chloride: 11.4 });
+        const anteil = { basis100: 40, basis120: 33.33, basis150: 26.67, basisFG: 40, basisPeripher: 20 };
+        for (const [id, ml] of Object.entries(anteil)) {
+            expect(sol(id).concentrateMlPer100ml, id).toBe(ml);
+            for (const k of Object.keys(konz)) {
+                expect(sol(id).per100ml[k], `${id} ${k}`).toBeCloseTo(konz[k] * ml / 100, 2);
+            }
+        }
+    });
+
+    it('AT3: Basislösung 100, 120 und 150 liefern bei ihrem Zielvolumen dieselbe Tagesdosis (3,5 g Aminosäuren, 15 g Glukose, 4,44 mmol Natrium je kg)', () => {
+        for (const id of ['basis100', 'basis120', 'basis150']) {
+            const s = sol(id);
+            expect(s.perKgAtTarget.aminoAcids, id).toBeCloseTo(s.per100ml.aminoAcids * s.targetVolume / 100, 3);
+            expect(s.perKgAtTarget.aminoAcids, id).toBeCloseTo(3.5, 1);
+            expect(s.perKgAtTarget.glucose, id).toBeCloseTo(15, 2);
+            expect(s.perKgAtTarget.sodium, id).toBeCloseTo(4.44, 2);
+            expect(s.perKgAtTarget.potassium, id).toBeCloseTo(3.0, 1);
+        }
+    });
+
+    const pnKind = o => baseInput({ birthWeight: 1000, currentWeight: 1000, ssw: 27, postnatalAge: 6, access: 'central',
+        enteralVolume: 0, lipids: 0, gir: 0, protein: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o });
+
+    it('AT4: Rechenkern — Basis 100 bei 100 ml/kg/d: 3,5 g Aminosäuren, GIR 10,4, Na 4,44, K 3,0, Ca 61,9 mg, Phosphor 44,4 mg je kg; Basis 150 bei 150 ml/kg/d dasselbe', () => {
+        for (const [id, vol] of [['basis100', 100], ['basis120', 120], ['basis150', 150]]) {
+            const r = calc.calculate(pnKind({ selectedSolution: id, tfi: vol })).results;
+            expect(r.effectiveAS_GKg, id).toBeCloseTo(3.5, 1);
+            expect(r.effectiveGIR, id).toBeCloseTo(10.4, 1);          // 15 g/kg/d = 10,42 mg/kg/min
+            expect(r.effectiveNa, id).toBeCloseTo(4.44, 2);
+            expect(r.effectiveK, id).toBeCloseTo(3.0, 1);
+            expect(r.calciumMgKg, id).toBeCloseTo(61.9, 0);           // 1,545 mmol × 40,08
+            expect(r.phosphateMgKg, id).toBeCloseTo(44.4, 0);         // 1,432 mmol × 30,97
+        }
+        // vorher (v3.6.22): Basis 150 bei 150 ml/kg/d ergab 1,63 g Aminosäuren und GIR 4,9
+        const halb = calc.calculate(pnKind({ selectedSolution: 'basis120', tfi: 60 })).results;
+        expect(halb.effectiveAS_GKg).toBeCloseTo(1.75, 1);
+    });
+
+    it('AT5: FG-Mix 7,5 % bei 80 ml/kg/d an Tag 1 ergibt GIR 4,2 und 2 g Aminosäuren, kein Hypoglykämie-Alarm (vorher GIR 2,7, kritisch)', () => {
+        const r = calc.calculate(pnKind({ birthWeight: 720, currentWeight: 720, ssw: 25, postnatalAge: 1, selectedSolution: 'fgMix75', tfi: 80 }));
+        expect(r.results.effectiveGIR).toBeCloseTo(4.2, 1);
+        expect(r.results.effectiveAS_GKg).toBeCloseTo(2.0, 2);
+        expect(r.warnings.some(w => /^CRITICAL: GIR/.test(w))).toBe(false);
+        // Basislösung FG enthält nur 4 g Glukose je 100 ml: bei 100 ml/kg/d GIR 2,8 — die Meldung bleibt und ist richtig
+        const fg = calc.calculate(pnKind({ selectedSolution: 'basisFG', tfi: 100 }));
+        expect(fg.results.effectiveGIR).toBeCloseTo(2.8, 1);
+        expect(fg.warnings.some(w => /^CRITICAL: GIR .* unter Minimum/.test(w))).toBe(true);
+    });
+
+    // ---------- Oberfläche ----------
+    async function boot(values, vorab = {}) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        Object.entries(vorab).forEach(([k, v]) => w.localStorage.setItem(k, v));
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        const C = w.NutritionCalculator.prototype; const orig = C.calculate;
+        C.calculate = function (inp) { w.__in = inp; const r = orig.call(this, inp); w.__res = r; return r; };
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1])
+            .filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) {
+            const el = w.document.getElementById(id);
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        w.updateCalculations();
+        return w;
+    }
+    const $ = (w, id) => w.document.getElementById(id);
+    const tippe = (w, id, v) => { const el = $(w, id); el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); el.dispatchEvent(new w.Event('change', { bubbles: true })); };
+    const fehler = w => !$(w, 'validation-error-banner').classList.contains('hidden');
+    const kind = { 'birth-weight': 800, 'current-weight': 770, 'input-ssw': 26, 'input-day': 7, 'input-tfi': 150 };
+
+    it('AT6: Fehlt im Verlauf das Gewicht des Vortags, rechnet die App weiter (keine Wachstumsrate) statt mit „previousWeight: NaN“ abzubrechen', async () => {
+        // Tag 6 wurde bearbeitet (Natrium geändert), aber kein Gewicht neu eingetippt
+        const verlauf = JSON.stringify({ 5: { 'current-weight': '760', _bw: '800' }, 6: { 'input-sodium': '2', _bw: '800' } });
+        const w = await boot(kind, { 'neo-history': verlauf });
+        expect(fehler(w)).toBe(false);
+        expect(w.__in.previousWeight).toBe(null);
+        expect(w.__res.results.weightVelocity).toBe('Initial');
+        expect($(w, 'yesterday-weight-note').textContent).toMatch(/kein Gewicht von gestern bekannt/);
+        // Das Feld „Gewicht gestern“ ist optional und hat Vorrang, wenn es ausgefüllt wird
+        tippe(w, 'yesterday-weight', 765);
+        expect(w.__in.previousWeight).toBe(765);
+        expect(w.__res.results.weightVelocity).toBeCloseTo(6.5, 1);   // (770 − 765) / 770 × 1000
+    });
+
+    it('AT7: Ein eingetragenes „Gewicht gestern“ gilt nur für den Lebenstag, an dem es eingetragen wurde', async () => {
+        const w = await boot(kind);
+        tippe(w, 'current-weight', 770);                               // Gewicht von Tag 7 wird im Verlauf festgehalten
+        tippe(w, 'yesterday-weight', 765);
+        expect(w.__in.previousWeight).toBe(765);
+        tippe(w, 'input-day', 8);                                      // nächster Tag: der Wert von gestern wäre jetzt „vorgestern“
+        expect($(w, 'yesterday-weight').value).toBe('');
+        expect(w.localStorage.getItem('yesterday-weight')).toBe(null);
+        expect(w.__in.previousWeight).toBe(770);                       // aus dem Verlauf: Gewicht von Tag 7
+    });
+
+    it('AT8: Die Nahrungspause bleibt nach dem Neuladen gesetzt, es gibt keine Empfehlung zum Nahrungsaufbau', async () => {
+        const w = await boot(kind);
+        const cb = $(w, 'input-feeding-paused');
+        cb.checked = true; cb.dispatchEvent(new w.Event('change', { bubbles: true }));
+        expect(w.localStorage.getItem('input-feeding-paused')).toBe('true');
+        const neu = await boot(kind, Object.fromEntries(Object.keys(w.localStorage).map(k => [k, w.localStorage.getItem(k)])));
+        expect($(neu, 'input-feeding-paused').checked).toBe(true);
+        expect($(neu, 'input-feeding-pause-reason').disabled).toBe(false);
+        expect(neu.__in.feedingPaused).toBe(true);
+        expect(neu.__res.results.enteralPhase).toBe('paused');
+        expect(neu.__res.warnings.some(t => /Steigerung um/.test(t))).toBe(false);
+        // älterer Speicherstand („on“) führt nicht zu einem gesetzten Haken und nicht zu einem Fehler
+        const alt = await boot(kind, { 'input-feeding-paused': 'on' });
+        expect($(alt, 'input-feeding-paused').checked).toBe(false);
+        expect(fehler(alt)).toBe(false);
+    });
+
+    it('AT9: Nach einem Eingabefehler sind die alten Ergebnisse ausgegraut und beschriftet, der Doku-Text ist leer; nach der Korrektur ist alles wieder aktuell', async () => {
+        const w = await boot(kind);
+        expect($(w, 'results-panel').classList.contains('results-stale')).toBe(false);
+        expect($(w, 'results-stale-note').classList.contains('hidden')).toBe(true);
+        const kcalVorher = $(w, 'qv-kcal').textContent;
+        $(w, 'input-tfi').value = 500; w.updateCalculations();        // über der harten Grenze 400 ml/kg/d
+        expect(fehler(w)).toBe(true);
+        expect($(w, 'results-panel').classList.contains('results-stale')).toBe(true);
+        expect($(w, 'results-stale-note').classList.contains('hidden')).toBe(false);
+        expect($(w, 'results-stale-note').textContent).toMatch(/Keine gültige Berechnung/);
+        expect($(w, 'qv-kcal').textContent).toBe('–');
+        expect($(w, 'qv-safety').textContent).toBe('–');
+        expect($(w, 'tfi-total-sub').textContent).toBe('keine gültige Berechnung');
+        $(w, 'input-tfi').value = 150; w.updateCalculations();
+        expect(fehler(w)).toBe(false);
+        expect($(w, 'results-panel').classList.contains('results-stale')).toBe(false);
+        expect($(w, 'qv-kcal').textContent).toBe(kcalVorher);
+        // Die Kennzeichnung ist im Stylesheet hinterlegt (ausgegraut, nicht bedienbar)
+        const css = [...w.document.querySelectorAll('style')].map(s => s.textContent).join('\n');
+        expect(css).toMatch(/\.results-stale > \*:not\(#results-stale-note\)\s*\{[^}]*opacity/);
+    });
+
+    it('AT10: Der Verlauf eines anderen Kindes am selben Gerät wird nicht verwendet (Vortagsgewicht, Energiedefizit)', async () => {
+        // Kind 1: Geburtsgewicht 3000 g, Tag 5 mit 2900 g und großem Energiedefizit gespeichert
+        const fremd = JSON.stringify({ 5: { 'current-weight': '2900', '_kcal-kg': 40, '_kcal-min': 110, _bw: '3000' } });
+        const w = await boot({ ...kind, 'input-day': 6 }, { 'neo-history': fremd });
+        expect(w.__in.previousWeight).toBe(null);
+        expect(Object.keys(w.__in.history)).toEqual(['6']);            // nur der heutige Tag dieses Kindes (kein Tag 5 des anderen Kindes)
+        expect($(w, 'qv-weight-velocity').textContent).not.toMatch(/-?\d{3,}/);   // vorher: −2816 g/kg/d
+        // Dasselbe Kind (gleiche Kennung): der Verlauf zählt
+        const eigen = JSON.stringify({ 5: { 'current-weight': '760', '_kcal-kg': 40, '_kcal-min': 110, _bw: '800' } });
+        const w2 = await boot({ ...kind, 'input-day': 6 }, { 'neo-history': eigen });
+        expect(w2.__in.previousWeight).toBe(760);
+        expect(Object.keys(w2.__in.history)).toContain('5');
+        // Jeder berechnete Tag trägt die Kennung des Kindes
+        expect(JSON.parse(w2.localStorage.getItem('neo-history'))['6']._bw).toBe('800');
+    });
+
+    it('AT11: Rechenkern — ein Vortagsgewicht, das mehr als 15 % abweicht, ergibt keine Wachstumsrate, sondern eine Warnung', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 800, currentWeight: 760, previousWeight: 2900, ssw: 26, postnatalAge: 6, tfi: 150 }));
+        expect(r.results.weightVelocity).toBe('Initial');
+        const warn = r.warnings.find(w => /Gewicht gestern/.test(w));
+        expect(warn).toMatch(/^Warnung: Gewicht gestern \(2900 g\) passt nicht zum aktuellen Gewicht \(760 g\)/);
+        expect(warn).toMatch(/Neues Kind/);
+        expect(calc.WEIGHT_COURSE.maxDailyChangePercent).toBe(15);
+        // plausibel: 900 → 918 g = 19,6 g/kg/d, keine Warnung
+        const ok = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 918, previousWeight: 900, ssw: 27, postnatalAge: 9, tfi: 150 }));
+        expect(ok.results.weightVelocity).toBeCloseTo(19.6, 1);
+        expect(ok.warnings.some(w => /Gewicht gestern/.test(w))).toBe(false);
+        // starker, aber möglicher Verlust (8 % an einem Tag) wird weiter berechnet
+        const verlust = calc.calculate(baseInput({ birthWeight: 800, currentWeight: 690, previousWeight: 750, ssw: 26, postnatalAge: 3, tfi: 120 }));
+        expect(typeof verlust.results.weightVelocity).toBe('number');
+    });
+
+    it('AT12: Doku-Text — „AS“ nennt die Aminosäuren der Infusion, Eiweiß gesamt steht getrennt, die Anreicherung ist dokumentiert', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 1000, currentWeight: 1000, ssw: 27, postnatalAge: 8, access: 'central',
+            tfi: 150, enteralVolume: 80, fm85Percent: 2, proteinAddPer100ml: 0.3, protein: 2.5, gir: 8, lipids: 2 }));
+        const doc = r.documentation;
+        expect(r.results.proteinTotalGPerKg).toBeGreaterThan(2.5);
+        expect(doc).toMatch(/AS 2\.50 g\/kg\/d/);                       // nicht das Gesamteiweiß
+        expect(doc).toMatch(new RegExp(`Eiweiß gesamt ${r.results.proteinTotalGPerKg.toFixed(2)} g/kg/d \\(Infusion 2\\.50 / enteral `));
+        expect(doc).toMatch(/Anreicherung: FM85 2\.0 % \(0\.20 g Pulver je Mahlzeit\), Eiweiß-Zusatz 0\.30 g\/100 ml \(0\.03 g Eiweiß je Mahlzeit\)/);
+        expect(doc).toMatch(/Lipide i\. v\. 2\.0 g\/kg\/d/);
+    });
+
+    it('AT13: Doku-Text und Beurteilung bei voll enteraler Ernährung — kein „Lipide-Target unterschritten“, Eiweiß ausgewiesen, Neocate mit Namen', () => {
+        const voll = o => calc.calculate(baseInput({ birthWeight: 1000, currentWeight: 1400, ssw: 27, postnatalAge: 30,
+            tfi: 160, enteralVolume: 160, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o }));
+        const r = voll({ fm85Percent: 4 });
+        expect(r.comparisons.lipids.status).toBe('neutral');
+        expect(r.comparisons.lipids.notApplicable).toBe(true);
+        expect(r.documentation).not.toMatch(/Lipide-Target/);
+        expect(r.assessment.bullets.some(b => /Lipide/.test(b.text))).toBe(false);
+        expect(r.documentation).toMatch(/Eiweiß gesamt 4\.08 g\/kg\/d \(Infusion 0\.00 \/ enteral 4\.08/);
+        expect(r.documentation).not.toMatch(/- PN /);
+        expect(voll({ selectedEnteralProduct: 'neocate' }).documentation).toMatch(/Enteral 160 ml\/kg\/d \(Neocate/);
+        // Mit laufender PN wird das Lipidziel weiter bewertet (Lipide 0 an Tag 8: unter Ziel)
+        const pn = calc.calculate(baseInput({ birthWeight: 1000, currentWeight: 1000, ssw: 27, postnatalAge: 8, tfi: 150, enteralVolume: 0, lipids: 0, gir: 8, protein: 3 }));
+        expect(pn.comparisons.lipids.status).not.toBe('neutral');
+        expect(pn.comparisons.lipids.status).not.toBe('green');
+        // Volumen ohne eingetragenen Inhalt heißt nicht mehr „PN … GIR 0.0“
+        const leer = calc.calculate(baseInput({ birthWeight: 1000, currentWeight: 1000, ssw: 27, postnatalAge: 8, tfi: 150, enteralVolume: 100, lipids: 0, gir: 0, protein: 0 }));
+        expect(leer.documentation).toMatch(/Infusion 50 ml\/d ohne eingetragenen Inhalt/);
+        expect(leer.documentation).not.toMatch(/- PN /);
+    });
+
+    it('AT14: Die Zusammenfassung nennt die Abweichungen beim Namen statt „Optimierungspunkte — siehe Befunde“', () => {
+        // v3.6.24: Beispiel auf ein spätes Frühgeborenes (34 SSW) umgestellt, weil Eiweiß und Energie bei Reifgeborenen
+        // nach Entscheidung des Neonatologen vom 17.11.2026 nicht mehr bewertet werden (Tests AU1, AU2). Prüfziel unverändert.
+        const r = calc.calculate(baseInput({ birthWeight: 2100, currentWeight: 2050, ssw: 34, postnatalAge: 6,
+            tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
+        expect(r.assessment.status).toBe('attention');
+        expect(r.assessment.summary).not.toMatch(/Optimierungspunkt/);
+        expect(r.assessment.summary).toMatch(/Eiweiß unter Ziel \(1\.7, Ziel 3–3\.5\)/);
+        expect(r.assessment.summary).toMatch(/Energie unter Ziel/);
+        expect(r.assessment.summary).not.toMatch(/Lipide/);
+    });
+
+    it('AT15: Lipid- und Triglyzerid-Meldungen tragen das Etikett „Eiweiß & Energie“ (vorher „Wachstum“ bzw. „Enteral“)', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
+            tfi: 150, enteralVolume: 0, lipids: 3, gir: 9, protein: 3.5 }));
+        const tg = r.alerts.items.find(i => /Triglyzerid/.test(i.text));
+        expect(tg.text).toMatch(/Geburtsgewicht bis 1000 g/);
+        expect(tg.domain).toBe('macro');
+        const arm = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
+            tfi: 150, enteralVolume: 0, lipids: 0.5, gir: 10, protein: 3.5 }));
+        const anteil = arm.alerts.items.find(i => /Lipid-Anteil an NPC/.test(i.text));
+        expect(anteil.domain).toBe('macro');
+    });
+
+    it('AT16: Der Hinweis zur möglichen FM85-Stufe zieht die Aminosäuren der Infusion ab (vorher „höchstens 17,5 %“)', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
+            tfi: 150, enteralVolume: 60, fm85Percent: 4, protein: 3.5, gir: 8, lipids: 2 }));
+        expect(r.results.proteinTotalGPerKg).toBeGreaterThan(4.5);
+        // enteral bleiben 4,5 − 3,5 = 1,0 g/kg/d → 1,667 g/100 ml bei 60 ml/kg/d → (1,667 − 1,13) / 0,355 = 1,51 % → Stufe 1,5 %
+        const h = r.warnings.find(w => /wäre FM85 höchstens/.test(w));
+        expect(h).toMatch(/FM85 höchstens 1\.5 % möglich \(aktuell 4 %\)/);
+        expect(r.warnings.find(w => /Treiber ist die Anreicherung/.test(w))).toMatch(/Die Infusion liefert 3\.5 g\/kg\/d Aminosäuren, das ist abgezogen/);
+    });
+
+    it('AT17: Mengen in Meldungen sind gerundet (8,3 statt 8.333 ml/kg/d)', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, tfi: 150, enteralVolume: 25 / 3 }));
+        const h = r.warnings.find(w => /unter dem Aufbau-Korridor/.test(w));
+        expect(h).toMatch(/Enteral 8\.3 ml\/kg\/d liegt/);
+        expect(h).not.toMatch(/8\.33/);
+    });
+
+    it('AT18: „Neues Kind“ steht bei den Patientendaten und leert Eingaben und Verlauf (mit Rückfrage)', async () => {
+        const w = await boot(kind, { 'neo-history': JSON.stringify({ 5: { 'current-weight': '760', _bw: '800' } }), 'input-gir': '7' });
+        const knopf = $(w, 'btn-new-child');
+        expect(knopf.textContent).toMatch(/Neues Kind/);
+        w.confirm = () => false;
+        knopf.click();
+        expect(w.localStorage.getItem('neo-history')).not.toBe(null);   // abgelehnt: nichts gelöscht
+        w.confirm = () => true;
+        try { knopf.click(); } catch (e) { /* jsdom kann die Seite nicht neu laden */ }
+        expect(w.localStorage.length).toBe(0);
+        expect($(w, 'yesterday-weight').previousElementSibling.textContent).toMatch(/optional/);
+    });
+
+    it('AT19: Die Auswahl einer Hauslösung zeigt ihre Zusammensetzung je 100 ml und die Zufuhr beim Zielvolumen', async () => {
+        const w = await boot({ ...kind, 'input-solution': 'basis120' });
+        w.updateSolutionUI();
+        const txt = $(w, 'sol-info').textContent;
+        expect(txt).toMatch(/Je 100 ml: Aminosäuren 2,92 g \| Glukose 12,5 g \| Na 3,7 \| K 2,5/);
+        expect(txt).toMatch(/Bei 120 ml\/kg\/d: Aminosäuren 3,5 g\/kg\/d \| Glukose 15 g\/kg\/d \(10,4 mg\/kg\/min\)/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AU — Entscheidungen des Neonatologen vom 17.11.2026 (v3.6.24)
+ * (1) Bei Reifgeborenen werden Eiweiß- und Energieziel nicht bewertet. (2) FM85 frühestens ab 100 ml/kg/d, die Erinnerung
+ * „empfohlen ab 50 ml/kg/d“ entfällt. (3) FG-Mix über Lebenstag 2 hinaus: Wechsel-Erinnerung und Phosphat-/Kalium-Hinweis.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AU) Reifgeborene, FM85-Start, FG-Mix nach Tag 2 (v3.6.24)', () => {
+    const enteral = o => calc.calculate(baseInput({ birthWeight: 3400, currentWeight: 3300, ssw: 40, postnatalAge: 6,
+        tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o }));
+
+    it('AU1: Reifgeborenes mit 150 ml/kg/d Muttermilch — Eiweiß und Energie werden nicht bewertet, die Beurteilung ist stabil', () => {
+        const r = enteral({});
+        expect(r.comparisons.protein.status).toBe('neutral');
+        expect(r.comparisons.energy.status).toBe('neutral');
+        expect(r.warnings.some(w => /unter Zielbereich|über Zielbereich/.test(w) && /Protein|Energie/.test(w))).toBe(false);
+        expect(r.fazit.some(f => /Proteinzufuhr|Energiezufuhr/.test(f))).toBe(false);
+        expect(r.assessment.status).toBe('stable');
+        expect(r.assessment.bullets.some(b => /Protein|Energie/.test(b.text))).toBe(false);
+        expect(r.documentation).toMatch(/Eiweiß gesamt 1\.70 g\/kg\/d \(Infusion 0\.00 \/ enteral 1\.70\)/);   // ohne Zielangabe
+        // Die Werte selbst bleiben berechnet und sichtbar
+        expect(r.results.proteinTotalGPerKg).toBeCloseTo(1.7, 1);
+        expect(r.results.kcalPerKg).toBeCloseTo(106.5, 1);
+    });
+
+    it('AU2: Die Grenze liegt bei 37+0 SSW; Sicherheitsgrenzen gelten auch bei Reifgeborenen', () => {
+        const fg = enteral({ ssw: 36, birthWeight: 2600, currentWeight: 2550 });
+        expect(fg.comparisons.protein.status).not.toBe('neutral');
+        expect(fg.warnings.some(w => /Protein .* unter Zielbereich/.test(w))).toBe(true);
+        expect(enteral({ ssw: 37 }).comparisons.energy.status).toBe('neutral');
+        // Eiweiß über 4,5 g/kg/d bleibt kritisch
+        const zuviel = enteral({ selectedEnteralProduct: 'bebaFG1', enteralVolume: 160, tfi: 160 });
+        expect(zuviel.results.proteinTotalGPerKg).toBeGreaterThan(4.5);
+        expect(zuviel.warnings.some(w => /^CRITICAL: Protein gesamt/.test(w))).toBe(true);
+        expect(zuviel.assessment.status).toBe('critical');
+    });
+
+    const fg = o => calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
+        tfi: 150, gir: 8, protein: 3, lipids: 2, ...o }));
+
+    it('AU3: FM85 frühestens ab 100 ml/kg/d — bei 60 ml/kg/d gibt es keine Empfehlung mehr, ab 100 das Start-Kriterium', () => {
+        const bei60 = fg({ enteralVolume: 60 });
+        expect([...bei60.reminders, ...bei60.warnings].some(t => /FM85|Fortifizierung/.test(t))).toBe(false);
+        const bei100 = fg({ enteralVolume: 100, protein: 1, gir: 3, lipids: 0 });
+        expect(bei100.reminders.some(t => /FM85 Start-Kriterium erfüllt \(≥ 100 ml\/kg\/d enteral\)/.test(t))).toBe(true);
+        // Wird FM85 vorher eingetragen, bleibt der Hinweis auf 100 ml/kg/d
+        expect(fg({ enteralVolume: 60, fm85Percent: 2 }).warnings.some(w => /erst ab 100 ml\/kg\/d/.test(w))).toBe(true);
+    });
+
+    it('AU4: FG-Mix an Lebenstag 3 — Wechsel-Erinnerung und Hinweis auf Phosphat und Kalium; an Tag 2 keines von beiden', () => {
+        const mix = tag => calc.calculate(baseInput({ birthWeight: 800, currentWeight: 780, ssw: 26, postnatalAge: tag, access: 'central',
+            tfi: 100, enteralVolume: 0, lipids: 1, selectedSolution: 'fgMix75' }));
+        const t3 = mix(3);
+        expect(t3.reminders.some(t => /FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf eine Basislösung empfohlen/.test(t))).toBe(true);
+        const h = t3.warnings.find(w => /^Hinweis: FG-Mix/.test(w));
+        expect(h).toMatch(/kein Phosphat und kein Kalium/);
+        expect(h).toMatch(/Serum-Phosphat und Kalium kontrollieren/);
+        expect(t3.alerts.items.find(i => /FG-Mix/.test(i.text)).domain).toBe('electrolytes');
+        const t2 = mix(2);
+        expect([...t2.reminders, ...t2.warnings].some(t => /FG-Mix/.test(t))).toBe(false);
     });
 });
