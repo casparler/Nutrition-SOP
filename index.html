@@ -324,37 +324,8 @@
             </div>
         </section>
 
-        <!-- Growth & Lab -->
-        <section class="bg-white rounded-lg shadow-sm p-0 mb-6 border-l-4 border-green-500 overflow-hidden">
-            <button onclick="toggleSection('growth-lab-content')" class="w-full flex justify-between items-center p-4 bg-white hover:bg-gray-50 transition-colors">
-                <h3 class="text-sm font-bold text-green-800 uppercase tracking-wider">Anthropometrie & Labor</h3>
-                <svg id="growth-lab-icon" class="h-5 w-5 text-green-600 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            <div id="growth-lab-content" class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 border-t border-gray-50 hidden">
-                <div class="space-y-4">
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Wachstum</h4>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Länge (cm)</label>
-                            <input type="number" id="input-length" step="0.1" class="w-full border-b border-gray-200 focus:border-green-500 outline-none py-1" placeholder="z.B. 38.5">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Kopf (cm)</label>
-                            <input type="number" id="input-head" step="0.1" class="w-full border-b border-gray-200 focus:border-green-500 outline-none py-1" placeholder="z.B. 26.0">
-                        </div>
-                    </div>
-                </div>
-                <div class="space-y-4 md:col-span-1 lg:col-span-3">
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Labor / Metabolik</h4>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Triglyzeride (mg/dl)</label>
-                            <input type="number" id="input-triglycerides" step="1" class="w-full border-b border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. 180">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- v3.6.28: Bereich „Anthropometrie & Labor“ (Länge, Kopfumfang, Triglyzeride) entfallen, Entscheidung des
+             Neonatologen 18.11.2026: wird im Alltag nicht genutzt, die App soll überschaubar bleiben. -->
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
@@ -1017,16 +988,6 @@
                                     <td class="p-3 text-right text-gray-400 text-sm">Fenton</td>
                                 </tr>
                                 <tr class="extra-detail hidden">
-                                    <td class="p-3 pl-6 text-sm">↳ Längen-Z-Score</td>
-                                    <td id="res-length-zscore" class="p-3 text-right font-bold text-green-700">–</td>
-                                    <td class="p-3 text-right text-gray-400 text-sm">Fenton</td>
-                                </tr>
-                                <tr class="extra-detail hidden">
-                                    <td class="p-3 pl-6 text-sm">↳ KU-Z-Score</td>
-                                    <td id="res-head-zscore" class="p-3 text-right font-bold text-green-700">–</td>
-                                    <td class="p-3 text-right text-gray-400 text-sm">Fenton</td>
-                                </tr>
-                                <tr class="extra-detail hidden">
                                     <td class="p-3 font-medium">Wachstumsrate</td>
                                     <td id="res-weight-velocity" class="p-3 text-right font-bold text-green-800">-</td>
                                     <td class="p-3 text-right text-gray-400 text-sm">g/kg/d</td>
@@ -1075,17 +1036,10 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.27"></script>
-    <script src="fenton_data.js?v=3.6.27"></script>
-    <script src="calculator.js?v=3.6.27"></script>
+    <script src="products.js?v=3.6.29"></script>
+    <script src="fenton_data.js?v=3.6.29"></script>
+    <script src="calculator.js?v=3.6.29"></script>
     <script>
-        function toggleSection(id) {
-            const el = document.getElementById(id);
-            const icon = document.getElementById(id.replace('-content', '-icon'));
-            el.classList.toggle('hidden');
-            if (icon) icon.classList.toggle('rotate-180');
-        }
-
         function toggleAccordionSection(id) {
             const el = document.getElementById(id);
             const icon = document.getElementById(id.replace('-content', '-icon'));
@@ -1133,7 +1087,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.27';
+            const EXPECTED_CALC_VERSION = '3.6.29';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1337,12 +1291,6 @@
                     intro: 'Tägliche Gewichtszunahme bezogen auf das Körpergewicht — Schlüsselindikator für adäquates Wachstum.',
                     espghan: 'Zielkorridor postnatal nach Stabilisierung: <strong>15–20 g/kg/d</strong> (entspricht intrauteriner Wachstumsrate). In der Transitionsphase (Tag 1–7) ist physiologischer Gewichtsverlust bis ~10 % normal.',
                     algo: 'Wachstumsrate = (aktuelles Gewicht − Vortagesgewicht) ÷ Vortagesgewicht(kg). Negative Werte in Phase A meist IWL-/Flüssigkeits-bedingt, nicht zwingend pathologisch.'
-                },
-                energyGap: {
-                    title: 'Energiedefizit-Index (kumulativ)',
-                    intro: 'Summe des täglichen Kalorien-Defizits (Ziel-Minimum minus Ist-Zufuhr) über alle dokumentierten Tage. Macht das schleichende „kumulative Defizit" sichtbar.',
-                    espghan: 'Embleton et al. 2001: Das früh akkumulierte Energiedefizit der ersten Lebenswochen korreliert linear mit späterer Wachstumsrestriktion. Konservativer Trigger in dieser App: ab <strong>&gt; 150 kcal/kg kumulativ</strong> steigt das PEW-Risiko deutlich.',
-                    algo: 'Index = Σ max(0, kcalMin_Tag − kcalIst_Tag) über alle History-Tage. Ampel: ok &lt; 75 ≤ watch ≤ 150 &lt; high. Diagnostischer Hinweis (Modell B) — niemals ein Stop-Signal.'
                 }
             };
 
@@ -1354,52 +1302,6 @@
                 document.getElementById('edu-modal-espghan').innerHTML = c.espghan;
                 document.getElementById('edu-modal-algo').innerHTML = c.algo;
                 document.getElementById('edu-modal').style.display = 'block';
-            }
-
-            // ============================================================
-            // v3.0 — ENERGY-GAP-INDEX Kachel
-            // Liest direkt aus dem (frischen) history-Objekt → kein 1-Zyklus-Lag.
-            // ============================================================
-            function renderEGI(hist) {
-                const valEl = document.getElementById('egi-value');
-                const barEl = document.getElementById('egi-bar');
-                const sevEl = document.getElementById('egi-severity');
-                const metaEl = document.getElementById('egi-meta');
-                if (!valEl) return;
-                const idx = (calculator && calculator.calculateEnergyGapIndex)
-                    ? calculator.calculateEnergyGapIndex(hist) : null;
-
-                if (!idx) {
-                    valEl.textContent = '–';
-                    valEl.className = 'text-4xl font-extrabold tabular-nums text-slate-400';
-                    if (barEl) { barEl.className = 'egi-bar-fill egi-ok'; barEl.style.width = '0%'; }
-                    if (sevEl) { sevEl.textContent = '–'; sevEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500'; }
-                    if (metaEl) metaEl.textContent = 'Noch keine Verlaufsdaten (kcal/kg pro Tag erfassen)';
-                    return;
-                }
-
-                const sevMap = {
-                    ok:    { label: 'OK',    bar: 'egi-ok',    txt: 'egi-ok-text',    pill: 'bg-emerald-100 text-emerald-700' },
-                    watch: { label: 'WATCH', bar: 'egi-watch', txt: 'egi-watch-text', pill: 'bg-amber-100 text-amber-700' },
-                    high:  { label: 'HIGH',  bar: 'egi-high',  txt: 'egi-high-text',  pill: 'bg-rose-100 text-rose-700' }
-                };
-                const s = sevMap[idx.severity] || sevMap.ok;
-                valEl.textContent = idx.cumulativeDeficit;
-                valEl.className = `text-4xl font-extrabold tabular-nums ${s.txt}`;
-                if (barEl) {
-                    // Balken relativ zur Threshold (150), gedeckelt bei 100 %.
-                    const pct = Math.min(100, Math.round((idx.cumulativeDeficit / idx.threshold) * 100));
-                    barEl.className = `egi-bar-fill ${s.bar}`;
-                    barEl.style.width = pct + '%';
-                }
-                if (sevEl) {
-                    sevEl.textContent = s.label;
-                    sevEl.className = `text-[10px] font-bold px-2 py-0.5 rounded-full ${s.pill}`;
-                }
-                if (metaEl) {
-                    const worst = idx.worstDay ? ` · stärkster Einbruch Tag ${idx.worstDay} (−${idx.worstGap})` : '';
-                    metaEl.textContent = `${idx.daysAnalyzed} Tag${idx.daysAnalyzed === 1 ? '' : 'e'} · Ø ${idx.dailyAverageGap} kcal/kg/d Defizit · Schwelle ${idx.threshold}${worst}`;
-                }
             }
 
             // ============================================================
@@ -1525,41 +1427,6 @@
                 });
             }
 
-            // B1: Render mini SVG sparkline. data: array of numbers (oldest→newest).
-            // Liefert eine schlanke Linie mit End-Marker; keine Animation, hoher Kontrast.
-            function renderSparkline(containerId, data, opts = {}) {
-                const el = document.getElementById(containerId);
-                if (!el) return;
-                const valid = (data || []).filter(v => typeof v === 'number' && isFinite(v));
-                if (valid.length < 2) {
-                    el.innerHTML = '<span class="text-[10px] text-slate-300 italic">zu wenig Daten</span>';
-                    return;
-                }
-                const w = opts.width || 110, h = opts.height || 28, pad = 3;
-                const color = opts.color || '#0d9488';
-                const min = Math.min(...valid);
-                const max = Math.max(...valid);
-                const range = (max - min) || 1;
-                const stepX = (w - 2 * pad) / (valid.length - 1);
-                const pts = valid.map((v, i) => {
-                    const x = pad + i * stepX;
-                    // Wenn min === max: in der Mitte zeichnen.
-                    const y = max === min ? h / 2 : h - pad - ((v - min) / range) * (h - 2 * pad);
-                    return `${x.toFixed(1)},${y.toFixed(1)}`;
-                }).join(' ');
-                const lastIdx = valid.length - 1;
-                const lastX = pad + lastIdx * stepX;
-                const lastY = max === min ? h / 2 : h - pad - ((valid[lastIdx] - min) / range) * (h - 2 * pad);
-                // Fläche unter der Kurve dezent füllen
-                const area = `${pad},${h - pad} ${pts} ${lastX.toFixed(1)},${h - pad}`;
-                el.innerHTML =
-                    `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${opts.label || 'Trend'}" preserveAspectRatio="none">` +
-                    `<polyline fill="${color}" fill-opacity="0.10" stroke="none" points="${area}" />` +
-                    `<polyline fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" points="${pts}" />` +
-                    `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="${color}" />` +
-                    `</svg>`;
-            }
-
             const inputs = [
                 'birth-weight', 'current-weight', 'yesterday-weight', 'input-tfi',
                 'input-enteral', 'input-enteral-product', 'input-fm85', 'input-meal-frequency',
@@ -1570,7 +1437,6 @@
                 'input-calcium', 'input-phosphate',
                 'input-sodium', 'input-potassium', 'input-access',
                 'input-nacl', 'input-kcl', 'input-hidden-sodium',
-                'input-length', 'input-head', 'input-triglycerides',
                 'input-ssw', 'input-day', 'input-invasive-ventilation',
                 'input-solution', 'input-secondary-solution', 'input-secondary-rate',
                 'input-tfi-unit', 'input-enteral-unit', 'input-carrier-unit', 'input-fm85-unit',
@@ -1674,11 +1540,11 @@
                         if (hinweis) hinweis.classList.add('hidden');
                     }
 
+                    // v3.6.28: Im Verlauf wird nur noch das Gewicht je Lebenstag gespeichert (für die Wachstumsrate).
+                    // Andere Felder wurden nur für den Natrium-Trend und die entfallenen Verlaufskarten gebraucht.
                     const currentDay = document.getElementById('input-day').value;
-                    if (!history[currentDay]) history[currentDay] = {};
-                    history[currentDay][id] = storedValue;
-
                     if (id === 'current-weight') {
+                        if (!history[currentDay]) history[currentDay] = {};
                         history[currentDay]['current-weight'] = storedValue;
                     }
 
@@ -1869,10 +1735,10 @@
                 Object.keys(history).forEach(d => {
                     const h = history[d];
                     if (h && (h._bw === undefined || h._bw === key)) {
-                        // v3.6.27: Früher gespeicherte Energiewerte gehen nicht mehr an den Rechenkern (kein Energiedefizit-Hinweis)
-                        const kopie = { ...h };
-                        delete kopie['_kcal-kg']; delete kopie['_kcal-min'];
-                        out[d] = kopie;
+                        // v3.6.28: Weitergegeben wird nur das Gewicht je Tag. Früher gespeicherte Energie- und Natriumwerte gehen
+                        // nicht mehr an den Rechenkern (kein Energiedefizit- und kein Natrium-Trend-Hinweis, Entscheidung 18.11.2026).
+                        out[d] = { _bw: h._bw };
+                        if (h['current-weight'] !== undefined) out[d]['current-weight'] = h['current-weight'];
                     }
                 });
                 return out;
@@ -1921,7 +1787,6 @@
                 }
 
                 const rawUrea = document.getElementById('input-urea').value;
-                const rawTg = document.getElementById('input-triglycerides').value;
 
                 // Auto-compute postnatal age from birth date
                 const birthDateEl = document.getElementById('input-birth-date');
@@ -2018,9 +1883,7 @@
                     sodium: document.getElementById('input-sodium').value || 0,
                     potassium: document.getElementById('input-potassium').value || 0,
                     access: document.getElementById('input-access').value || 'peripheral',
-                    length: document.getElementById('input-length').value || null,
-                    head: document.getElementById('input-head').value || null,
-                    triglycerides: rawTg === '' || rawTg == null ? null : parseFloat(rawTg),
+                    triglycerides: null,   // v3.6.28: kein Eingabefeld mehr (Bereich „Anthropometrie & Labor“ entfallen)
                     birthWeight: document.getElementById('birth-weight').value,
                     ssw: document.getElementById('input-ssw').value || 28,
                     postnatalAge: document.getElementById('input-day').value || 1,
@@ -2329,8 +2192,6 @@
                 }
 
                 // Length and Head Z-Scores
-                document.getElementById('res-length-zscore').innerText = r.lengthZScore !== null && r.lengthZScore !== undefined ? `${r.lengthZScore}` : '–';
-                document.getElementById('res-head-zscore').innerText = r.headZScore !== null && r.headZScore !== undefined ? `${r.headZScore}` : '–';
 
                 // v3.6.14: Was die Eingabe in der Verordnung bedeutet (Konzentration, Dosis je Mahlzeit)
                 {
@@ -2488,74 +2349,6 @@
                     // v3.6.27: Energie und Energieziel je Tag werden nicht mehr gespeichert (Energiedefizit-Index entfallen)
                     localStorage.setItem('neo-history', JSON.stringify(history));
                 } catch (e) { /* localStorage quota / parse — non-blocking */ }
-            }
-
-            // B1: Liest aus dem history-Objekt die letzten ≤7 Tage für ein bestimmtes
-            // Feld und gibt {values, days, latest} zurück. Lücken (undefined) werden
-            // ausgelassen — Sparkline zeigt nur tatsächlich gemessene Werte.
-            function getTrend(field, maxDays = 7) {
-                const curDay = parseInt(document.getElementById('input-day').value) || 1;
-                const start = Math.max(1, curDay - (maxDays - 1));
-                const values = [];
-                const days = [];
-                const verlauf = childHistory();
-                for (let d = start; d <= curDay; d++) {
-                    const dd = verlauf[String(d)];
-                    if (!dd) continue;
-                    const raw = dd[field];
-                    if (raw === undefined || raw === null || raw === '') continue;
-                    const v = typeof raw === 'number' ? raw : parseFloat(raw);
-                    if (!isFinite(v)) continue;
-                    values.push(v);
-                    days.push(d);
-                }
-                return { values, days, latest: values[values.length - 1] };
-            }
-
-            // B1: Rendert alle Trend-Sparklines + Werte. Blendet die Card aus,
-            // solange noch nicht ein einziger Trend ≥2 Datenpunkte hat.
-            function renderTrendCard() {
-                const card = document.getElementById('trend-card');
-                if (!card) return;
-                const trends = {
-                    weight: { trend: getTrend('current-weight'), color: '#047857', unit: 'g',          decimals: 0, valId: 'spark-weight-val', sparkId: 'spark-weight', deltaId: 'spark-weight-delta', label: 'Gewichts-Trend' },
-                    sodium: { trend: getTrend('input-sodium'),   color: '#0284c7', unit: 'mmol/kg/d',  decimals: 1, valId: 'spark-sodium-val', sparkId: 'spark-sodium', deltaId: 'spark-sodium-delta', label: 'Natrium-Trend' },
-                    bun:    { trend: getTrend('input-urea'),     color: '#b45309', unit: 'mmol/l',     decimals: 1, valId: 'spark-bun-val',    sparkId: 'spark-bun',    deltaId: 'spark-bun-delta',    label: 'BUN-Trend' },
-                    kcal:   { trend: getTrend('_kcal-kg'),       color: '#ea580c', unit: 'kcal/kg/d',  decimals: 0, valId: 'spark-kcal-val',   sparkId: 'spark-kcal',   deltaId: 'spark-kcal-delta',   label: 'Energie-Trend' }
-                };
-
-                let anyData = false;
-                let maxDays = 0;
-                Object.values(trends).forEach(t => {
-                    const valEl = document.getElementById(t.valId);
-                    const deltaEl = document.getElementById(t.deltaId);
-                    if (t.trend.values.length >= 2) anyData = true;
-                    if (t.trend.values.length > maxDays) maxDays = t.trend.values.length;
-
-                    if (t.trend.values.length === 0) {
-                        if (valEl) valEl.textContent = '–';
-                        if (deltaEl) deltaEl.textContent = t.unit;
-                    } else {
-                        const last = t.trend.latest;
-                        if (valEl) valEl.textContent = last.toFixed(t.decimals);
-                        if (t.trend.values.length >= 2 && deltaEl) {
-                            const first = t.trend.values[0];
-                            const delta = last - first;
-                            const sign = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
-                            const color = delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-slate-400';
-                            deltaEl.className = `text-[10px] tabular-nums ${color}`;
-                            deltaEl.textContent = `${sign} ${Math.abs(delta).toFixed(t.decimals)} ${t.unit}`;
-                        } else if (deltaEl) {
-                            deltaEl.className = 'text-[10px] text-slate-400 tabular-nums';
-                            deltaEl.textContent = t.unit;
-                        }
-                    }
-                    renderSparkline(t.sparkId, t.trend.values, { color: t.color, label: t.label });
-                });
-
-                const meta = document.getElementById('trend-meta');
-                if (meta) meta.textContent = anyData ? `${maxDays} Tag${maxDays === 1 ? '' : 'e'} im Verlauf` : '';
-                card.classList.toggle('hidden', !anyData);
             }
 
             // PDF Export
