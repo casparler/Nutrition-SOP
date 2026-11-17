@@ -714,7 +714,7 @@
                             <label class="block text-sm font-medium text-gray-700">Zugang</label>
                             <select id="input-access" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
                                 <option value="peripheral" selected>Peripher</option>
-                                <option value="central">Zentral (ZVK/PDK)</option>
+                                <option value="central">Zentral (ZVK, ESK, NVK)</option>
                             </select>
                         </div>
                     </div>
@@ -805,41 +805,8 @@
                     <p id="egi-meta" class="text-[11px] text-slate-500 mt-2 text-center leading-snug">Noch keine Verlaufsdaten</p>
                 </div>
 
-                <!-- B1 — 7-Tage-Trend: kompakte SVG-Sparklines aus dem history-Objekt.
-                     Zeigt Verlauf für Gewicht, Natrium-Zufuhr, BUN (Harnstoff) und kcal/kg.
-                     Hidden, solange keine 2+ Datenpunkte vorliegen. -->
-                <div id="trend-card" class="cockpit-full hidden bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-                    <div class="px-4 py-2.5 border-b border-slate-100 flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">📈 7-Tage-Trend</span>
-                        <span id="trend-meta" class="text-[10px] text-slate-400 tabular-nums">–</span>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-100">
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gewicht</p>
-                            <p id="spark-weight-val" class="text-base font-bold text-emerald-700 tabular-nums leading-tight">–</p>
-                            <div id="spark-weight" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-weight-delta" class="text-[10px] text-slate-400 tabular-nums">g</p>
-                        </div>
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Natrium</p>
-                            <p id="spark-sodium-val" class="text-base font-bold text-sky-700 tabular-nums leading-tight">–</p>
-                            <div id="spark-sodium" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-sodium-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/kg/d</p>
-                        </div>
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">BUN</p>
-                            <p id="spark-bun-val" class="text-base font-bold text-amber-700 tabular-nums leading-tight">–</p>
-                            <div id="spark-bun" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-bun-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/l</p>
-                        </div>
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Energie</p>
-                            <p id="spark-kcal-val" class="text-base font-bold text-orange-600 tabular-nums leading-tight">–</p>
-                            <div id="spark-kcal" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-kcal-delta" class="text-[10px] text-slate-400 tabular-nums">kcal/kg/d</p>
-                        </div>
-                    </div>
-                </div>
+                <!-- v3.6.26: Die Karte „7-Tage-Trend“ ist entfallen (Entscheidung des Neonatologen 18.11.2026: es wird kein
+                     Verlauf über 7 Tage erhoben, die Seite soll überschaubar bleiben). -->
 
               </div><!-- /.cockpit-grid -->
 
@@ -1114,9 +1081,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.25"></script>
-    <script src="fenton_data.js?v=3.6.25"></script>
-    <script src="calculator.js?v=3.6.25"></script>
+    <script src="products.js?v=3.6.26"></script>
+    <script src="fenton_data.js?v=3.6.26"></script>
+    <script src="calculator.js?v=3.6.26"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1172,7 +1139,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.25';
+            const EXPECTED_CALC_VERSION = '3.6.26';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips

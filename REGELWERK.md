@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 18.11.2026, Version v3.6.25, 349 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 18.11.2026, Version v3.6.26, 352 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -199,7 +199,7 @@ Verschiebung der Kaliumgabe nötig sein (Risiko nicht-oligurische Hyperkaliämie
 
 | ID | Regel | Status | Code |
 |---|---|---|---|
-| 9.8 | SID-light (Na + K − Cl) negativ → CRITICAL; Na:Cl-Verhältnis < 1 → Warnung | Haus | `calculate` |
+| 9.8 | **Zu Chlorid gibt es keine Meldungen** (gestrichen: „SID-light negativ → CRITICAL“ und „Na:Cl < 1 → Warnung“). Der Säure-Basen-Status wird über die fast tägliche BGA beurteilt; Chlorid und Na + K − Cl werden weiter berechnet und in der Tabelle gezeigt (Test AW1) | Entscheidung 18.11.2026 | `calculate` |
 
 ## 9a. Sekundärinfusionen (v3.6.3)
 
@@ -326,6 +326,7 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 | 14.7 | **Nach einem Eingabefehler sind die Ergebnisse als nicht aktuell gekennzeichnet:** ausgegraut, nicht bedienbar, mit Hinweiszeile; Quick-View zeigt „–“, der Doku-Text ist leer (Tests AT9) | Fehlerkorrektur 17.11.2026 | `markResultsStale` |
 | 14.8 | **Doku-Text:** „AS“ nennt die Aminosäuren der Infusion; „Eiweiß gesamt“ steht immer, getrennt nach Infusion und enteral; FM85 und Eiweiß-Zusatz mit Menge je Mahlzeit; Lipide i. v. nur, wenn sie laufen; Volumen ohne Glukose und Aminosäuren heißt „Infusion … ohne eingetragenen Inhalt“ (Tests AT12, AT13) | Fehlerkorrektur 17.11.2026 | `generateDocumentationString` |
 | 14.9 | Haken werden als angehakt/nicht angehakt gespeichert; die **Nahrungspause bleibt nach dem Neuladen** gesetzt (Test AT8) | Fehlerkorrektur 17.11.2026 | `index.html` (Speichern/Laden) |
+| 14.10 | **Die Karte „7-Tage-Trend“ ist entfallen** (es wird kein Verlauf über 7 Tage erhoben; die App soll überschaubar bleiben). Eine Natrium-Meldung ab fester Schwelle wird nicht eingeführt (BGA fast täglich) (Test AW2) | Entscheidung 18.11.2026 | `index.html` |
 
 ## 15. Vorhersagehinweise (nur Hinweis, nie Sperre)
 
@@ -387,7 +388,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.20 | **Produkte nur im Excel (Werte je 100 ml, aus dem Excel, nicht an der Packung geprüft):** Aptamil HA Pre 66 kcal, 1,5 g Eiweiß, 3,4 g Fett, 7,2 g KH; Aptamil AR Komplettnahrung 66 kcal, 1,6 g, 3,5 g, 6,8 g (Ca 77, P 43 mg); Neocate 67 kcal, 1,8 g, 3,4 g, 7,2 g; „Primergen, Aptamil“ 62 kcal, **0,7 g Eiweiß** (wirkt zu niedrig, vermutlich Tippfehler), 3,6 g, 6,4 g; Frühkarotten je 100 ml 39 kcal, 0,8 g Eiweiß, 1,0 g Fett, 5,5 g KH. Soll das in die App? Frühkarotten und Liquigen als Volumen zusätzlich oder in der Mahlzeit enthalten? | zu entscheiden |
 | 17.21 | **Mögliche Datenverwechslung in `products.js`:** Beba FG 1 hat dort 116 mg Phosphor, im Excel stehen 116 für Calcium und 77 für Phosphat; Beba FG 2 hat 77 mg Phosphor. Bitte an der Packung prüfen | zu prüfen |
 | 17.22 | **Eingabe Aptamil Eiweiß+ wie im Excel** (g Pulver je 100 ml Milch): 1 entspricht 0,82 g Eiweiß/100 ml der App. Als zusätzliche Einheit denkbar | Vorschlag |
-| 17.23 | ~~Basislösung FG und Regel 12.2~~ **entschieden 18.11.2026:** Die Basislösung FG ist die Standardlösung aller Frühgeborenen ab Lebenstag 3; Regel 12.2 nennt sie wieder. **Offen bleibt:** Laut Tabelle enthält sie nur 4 g Glukose und 2 g Aminosäuren je 100 ml; allein bei 100 ml/kg/d ergibt das GIR 2,8 (Hypoglykämie-Alarm) und 2 g Aminosäuren/kg/d. Bitte Rezeptur prüfen | Rezeptur zu prüfen |
+| 17.23 | ~~Basislösung FG~~ **bestätigt 18.11.2026:** je Liter 57 ml Glukose 70 % (39,9 g) und 200 ml Aminosäurenlösung 10 % (20 g), das entspricht 8a. Die Lösung ist Standard ab Lebenstag 3 (12.2). Allein bei 100 ml/kg/d ergibt sie GIR 2,8; der Hypoglykämie-Alarm (8.3) ist dann sachlich richtig | erledigt |
 | 17.24 | ~~Chlorid der Hauslösungen~~ **entschieden 18.11.2026:** wird nicht in die Bilanz gerechnet (keine große Relevanz, würde die Anzeige überladen). Die Werte bleiben hinterlegt | erledigt |
 | 17.25 | ~~Weitere Lösungen der Stations-Tabelle~~ **erledigt 18.11.2026** (Regeln 8a.6, 8a.7) | erledigt |
 | 17.26 | ~~Stand der Stations-Tabelle~~ **bestätigt 18.11.2026:** entspricht ungefähr dem heutigen Stand der Apotheke, in den letzten Jahren unverändert | erledigt |
@@ -449,3 +450,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 17.11.2026 | Kritische Prüfung mit Szenarien. **Hauslösungen nach der Stations-Verordnungstabelle 09/2023 korrigiert** (Abschnitt 8a; vorher 30–53 % zu niedrig). Vortagsgewicht optional und auf Plausibilität geprüft, Verlauf je Kind, Knopf „Neues Kind“, Nahrungspause bleibt nach dem Neuladen, Ergebnisse nach Eingabefehler als nicht aktuell gekennzeichnet, Doku-Text korrigiert, Lipidziel i. v. nur bei laufender Infusion, Zusammenfassung nennt die Abweichungen, FM85-Hinweis zieht Aminosäuren i. v. ab (Regeln 7.7, 8a, 11.14c, 13.8–13.10, 14.6–14.9, 16a.13, Version 3.6.23). Tests F1, M4, M5 mit Begründung angepasst, neu AT1–AT19. Neue offene Punkte 17.23–17.27 |
 | 17.11.2026 | Entscheidungen des Neonatologen: Eiweiß- und Energieziel bei Reifgeborenen nicht bewerten (5.1a, 6.1a), FM85 frühestens ab 100 ml/kg/d, Erinnerung „ab 50“ entfällt (11.12), FG-Mix ab Tag 3 mit Wechsel-Erinnerung und Phosphat-/Kalium-Hinweis (12.2). Version 3.6.24, Tests AU1–AU4, AT14 auf ein Frühgeborenes umgestellt |
 | 18.11.2026 | Stations-Tabelle als aktuell bestätigt; Basislösung FG ist Standard ab Lebenstag 3 (12.2); Chlorid der Hauslösungen bleibt außen vor (17.24); NG-Mix und vier weitere Sekundärlösungen aufgenommen (8a.6, 8a.7); Eingabefelder starten leer (8a.8). Version 3.6.25, Tests AV1–AV4, AQ5/AQ8/AU4 mit Begründung angepasst |
+| 18.11.2026 | Leitgedanke: Die App soll überschaubar bleiben. Chlorid-Meldungen gestrichen (9.8), Karte „7-Tage-Trend“ entfernt (14.10), keine zusätzliche Natrium-Meldung; Rezeptur der Basislösung FG bestätigt (17.23). Beschriftung des Zugangs: „Zentral (ZVK, ESK, NVK)“ statt „ZVK/PDK“. Version 3.6.26, Tests AW1–AW3 |

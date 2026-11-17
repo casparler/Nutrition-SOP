@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.25';
+        this.VERSION = '3.6.26';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -692,7 +692,8 @@ class NutritionCalculator {
                 basisPeripher: 'Basis peripher'
               }[input.selectedSolution] || input.selectedSolution)
             : 'manuell';
-        const access = input.access === 'central' ? 'ZVK' : 'peripher';
+        // v3.6.26: „zentral“ statt „ZVK“, der Zugang kann auch ein Einschwemm- oder Nabelvenenkatheter sein
+        const access = input.access === 'central' ? 'zentral' : 'peripher';
 
         const lines = [];
         lines.push(`Ernährung Tag ${day} (${cw} g, korr. ${corrGA} SSW, ${phase.label}):`);
@@ -2069,14 +2070,9 @@ class NutritionCalculator {
         // 0,5–0,77 mmol/g und lösten die Warnung ständig aus. Der Wert wird weiter
         // berechnet und angezeigt, löst aber weder Warnung noch Fazit aus.
 
-        // --- AUDIT: SID-light warning (metabolic acidosis proxy) ---
-        if (n.sidLight !== undefined && (n.effectiveNa > 0 || n.effectiveK > 0)) {
-            if (n.sidLight < 0) {
-                warnings.push(`CRITICAL: SID-light ${n.sidLight} mmol/kg/d negativ — hyperchlorämische Azidose-Gefahr!`);
-            } else if (n.naClRatio > 0 && n.naClRatio < 1.0) {
-                warnings.push(`Warnung: Na:Cl Ratio ${n.naClRatio}:1 — Chlorid-Überhang, Azidose-Risiko.`);
-            }
-        }
+        // v3.6.26 (Entscheidung des Neonatologen 18.11.2026): Zu Chlorid gibt es keine Meldungen mehr (früher
+        // „SID-light negativ“ als CRITICAL und „Na:Cl Ratio < 1, Chlorid-Überhang“ als Warnung). Der Säure-Basen-Status
+        // wird über die fast tägliche BGA beurteilt; die Werte (Cl, SID) werden weiter berechnet und in der Tabelle gezeigt.
 
         // --- v3.5: Kalium ---
         // (a) kaliumfreie Phase an Lebenstag 1–2, (b) Obergrenze nach Gewichtsklasse.

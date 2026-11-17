@@ -3970,3 +3970,40 @@ describe('AV) Weitere Lösungen und leere Startfelder (v3.6.25)', () => {
         NP.parenteralSolutions.forEach(s => expect(opt('input-solution'), s.id).toContain(s.id));
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AW — Entscheidungen des Neonatologen vom 18.11.2026 (v3.6.26): überschaubare App
+ * Keine Meldungen zu Chlorid (Säure-Basen-Status über die BGA), die Karte „7-Tage-Trend“ entfällt.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AW) Keine Chlorid-Meldungen, kein 7-Tage-Trend (v3.6.26)', () => {
+    it('AW1: Auch bei deutlichem Chlorid-Überhang (KCl 5 mmol/kg/d, Natrium 0) gibt es keine Meldung zu Chlorid; die Werte bleiben berechnet', () => {
+        const r = calc.calculate(baseInput({ sodium: 0, potassium: 0, naclMl: 0, kclMl: 5 }));
+        const alle = [...r.warnings, ...r.reminders, ...r.fazit, r.documentation.split('Beurteilung:')[1] || ''].join(' ');
+        expect(alle).not.toMatch(/Na:Cl|SID-light|Chlorid|Azidose/);
+        expect(r.results.effectiveCl).toBe(5);
+        expect(r.results.sidLight).toBeDefined();
+        // Sterofundin VG-5 (Cl 14,1 gegen Na 14,0 mmol je 100 ml) löst ebenfalls nichts aus
+        const s = calc.calculate(baseInput({ birthWeight: 2200, currentWeight: 2150, ssw: 34, postnatalAge: 4, tfi: 65, enteralVolume: 0,
+            gir: 0, protein: 0, lipids: 0, secondarySolution: 'sterofundinVG5', secondaryRateKg: 65 }));
+        expect(s.warnings.some(w => /Na:Cl|Chlorid/.test(w))).toBe(false);
+    });
+
+    it('AW2: Die Karte „7-Tage-Trend“ gibt es in der Oberfläche nicht mehr', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const d = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url).pathname, 'utf8')).window.document;
+        ['trend-card', 'trend-meta', 'spark-weight', 'spark-sodium', 'spark-bun', 'spark-kcal'].forEach(id => expect(d.getElementById(id), id).toBeNull());
+        d.querySelectorAll('script, style').forEach(n => n.remove());
+        expect(d.body.textContent).not.toMatch(/7-Tage-Trend/);
+    });
+
+    it('AW3: Der zentrale Zugang heißt „Zentral (ZVK, ESK, NVK)“ (Einschwemm- und Nabelvenenkatheter), „PDK“ kommt nicht mehr vor', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const d = new JSDOM(fs.readFileSync(new URL('../index.html', import.meta.url).pathname, 'utf8')).window.document;
+        expect(d.querySelector('#input-access option[value="central"]').textContent).toBe('Zentral (ZVK, ESK, NVK)');
+        expect(d.body.textContent).not.toMatch(/PDK/);
+        const r = calc.calculate(baseInput({ access: 'central', gir: 8, protein: 3 }));
+        expect(r.documentation).toMatch(/\(manuell, zentral\)/);
+    });
+});
