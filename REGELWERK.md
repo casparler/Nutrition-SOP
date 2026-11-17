@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 17.11.2026, Version v3.6.24, 345 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 18.11.2026, Version v3.6.25, 349 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -168,6 +168,9 @@ Elektrolyt-Konzentrat je 100 ml: Na 11,1, K 7,51, Ca 3,863, Mg 0,507, Phosphat 3
 | 8a.3 | Basislösung 100, 120 und 150 liefern bei 100, 120 bzw. 150 ml/kg/d dieselbe Tagesdosis: 3,5 g Aminosäuren, 15 g Glukose (GIR 10,4), Na 4,44, K 3,0, Ca 1,55, Phosphat 1,43 mmol je kg | folgt aus 8a.1 | `products.js` | AT3, AT4 |
 | 8a.4 | Die Oberfläche zeigt bei Auswahl einer Hauslösung den Gehalt je 100 ml und die Zufuhr beim Zielvolumen | Technisch | `updateSolutionUI` | AT19 |
 | 8a.5 | Magnesium und Chlorid der Hauslösungen sind hinterlegt, werden aber **noch nicht** in die Bilanz gerechnet (Chlorid: siehe offener Punkt 17.24) | **Offen** | `products.js` | – |
+| 8a.6 | **NG-Mix 7,5 %** als Infusionslösung wählbar: Glukose 7,5 g, Natrium 4,0 mmol, Calcium 0,994 mmol, Chlorid 4,0 mmol je 100 ml, keine Aminosäuren | Stations-Tabelle 09/2023, Entscheidung 18.11.2026 | `products.js` | AV3, AV4 |
+| 8a.7 | **Weitere Sekundärlösungen** (je 100 ml): Sterofundin VG-5 (Glukose 5 g, Na 14,0, Cl 14,1, K 0,4, Ca 0,25 mmol), Halbelektrolyt-Lösung G5 % (Glukose 5 g, Na 7,7, Cl 7,7), NaCl 0,45 %/Glukose 2,5 % (Glukose 2,5 g, Na 7,7, Cl 7,7), Elektrolyt-Infusionslösung 153 (Na 14,0, Cl 10,3, K 0,5, Ca 0,25) | Stations-Tabelle 09/2023, Entscheidung 18.11.2026 | `products.js` | AV1, AV2, AV4 |
+| 8a.8 | **Die Eingabefelder starten leer** (Infusion, GIR, Aminosäuren, Calcium, Phosphat, Lipide; vorher 80 / 6 / 2 / 40 / 31 / 1). Vorbelegte Werte wirkten wie eine Verordnung und erzeugten Meldungen | Entscheidung 18.11.2026 | `index.html` | AV4, AQ5, AQ8 |
 
 ## 9. Elektrolyte
 
@@ -292,7 +295,7 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
 | 12.1 | **Vitamin D und Proprems**, sobald die Einzelmahlzeit **≥ 3 ml** beträgt. Die absolute Grenze bleibt bewusst so | Entscheidung 02.10.2026 | `calculate` Step 11 | – |
-| 12.2 | **FG-Mix 7,5 % über Lebenstag 2 hinaus** (ab Tag 3): Erinnerung „Wechsel auf eine Basislösung“ und Hinweis „kein Phosphat, kein Kalium: Serum-Phosphat und Kalium kontrollieren“ (Hypophosphatämie-Risiko bei Aminosäuren ohne Phosphat). Der Mix wird auf Station kaum länger als 2 Tage gegeben | Entscheidung 17.11.2026 | `calculate` | F6, AU4 |
+| 12.2 | **FG-Mix 7,5 % über Lebenstag 2 hinaus** (ab Tag 3): Erinnerung „Wechsel auf Basislösung FG (enthält Natrium, Kalium und Phosphat)“ und Hinweis „kein Phosphat, kein Kalium: Serum-Phosphat und Kalium kontrollieren“. Hausstandard: Alle Frühgeborenen wechseln ab Lebenstag 3 vom FG-Mix auf die Basislösung FG | Entscheidung 17.11. und 18.11.2026 | `calculate` | F6, AU4 |
 | 12.3 | Triglyzeride 200–250: Lipid-Reduktion erwägen | Haus | `calculate` | – |
 
 ## 13. Gewicht, Perzentilen, SGA
@@ -384,10 +387,10 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.20 | **Produkte nur im Excel (Werte je 100 ml, aus dem Excel, nicht an der Packung geprüft):** Aptamil HA Pre 66 kcal, 1,5 g Eiweiß, 3,4 g Fett, 7,2 g KH; Aptamil AR Komplettnahrung 66 kcal, 1,6 g, 3,5 g, 6,8 g (Ca 77, P 43 mg); Neocate 67 kcal, 1,8 g, 3,4 g, 7,2 g; „Primergen, Aptamil“ 62 kcal, **0,7 g Eiweiß** (wirkt zu niedrig, vermutlich Tippfehler), 3,6 g, 6,4 g; Frühkarotten je 100 ml 39 kcal, 0,8 g Eiweiß, 1,0 g Fett, 5,5 g KH. Soll das in die App? Frühkarotten und Liquigen als Volumen zusätzlich oder in der Mahlzeit enthalten? | zu entscheiden |
 | 17.21 | **Mögliche Datenverwechslung in `products.js`:** Beba FG 1 hat dort 116 mg Phosphor, im Excel stehen 116 für Calcium und 77 für Phosphat; Beba FG 2 hat 77 mg Phosphor. Bitte an der Packung prüfen | zu prüfen |
 | 17.22 | **Eingabe Aptamil Eiweiß+ wie im Excel** (g Pulver je 100 ml Milch): 1 entspricht 0,82 g Eiweiß/100 ml der App. Als zusätzliche Einheit denkbar | Vorschlag |
-| 17.23 | **Basislösung FG und Regel 12.2:** Die Lösung enthält laut Stations-Tabelle nur 4 g Glukose je 100 ml (GIR 2,8 bei 100 ml/kg/d) und löst allein den Hypoglykämie-Alarm aus. Regel 12.2 empfiehlt ab Tag 3 den Wechsel von FG-Mix (7,5 % Glukose) auf diese Lösung. Wofür wird die Basislösung FG eingesetzt (Hyperglykämie, zusammen mit einer Glukose-Infusion)? Soll die Erinnerung 12.2 bleiben, auf „Basislösung“ allgemein lauten oder entfallen? | teilweise erledigt 17.11.2026: Regel 12.2 nennt jetzt „eine Basislösung“; die Frage zur Verwendung der Basislösung FG ist offen |
-| 17.24 | **Chlorid der Hauslösungen:** Jetzt bekannt (Basislösung 100: Cl 4,56 bei Na 4,44 und K 3,0 mmol/100 ml), aber noch nicht in der Bilanz. Wird es mitgerechnet, liegt Na:Cl bei 0,97 und die Warnung „Chlorid-Überhang“ (Na:Cl < 1) erschiene bei jeder Basislösung. Vorschlag: Chlorid mitrechnen und nur noch über Na + K − Cl bewerten | offen, Vorschlag |
-| 17.25 | **Weitere Lösungen der Stations-Tabelle, die in der App fehlen:** NG-Mix 7,5 % (Glukose 75 g/l, Na 40 mmol/l, Ca 0,994 mmol/100 ml), Sterofundin VG-5 (Glukose 5 %, Na 140, K 4, Ca 2,5, Mg 1, Cl 141 mmol/l), fertige Halbelektrolyt-Lösung G5 % (Na 77 mmol/l), NaCl 0,45 %/Glukose 2,5 %, Elektrolyt-Infusionslösung 153 (Na 140, K 5, Ca 2,5, Mg 1,5, Cl 103 mmol/l). Aufnehmen? | offen |
-| 17.26 | **Stand der Stations-Tabelle:** Dateiname „September 2023 … AUF FEHLER ACHTEN“. Bitte bestätigen, dass die Rezepturen (8a) dem aktuellen Stand der Apotheke entsprechen | zu bestätigen |
+| 17.23 | ~~Basislösung FG und Regel 12.2~~ **entschieden 18.11.2026:** Die Basislösung FG ist die Standardlösung aller Frühgeborenen ab Lebenstag 3; Regel 12.2 nennt sie wieder. **Offen bleibt:** Laut Tabelle enthält sie nur 4 g Glukose und 2 g Aminosäuren je 100 ml; allein bei 100 ml/kg/d ergibt das GIR 2,8 (Hypoglykämie-Alarm) und 2 g Aminosäuren/kg/d. Bitte Rezeptur prüfen | Rezeptur zu prüfen |
+| 17.24 | ~~Chlorid der Hauslösungen~~ **entschieden 18.11.2026:** wird nicht in die Bilanz gerechnet (keine große Relevanz, würde die Anzeige überladen). Die Werte bleiben hinterlegt | erledigt |
+| 17.25 | ~~Weitere Lösungen der Stations-Tabelle~~ **erledigt 18.11.2026** (Regeln 8a.6, 8a.7) | erledigt |
+| 17.26 | ~~Stand der Stations-Tabelle~~ **bestätigt 18.11.2026:** entspricht ungefähr dem heutigen Stand der Apotheke, in den letzten Jahren unverändert | erledigt |
 | 17.27 | **Reihenfolge Tag/Gewicht:** Wird das neue Gewicht eingetippt, bevor der Lebenstag weitergestellt ist, landet es im Verlauf beim alten Tag (Wachstumsrate fehlt dann). Mit eingetragenem Geburtsdatum tritt das nicht auf | bekannt, Lösung offen |
 
 ---
@@ -445,3 +448,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 02.11.2026 | Lipide wahlweise als Laufrate in ml/h, Gesamtflüssigkeit groß angezeigt, Startwerte und Simulationspatienten aus der Oberfläche entfernt (Regeln 4.10, 4.11, Version 3.6.22). Tests M2, M3, M5, AF5, AK10, AL11, AO6, AQ7, AQ8, AR7, AR8 auf den neuen Zustand umgestellt |
 | 17.11.2026 | Kritische Prüfung mit Szenarien. **Hauslösungen nach der Stations-Verordnungstabelle 09/2023 korrigiert** (Abschnitt 8a; vorher 30–53 % zu niedrig). Vortagsgewicht optional und auf Plausibilität geprüft, Verlauf je Kind, Knopf „Neues Kind“, Nahrungspause bleibt nach dem Neuladen, Ergebnisse nach Eingabefehler als nicht aktuell gekennzeichnet, Doku-Text korrigiert, Lipidziel i. v. nur bei laufender Infusion, Zusammenfassung nennt die Abweichungen, FM85-Hinweis zieht Aminosäuren i. v. ab (Regeln 7.7, 8a, 11.14c, 13.8–13.10, 14.6–14.9, 16a.13, Version 3.6.23). Tests F1, M4, M5 mit Begründung angepasst, neu AT1–AT19. Neue offene Punkte 17.23–17.27 |
 | 17.11.2026 | Entscheidungen des Neonatologen: Eiweiß- und Energieziel bei Reifgeborenen nicht bewerten (5.1a, 6.1a), FM85 frühestens ab 100 ml/kg/d, Erinnerung „ab 50“ entfällt (11.12), FG-Mix ab Tag 3 mit Wechsel-Erinnerung und Phosphat-/Kalium-Hinweis (12.2). Version 3.6.24, Tests AU1–AU4, AT14 auf ein Frühgeborenes umgestellt |
+| 18.11.2026 | Stations-Tabelle als aktuell bestätigt; Basislösung FG ist Standard ab Lebenstag 3 (12.2); Chlorid der Hauslösungen bleibt außen vor (17.24); NG-Mix und vier weitere Sekundärlösungen aufgenommen (8a.6, 8a.7); Eingabefelder starten leer (8a.8). Version 3.6.25, Tests AV1–AV4, AQ5/AQ8/AU4 mit Begründung angepasst |

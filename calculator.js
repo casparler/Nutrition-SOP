@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.24';
+        this.VERSION = '3.6.25';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -687,7 +687,7 @@ class NutritionCalculator {
         const lipidProd = input.selectedLipidProduct === 'smoflipid20' ? 'SMOFlipid 20%' : 'Standard 20%';
         const sol = input.selectedSolution && input.selectedSolution !== 'none'
             ? ({
-                fgMix75: 'FG-Mix 7,5%', basisFG: 'Basislösung FG',
+                fgMix75: 'FG-Mix 7,5%', ngMix75: 'NG-Mix 7,5%', basisFG: 'Basislösung FG',
                 basis100: 'Basis 100', basis120: 'Basis 120', basis150: 'Basis 150',
                 basisPeripher: 'Basis peripher'
               }[input.selectedSolution] || input.selectedSolution)
@@ -1747,7 +1747,7 @@ class NutritionCalculator {
         // v3.6.24: FG-Mix ist für die ersten 2 Lebenstage gedacht. Danach Wechsel-Erinnerung (ohne Festlegung auf
         // „Basislösung FG“, siehe REGELWERK 17.23) und unten ein Phosphat-/Kalium-Hinweis.
         if (postnatalAge >= 3 && selectedSolution === 'fgMix75') {
-            reminders.push(`💡 Lebenstag ${postnatalAge}: FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf eine Basislösung empfohlen`);
+            reminders.push(`💡 Lebenstag ${postnatalAge}: FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf Basislösung FG empfohlen (enthält Natrium, Kalium und Phosphat)`);
         }
         if (fm85Percent > 0 && n.enteralVolKg < 100) {
             reminders.push('💡 FM85 aktiv bei < 100 ml/kg/d – Verträglichkeit engmaschig kontrollieren');
@@ -2003,7 +2003,7 @@ class NutritionCalculator {
 
         // v3.6.24: FG-Mix über Tag 2 hinaus — Aminosäuren ohne Phosphat und Kalium
         if (postnatalAge >= 3 && selectedSolution === 'fgMix75' && hasPNVolume) {
-            warnings.push(`Hinweis: FG-Mix 7,5 % an Lebenstag ${postnatalAge} – die Lösung enthält Aminosäuren, aber kein Phosphat und kein Kalium. Serum-Phosphat und Kalium kontrollieren (Hypophosphatämie-Risiko), Wechsel auf eine Basislösung.`);
+            warnings.push(`Hinweis: FG-Mix 7,5 % an Lebenstag ${postnatalAge} – die Lösung enthält Aminosäuren, aber kein Phosphat und kein Kalium. Serum-Phosphat und Kalium kontrollieren (Hypophosphatämie-Risiko), Wechsel auf Basislösung FG.`);
         }
 
         // C-02: Protein deficiency below target at day 4+ for ELBW

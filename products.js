@@ -37,6 +37,15 @@ const NeoProducts = {
             micronutrients: null
         },
         {
+            // v3.6.25, Stations-Tabelle: Glukose 75 g/l, Natrium 40 mmol/l (als NaCl), Calcium 0,497 mmol je 50 ml; ohne Aminosäuren
+            id: 'ngMix75',
+            name: 'NG-Mix 7,5%',
+            targetVolume: 100,
+            concentrateMlPer100ml: 0,
+            per100ml: { aminoAcids: 0, glucose: 7.5, sodium: 4.0, potassium: 0, calcium: 0.994, magnesium: 0, phosphate: 0, chloride: 4.0 },
+            micronutrients: null
+        },
+        {
             // Aminosäuren 20 g/l, Glukose 40 g/l, 40 ml Elektrolyt-Konzentrat je 100 ml
             id: 'basisFG',
             name: 'Basislösung FG (Frühgeborene)',
@@ -271,6 +280,27 @@ const NeoProducts = {
             id: 'sterofundinIso',
             name: 'Sterofundin ISO',
             per100ml: { glucose_g: 0, sodium_mmol: 14.5, chloride_mmol: 12.7, potassium_mmol: 0.4, calcium_mmol: 0.25, magnesium_mmol: 0.1, acetate_mmol: 2.4, malate_mmol: 0.5 }
+        },
+        // v3.6.25: weitere Lösungen aus der Stations-Verordnungstabelle 09/2023 (Blatt „Eingabemaske“, V15–V19, Werte je Liter ÷ 10).
+        {
+            id: 'sterofundinVG5',
+            name: 'Sterofundin VG-5 (Glucose 5%)',
+            per100ml: { glucose_g: 5.0, sodium_mmol: 14.0, chloride_mmol: 14.1, potassium_mmol: 0.4, calcium_mmol: 0.25, magnesium_mmol: 0.1 }
+        },
+        {
+            id: 'halbElytG5',
+            name: 'Halbelektrolyt-Lösung mit Glucose 5%',
+            per100ml: { glucose_g: 5.0, sodium_mmol: 7.7, chloride_mmol: 7.7 }
+        },
+        {
+            id: 'nacl045Gluc25',
+            name: 'NaCl 0,45% / Glucose 2,5% (1:1 aus NaCl 0,9% und G5%)',
+            per100ml: { glucose_g: 2.5, sodium_mmol: 7.7, chloride_mmol: 7.7 }
+        },
+        {
+            id: 'elyt153',
+            name: 'Elektrolyt-Infusionslösung 153 (acetathaltig)',
+            per100ml: { glucose_g: 0, sodium_mmol: 14.0, chloride_mmol: 10.3, potassium_mmol: 0.5, calcium_mmol: 0.25, magnesium_mmol: 0.15 }
         }
     ]
 
