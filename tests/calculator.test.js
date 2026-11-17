@@ -4068,3 +4068,65 @@ describe('AX) Kein Energiedefizit über mehrere Tage (v3.6.27)', () => {
         expect(w.document.getElementById('quick-view-card').classList.contains('cockpit-full')).toBe(true);
     });
 });
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AY — Entscheidungen des Neonatologen vom 18.11.2026 (v3.6.28)
+ * Bereich „Anthropometrie & Labor“ entfällt (Länge, Kopfumfang, Triglyzeride im Alltag nicht genutzt). Der Hinweis
+ * „Natrium-Zufuhr in 48 h gestiegen“ entfällt (die App wird je Kind und Sitzung neu geöffnet, ein Verlauf fehlt).
+ * ────────────────────────────────────────────────────────────────*/
+describe('AY) Kein Bereich Anthropometrie & Labor, kein Natrium-Trend (v3.6.28)', () => {
+    async function boot(values, vorab = {}) {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const root = new URL('../', import.meta.url).pathname;
+        const html = fs.readFileSync(root + 'index.html', 'utf8');
+        const w = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'http://localhost/' }).window;
+        Object.entries(vorab).forEach(([k, v]) => w.localStorage.setItem(k, v));
+        w.eval(fs.readFileSync(root + 'node_modules/decimal.js/decimal.js', 'utf8'));
+        for (const f of ['products.js', 'fenton_data.js', 'calculator.js']) w.eval(fs.readFileSync(root + f, 'utf8'));
+        w.tippy = () => ({ setContent() {}, destroy() {}, show() {}, hide() {} });
+        w.HTMLElement.prototype.scrollIntoView = () => {};
+        const C = w.NutritionCalculator.prototype; const orig = C.calculate;
+        C.calculate = function (inp) { w.__in = inp; const r = orig.call(this, inp); w.__res = r; return r; };
+        [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(s => s.includes('updateCalculations')).forEach(c => w.eval(c));
+        w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+        for (const [id, v] of Object.entries(values)) w.document.getElementById(id).value = v;
+        w.updateCalculations();
+        return w;
+    }
+    const kind = { 'birth-weight': 800, 'current-weight': 810, 'input-ssw': 26, 'input-day': 7, 'input-tfi': 150, 'input-gir': 7, 'input-protein': 3, 'input-sodium': 8 };
+
+    it('AY1: Der Bereich „Anthropometrie & Labor“ mit Länge, Kopfumfang und Triglyzeriden ist entfernt; gerechnet wird ohne diese Werte', async () => {
+        const w = await boot(kind);
+        ['input-length', 'input-head', 'input-triglycerides', 'growth-lab-content', 'res-length-zscore', 'res-head-zscore']
+            .forEach(id => expect(w.document.getElementById(id), id).toBeNull());
+        const text = (() => { const d = w.document.cloneNode(true); d.querySelectorAll('script, style').forEach(n => n.remove()); return d.body.textContent; })();
+        expect(text).not.toMatch(/Anthropometrie|Kopf \(cm\)|Länge \(cm\)|Triglyzeride \(mg\/dl\)/);
+        expect(w.__in.triglycerides).toBe(null);
+        expect(w.__in.length).toBeUndefined();
+        expect(w.__in.head).toBeUndefined();
+        expect(w.document.getElementById('validation-error-banner').classList.contains('hidden')).toBe(true);
+    });
+
+    it('AY2: Auch mit gespeichertem Natriumverlauf (2 → 8 mmol/kg/d in 48 h) erscheint kein Natrium-Trend-Hinweis; gespeichert wird nur das Gewicht', async () => {
+        const alt = JSON.stringify({ 5: { 'input-sodium': '2', 'current-weight': '790', _bw: '800' }, 6: { 'input-sodium': '2', 'current-weight': '800', _bw: '800' } });
+        const w = await boot(kind, { 'neo-history': alt });
+        expect(w.__in.history['5']).toEqual({ _bw: '800', 'current-weight': '790' });
+        expect(w.__res.predictive.sodiumTrend).toBe(null);
+        expect(w.__res.assessment.predictiveHints).toEqual([]);
+        expect(w.document.body.textContent).not.toMatch(/Na-Zufuhr-Anstieg/);
+        expect(w.__in.previousWeight).toBe(800);                          // Wachstumsrate bleibt
+        const el = w.document.getElementById('input-sodium');
+        el.value = 9; el.dispatchEvent(new w.Event('input', { bubbles: true }));
+        expect(JSON.parse(w.localStorage.getItem('neo-history'))['7']['input-sodium']).toBeUndefined();
+        // der Rechenkern kann den Trend weiterhin berechnen, wenn ihm Natriumwerte übergeben werden (Tests I3, I4)
+        expect(typeof calc._analyzeSodiumTrend).toBe('function');
+    });
+
+    it('AY3: Der Triglyzerid-Kontrollhinweis kommt ohne „kein Triglyzerid-Wert eingetragen“ aus', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
+            tfi: 150, enteralVolume: 0, lipids: 3, gir: 9, protein: 3.5 }));
+        const h = r.warnings.find(w => /Triglyzeride kontrollieren/.test(w));
+        expect(h).toBe('Hinweis: Lipide i. v. 3 g/kg/d (bei Geburtsgewicht bis 1000 g ab 2 g/kg/d) – Triglyzeride kontrollieren (Zufallswert genügt).');
+    });
+});

@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.27';
+        this.VERSION = '3.6.28';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1845,7 +1845,8 @@ class NutritionCalculator {
             const grund = n.lipidsPNKg > this.LIPID_TG_HINT.dose
                 ? `über ${this.LIPID_TG_HINT.dose} g/kg/d`
                 : `bei Geburtsgewicht bis 1000 g ab ${this.LIPID_TG_HINT.doseElbw} g/kg/d`;
-            warnings.push(`Hinweis: Lipide i. v. ${n.lipidsPNKg} g/kg/d (${grund}) und kein Triglyzerid-Wert eingetragen – Triglyzeride kontrollieren (Zufallswert genügt).`);
+            // v3.6.28: Die Oberfläche hat kein Triglyzerid-Feld mehr, daher ohne „kein Triglyzerid-Wert eingetragen“
+            warnings.push(`Hinweis: Lipide i. v. ${n.lipidsPNKg} g/kg/d (${grund}) – Triglyzeride kontrollieren (Zufallswert genügt).`);
         }
 
         // C-01: Glucose concentration > 12.5% at peripheral access

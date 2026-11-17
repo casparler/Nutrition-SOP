@@ -3,7 +3,7 @@
 > **Verbindliche Leitlinien für alle KI-Agenten und Entwickler, die an diesem Projekt arbeiten.**
 > Dies ist eine **klinische Safety-First-Applikation**. Verstöße gegen die folgenden Regeln können zu Patientengefährdung führen.
 >
-> **Aktueller Stand:** v3.6 (übersichtlichere Meldungen) auf v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **354/354 grün** (Sektionen A–Z und AA–AX).
+> **Aktueller Stand:** v3.6 (übersichtlichere Meldungen) auf v3.5 — Korrekturen aus der Patientensimulation und Entscheidungen des Neonatologen vom 02.10.2026 (Hypoglykämie CRITICAL, Kalium-Regeln, SGA-Erkennung, Ca:P entfernt, nur mit realem Gewicht rechnen, FM85-Empfehlung nur < 1800 g). Alle Regeln stehen im [REGELWERK.md](./REGELWERK.md). Davor v3.4 — neu kalibrierte Flüssigkeitsziele, Gewichtsverlauf als Kontrollgröße, Anreicherungs-Rechner. Davor v3.3 (Sprache im UI, Quick-View-Layout), v3.2 (klinisches Review: Kopplung Zielvolumen an Nährstoffgrenzen, Nahrungspause, Ampel-Korrektur, Gesamt-Natrium), v3.1 (enteraler Aufbau, TFI-Stufen, enterale Supplemente) und v3.0 (Teaching-Layer, Energy-Gap-Index, Smart Defaults, History-Sync). Test-Suite: **357/357 grün** (Sektionen A–Z und AA–AY).
 > CI: [.github/workflows/ci.yml](./.github/workflows/ci.yml) führt `npm test` bei jedem Push/PR aus.
 
 ---
@@ -12,7 +12,7 @@
 
 ### 1. Test-Suite (Vitest) — ALLE Tests müssen IMMER zu 100 % grün sein
 
-- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 354 klinische Tests** (Sektionen A–Z und AA–AD; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
+- Die Datei [tests/calculator.test.js](./tests/calculator.test.js) enthält **aktuell 357 klinische Tests** (Sektionen A–Z und AA–AD; ursprünglich 31, schrittweise erweitert über v1.2/v1.3 [Validierung + Type-safe Parser], v2.0 [Clinical Cockpit H1–H7], v2.1 [Predictive Analytics I1–I4 + Smoke-Test J1], v3.0 [Energy-Gap-Index K1–K5, Smart Defaults L1–L5, Frontend-Integration M1–M6], v3.1 [Enteraler Aufbau + TFI-Stufen + Supplemente N1–N20], v3.2 [Klinisches Review O1–O17], v3.3 [Sprache + Quick-View P1–P9], v3.4 [Flüssigkeitsziele, Gewichtsverlauf, Zubereitung Q1–Q23, Auffindbarkeit R1–R2]), die das gesamte Sicherheitsverhalten des Calculators und die Frontend-Integrität absichern.
 - Die Anzahl darf wachsen, aber **nie schrumpfen**. Neue Tests gerne — alte nur mit klinischer Begründung anpassen.
 - **Vor JEDEM Refactoring, JEDEM Commit, JEDER produktiven Änderung an `calculator.js` muss `npm test` ausgeführt werden — ALLE Tests müssen bestanden sein.**
 - **Nach JEDER Änderung an `calculator.js` muss `npm test` erneut grün sein, bevor die Aufgabe als abgeschlossen gilt.**
@@ -20,7 +20,7 @@
 - Verbotene Workarounds: `.skip`, `.todo`, auskommentieren, `expect(true).toBe(true)` als Platzhalter, manipulierte Vergleichswerte.
 
 ```bash
-npm test    # MUSS 354 passed, 0 failed zeigen
+npm test    # MUSS 357 passed, 0 failed zeigen
 ```
 
 ### 2. ELBW-Klassengrenze bei exakt 1000 g — SAKROSANKT
@@ -83,6 +83,7 @@ Tests **N11–N14** sichern das Verhalten ab.
 - Schwellwerte sind klinisch begründet und dürfen nur mit Quelle + Datum geändert werden:
   - **Energy-Gap:** kumulatives Defizit **> 150 kcal/kg** über **≥ 3 Tage** → Hinweis (Hausfestlegung; das Konzept stützt Embleton 2001, die Schwelle selbst steht dort nicht, siehe [QUELLEN.md](./QUELLEN.md)).
   - **Sodium-Trend:** Anstieg der Na-**Zufuhr** **Δ > 5 mmol/kg/d in 48 h** → Hinweis „Serum-Natrium kontrollieren".
+- **Seit v3.6.28 (18.11.2026) zeigt die Oberfläche beide Hinweise nicht mehr:** Sie gibt nur noch das Gewicht je Tag weiter (`childHistory()`), die Funktionen ruhen im Kern.
 - Die History wird optional über `input.history` übergeben (Tag-Keys `"1"`, `"2"`, … mit Feldern `_kcal-kg`, `_kcal-min`, `input-sodium`). Fehlt sie, geben beide Funktionen `null` zurück — kein Fehler.
 
 ---
@@ -423,10 +424,10 @@ Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende ver
 
 ## 📋 Standard-Workflow für jede Änderung an `calculator.js`
 
-1. **Vor der Änderung:** `npm test` ausführen → muss 354/354 grün sein. Sonst zuerst Bestand reparieren.
+1. **Vor der Änderung:** `npm test` ausführen → muss 357/357 grün sein. Sonst zuerst Bestand reparieren.
 2. **Während der Änderung:** Keine der drei Invarianten oben antasten.
-3. **Nach der Änderung:** `npm test` erneut ausführen → muss 354/354 grün sein.
-4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 354/354 wieder grün sind.
+3. **Nach der Änderung:** `npm test` erneut ausführen → muss 357/357 grün sein.
+4. **Falls Tests rot:** Autonomer Korrektur-Loop am Produktivcode (nicht an den Tests), bis 357/357 wieder grün sind.
 
 ---
 
@@ -437,7 +438,7 @@ Entscheidungsdatum, Code-Stelle, Test) und im Entscheidungsprotokoll am Ende ver
 | [REGELWERK.md](./REGELWERK.md) | Manuskript aller Regeln mit Herkunft, Entscheidungsdatum und Tests |
 | [calculator.js](./calculator.js) | Safety Core Engine — Decimal.js, Validierung, Targets, Warnings |
 | [index.html](./index.html) | UI inkl. try-catch um `calculate()` und Error-Banner |
-| [tests/calculator.test.js](./tests/calculator.test.js) | 354 klinische Vitest-Tests (Sektionen A–Z und AA–AX) |
+| [tests/calculator.test.js](./tests/calculator.test.js) | 357 klinische Vitest-Tests (Sektionen A–Z und AA–AY) |
 | [NICU_NUTRITION_MASTER_PROTOCOL.md](./NICU_NUTRITION_MASTER_PROTOCOL.md) | Klinische Spezifikation (Single Source of Truth) |
 | [NEO_NUTRITION_MASTER_LOGIC.md](./NEO_NUTRITION_MASTER_LOGIC.md) | Logik-Spezifikation V11 |
 
@@ -478,7 +479,7 @@ cp index.html      _Archiv/backups/backup_index_v{X.Y}.html
 cp calculator.js   _Archiv/backups/backup_calculator_v{X.Y}.js
 cp AGENTS.md       _Archiv/backups/backup_AGENTS_v{X.Y}.md
 
-# 2. Tests müssen 354/354 grün sein
+# 2. Tests müssen 357/357 grün sein
 npm test    # im Obsidian-Ordner
 
 # 3. Repo frisch in /tmp klonen (wenn nicht schon vorhanden)
@@ -577,6 +578,8 @@ git push -u origin feature/{name}-v{X.Y}
 | v3.6.26 | `claude/zen-babbage-vjgke2` | Entscheidungen 18.11.2026, Leitgedanke **„die App soll überschaubar bleiben“**: keine Meldungen zu Chlorid mehr (SID-light, Na:Cl; Werte bleiben in der Tabelle), Karte „7-Tage-Trend“ entfernt, keine zusätzliche Natrium-Meldung. Neue Anzeigen und Meldungen nur nach Rücksprache. Zugang heißt „Zentral (ZVK, ESK, NVK)“. Tabelle aller Werte zugeklappt (aufklappbar). → Tests AW1–AW4. **353 Tests total** | in Arbeit |
 
 | v3.6.27 | `claude/zen-babbage-vjgke2` | Energiedefizit-Index aus der Oberfläche entfernt (Kachel und Hinweis; es wird kein Verlauf über mehrere Tage erhoben). `calculateEnergyGapIndex()` bleibt im Rechenkern. → Test AX1, M4/M5/P4 mit Begründung angepasst. **354 Tests total** | in Arbeit |
+
+| v3.6.28 | `claude/zen-babbage-vjgke2` | Bereich „Anthropometrie & Labor“ entfernt (Länge, Kopfumfang, Triglyzeride, Z-Scores); Natrium-Trend-Hinweis entfällt, im Verlauf nur noch Gewichte; Triglyzerid-Kontrollhinweis ohne Feldbezug; tote Funktionen der entfallenen Karten entfernt. → Tests AY1–AY3. **357 Tests total** | in Arbeit |
 
 ### Git-Konfiguration im Clone
 ```
