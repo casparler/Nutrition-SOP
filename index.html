@@ -78,6 +78,8 @@
         .f-ok { margin-top:.5rem; font-size:.8rem; color:#065f46; }
         /* v3.6.23: Nach einem Eingabefehler sind die Ergebnisse nicht aktuell — sichtbar ausgegraut, nicht bedienbar */
         .results-stale > *:not(#results-stale-note) { opacity:.3; filter:grayscale(1); pointer-events:none; }
+        /* v3.6.26: Ergebnistabelle standardmäßig zugeklappt, nur die Kopfzeile bleibt sichtbar */
+        #result-card.collapsed > *:not(:first-child) { display:none !important; }
         #results-stale-note { border:2px solid #b91c1c; background:#fef2f2; color:#7f1d1d; border-radius:.5rem; padding:.6rem .8rem; font-size:.85rem; font-weight:600; }
         @media print { .f-fold:not([open]) > .f-fold-body { display:block; } }
 
@@ -714,7 +716,7 @@
                             <label class="block text-sm font-medium text-gray-700">Zugang</label>
                             <select id="input-access" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
                                 <option value="peripheral" selected>Peripher</option>
-                                <option value="central">Zentral (ZVK/PDK)</option>
+                                <option value="central">Zentral (ZVK, ESK, NVK)</option>
                             </select>
                         </div>
                     </div>
@@ -764,7 +766,7 @@
                 </div>
 
                 <!-- Quick-View -->
-                <div id="quick-view-card" class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden">
+                <div id="quick-view-card" class="cockpit-full bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden">
                     <p class="qv-title">Auf einen Blick</p>
                     <div class="qv-grid">
                         <div class="qv-cell">
@@ -789,64 +791,23 @@
                     </div>
                 </div>
 
-                <!-- v3.0 — ENERGY-GAP-INDEX: kumulatives Kaloriendefizit über alle Tage -->
-                <div id="egi-card" class="bg-white rounded-xl shadow-lg border-2 border-slate-200 overflow-hidden p-4 flex flex-col">
-                    <div class="flex items-center justify-between mb-2">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">⚡ Energiedefizit-Index
-                            <span class="teach text-slate-400" tabindex="0" onclick="openEduModal('energyGap')" title="Erklärung & Algorithmus">ⓘ</span>
-                        </p>
-                        <span id="egi-severity" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">–</span>
-                    </div>
-                    <div class="flex items-baseline gap-1 justify-center my-1">
-                        <span id="egi-value" class="text-4xl font-extrabold tabular-nums text-slate-400">–</span>
-                        <span class="text-xs text-slate-400">kcal/kg kumulativ</span>
-                    </div>
-                    <div class="egi-bar-track mt-2"><div id="egi-bar" class="egi-bar-fill egi-ok" style="width:0%"></div></div>
-                    <p id="egi-meta" class="text-[11px] text-slate-500 mt-2 text-center leading-snug">Noch keine Verlaufsdaten</p>
-                </div>
+                <!-- v3.6.27: Die Kachel „Energiedefizit-Index“ ist entfallen (Entscheidung des Neonatologen 18.11.2026: ohne
+                     Verlauf über mehrere Tage nicht sinnvoll). -->
 
-                <!-- B1 — 7-Tage-Trend: kompakte SVG-Sparklines aus dem history-Objekt.
-                     Zeigt Verlauf für Gewicht, Natrium-Zufuhr, BUN (Harnstoff) und kcal/kg.
-                     Hidden, solange keine 2+ Datenpunkte vorliegen. -->
-                <div id="trend-card" class="cockpit-full hidden bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-                    <div class="px-4 py-2.5 border-b border-slate-100 flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">📈 7-Tage-Trend</span>
-                        <span id="trend-meta" class="text-[10px] text-slate-400 tabular-nums">–</span>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-100">
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gewicht</p>
-                            <p id="spark-weight-val" class="text-base font-bold text-emerald-700 tabular-nums leading-tight">–</p>
-                            <div id="spark-weight" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-weight-delta" class="text-[10px] text-slate-400 tabular-nums">g</p>
-                        </div>
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Natrium</p>
-                            <p id="spark-sodium-val" class="text-base font-bold text-sky-700 tabular-nums leading-tight">–</p>
-                            <div id="spark-sodium" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-sodium-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/kg/d</p>
-                        </div>
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">BUN</p>
-                            <p id="spark-bun-val" class="text-base font-bold text-amber-700 tabular-nums leading-tight">–</p>
-                            <div id="spark-bun" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-bun-delta" class="text-[10px] text-slate-400 tabular-nums">mmol/l</p>
-                        </div>
-                        <div class="p-3 text-center">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Energie</p>
-                            <p id="spark-kcal-val" class="text-base font-bold text-orange-600 tabular-nums leading-tight">–</p>
-                            <div id="spark-kcal" class="h-7 flex justify-center items-center mt-0.5"></div>
-                            <p id="spark-kcal-delta" class="text-[10px] text-slate-400 tabular-nums">kcal/kg/d</p>
-                        </div>
-                    </div>
-                </div>
+                <!-- v3.6.26: Die Karte „7-Tage-Trend“ ist entfallen (Entscheidung des Neonatologen 18.11.2026: es wird kein
+                     Verlauf über 7 Tage erhoben, die Seite soll überschaubar bleiben). -->
 
               </div><!-- /.cockpit-grid -->
 
                 <!-- Main Result Card -->
-                <div id="result-card" class="bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
+                <div id="result-card" class="collapsed bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
                     <div class="bg-blue-600 text-white px-4 py-3 flex justify-between items-center">
-                        <span class="font-bold text-lg">Ergebnis-Zusammenfassung</span>
+                        <!-- v3.6.26: Die Tabelle aller Werte ist zugeklappt; das Wesentliche steht in der klinischen Beurteilung -->
+                        <button type="button" id="btn-toggle-results" aria-expanded="false" aria-controls="result-card" class="font-bold text-lg text-left flex items-center gap-2 hover:underline">
+                            <span id="result-toggle-icon" aria-hidden="true">▸</span>
+                            <span>Alle Werte im Einzelnen</span>
+                            <span id="result-toggle-hint" class="text-xs font-normal opacity-90">(anzeigen)</span>
+                        </button>
                         <span id="safety-badge" onclick="openSafetyModal()" class="bg-green-500 text-white text-xs px-2 py-1 rounded-full uppercase font-bold cursor-pointer hover:scale-105 transition-transform" title="Klicken für Sicherheits-Details">Sicher</span>
                     </div>
 
@@ -1114,9 +1075,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.25"></script>
-    <script src="fenton_data.js?v=3.6.25"></script>
-    <script src="calculator.js?v=3.6.25"></script>
+    <script src="products.js?v=3.6.27"></script>
+    <script src="fenton_data.js?v=3.6.27"></script>
+    <script src="calculator.js?v=3.6.27"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1172,7 +1133,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.25';
+            const EXPECTED_CALC_VERSION = '3.6.27';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1907,7 +1868,12 @@
                 const out = {};
                 Object.keys(history).forEach(d => {
                     const h = history[d];
-                    if (h && (h._bw === undefined || h._bw === key)) out[d] = h;
+                    if (h && (h._bw === undefined || h._bw === key)) {
+                        // v3.6.27: Früher gespeicherte Energiewerte gehen nicht mehr an den Rechenkern (kein Energiedefizit-Hinweis)
+                        const kopie = { ...h };
+                        delete kopie['_kcal-kg']; delete kopie['_kcal-min'];
+                        out[d] = kopie;
+                    }
                 });
                 return out;
             }
@@ -2519,24 +2485,9 @@
                     const curDay = parseInt(document.getElementById('input-day').value) || 1;
                     if (!history[String(curDay)]) history[String(curDay)] = {};
                     history[String(curDay)]._bw = childKey();
-                    if (typeof r.kcalPerKg === 'number' && isFinite(r.kcalPerKg)) {
-                        history[String(curDay)]['_kcal-kg'] = r.kcalPerKg;
-                    }
-                    // v3.0 — Ziel-Minimum pro Tag persistieren, damit der
-                    // Energy-Gap-Index das tägliche Defizit (min − ist) bilden kann.
-                    // v3.6.24: Bei Reifgeborenen wird das Energieziel nicht bewertet, also auch kein Defizit gezählt
-                    const eMin = res.comparisons && res.comparisons.energy && res.comparisons.energy.target
-                        && res.comparisons.energy.status !== 'neutral'
-                        ? res.comparisons.energy.target.min : null;
-                    if (typeof eMin === 'number' && isFinite(eMin)) {
-                        history[String(curDay)]['_kcal-min'] = eMin;
-                    }
+                    // v3.6.27: Energie und Energieziel je Tag werden nicht mehr gespeichert (Energiedefizit-Index entfallen)
                     localStorage.setItem('neo-history', JSON.stringify(history));
                 } catch (e) { /* localStorage quota / parse — non-blocking */ }
-                renderTrendCard();
-
-                // v3.0 — Energy-Gap-Index + Smart Defaults rendern (frische History).
-                renderEGI(childHistory());
             }
 
             // B1: Liest aus dem history-Objekt die letzten ≤7 Tage für ein bestimmtes
@@ -2639,6 +2590,26 @@
 
                 doc.save(`Nutrition_${pId.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
             });
+
+            // v3.6.26: Ergebnistabelle auf- und zuklappen; die Wahl wird für dieses Gerät gemerkt
+            (function () {
+                const card = document.getElementById('result-card');
+                const btn = document.getElementById('btn-toggle-results');
+                const setOpen = open => {
+                    card.classList.toggle('collapsed', !open);
+                    btn.setAttribute('aria-expanded', String(open));
+                    document.getElementById('result-toggle-icon').textContent = open ? '▾' : '▸';
+                    document.getElementById('result-toggle-hint').textContent = open ? '(ausblenden)' : '(anzeigen)';
+                };
+                let offen = false;
+                try { offen = localStorage.getItem('neo-results-open') === 'true'; } catch (e) { /* ohne Speicher: zugeklappt */ }
+                setOpen(offen);
+                btn.addEventListener('click', () => {
+                    const open = card.classList.contains('collapsed');
+                    setOpen(open);
+                    try { localStorage.setItem('neo-results-open', String(open)); } catch (e) { /* nicht speicherbar */ }
+                });
+            })();
 
             // Reset / Neues Kind (v3.6.23: zweiter Knopf oben bei den Patientendaten)
             const resetAll = () => {
