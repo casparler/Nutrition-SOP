@@ -3334,7 +3334,8 @@ describe('AQ) Infusion gesamt plus enteral (v3.6.20)', () => {
 
     it('AQ5: Ein früher gespeicherter Wert (damals Gesamtflüssigkeit) wird nicht als Infusion übernommen; Hinweis erscheint', async () => {
         const w = await boot({}, { 'input-tfi': '150', 'input-enteral': '60' });
-        expect($(w, 'input-tfi').value).toBe('80');                         // Standardwert, nicht 150
+        // v3.6.25 — Entscheidung des Neonatologen 18.11.2026: Die Felder starten leer (vorher Vorbelegung 80). Prüfziel unverändert: nicht 150.
+        expect($(w, 'input-tfi').value).toBe('');                           // leer, nicht 150
         expect($(w, 'input-enteral').value).toBe('60');                     // andere Felder bleiben erhalten
         expect($(w, 'tfi-semantics-note').classList.contains('hidden')).toBe(false);
     });
@@ -3360,9 +3361,10 @@ describe('AQ) Infusion gesamt plus enteral (v3.6.20)', () => {
         expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 130 ml\/kg\/d/);   // 90 Infusion + 40 enteral
     });
 
-    it('AQ8: Es gibt keine Vorlagen mehr; die Standardwerte ergeben 80 ml/kg/d Gesamtflüssigkeit bei Infusion 80 ohne enterale Nahrung', async () => {
+    // v3.6.25 — Entscheidung des Neonatologen 18.11.2026: Die Felder starten leer; die 80 ml/kg/d werden hier eingetragen statt vorbelegt.
+    it('AQ8: Es gibt keine Vorlagen mehr; Infusion 80 ohne enterale Nahrung ergibt 80 ml/kg/d Gesamtflüssigkeit', async () => {
         // v3.6.22 — Anpassung auf Wunsch des Neonatologen: Startwerte und Simulationspatienten sind aus der Oberfläche entfernt (überladen die Seite).
-        const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3 });
+        const w = await boot({ 'birth-weight': 730, 'current-weight': 800, 'input-ssw': 28, 'input-day': 3, 'input-tfi': 80 });
         expect(typeof w.loadSimulation).toBe('undefined');
         expect($(w, 'tfi-converted').innerText).toMatch(/Gesamtflüssigkeit 80 ml\/kg\/d/);
     });
@@ -3912,12 +3914,59 @@ describe('AU) Reifgeborene, FM85-Start, FG-Mix nach Tag 2 (v3.6.24)', () => {
         const mix = tag => calc.calculate(baseInput({ birthWeight: 800, currentWeight: 780, ssw: 26, postnatalAge: tag, access: 'central',
             tfi: 100, enteralVolume: 0, lipids: 1, selectedSolution: 'fgMix75' }));
         const t3 = mix(3);
-        expect(t3.reminders.some(t => /FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf eine Basislösung empfohlen/.test(t))).toBe(true);
+        expect(t3.reminders.some(t => /FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf Basislösung FG empfohlen \(enthält Natrium, Kalium und Phosphat\)/.test(t))).toBe(true);
         const h = t3.warnings.find(w => /^Hinweis: FG-Mix/.test(w));
         expect(h).toMatch(/kein Phosphat und kein Kalium/);
         expect(h).toMatch(/Serum-Phosphat und Kalium kontrollieren/);
         expect(t3.alerts.items.find(i => /FG-Mix/.test(i.text)).domain).toBe('electrolytes');
         const t2 = mix(2);
         expect([...t2.reminders, ...t2.warnings].some(t => /FG-Mix/.test(t))).toBe(false);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AV — Entscheidungen des Neonatologen vom 18.11.2026 (v3.6.25)
+ * Weitere Lösungen der Stations-Tabelle wählbar, Eingabefelder starten leer, Wechsel-Erinnerung nennt die Basislösung FG.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AV) Weitere Lösungen und leere Startfelder (v3.6.25)', () => {
+    const NP = require('../products.js');
+    const sek = id => NP.secondarySolutions.find(s => s.id === id).per100ml;
+
+    it('AV1: Die neuen Sekundärlösungen entsprechen der Stations-Tabelle (Werte je Liter ÷ 10)', () => {
+        expect(sek('sterofundinVG5')).toMatchObject({ glucose_g: 5, sodium_mmol: 14.0, chloride_mmol: 14.1, potassium_mmol: 0.4, calcium_mmol: 0.25 });
+        expect(sek('halbElytG5')).toMatchObject({ glucose_g: 5, sodium_mmol: 7.7, chloride_mmol: 7.7 });
+        expect(sek('nacl045Gluc25')).toMatchObject({ glucose_g: 2.5, sodium_mmol: 7.7, chloride_mmol: 7.7 });
+        expect(sek('elyt153')).toMatchObject({ glucose_g: 0, sodium_mmol: 14.0, chloride_mmol: 10.3, potassium_mmol: 0.5, calcium_mmol: 0.25 });
+    });
+
+    it('AV2: Sterofundin VG-5 mit 48 ml/kg/d liefert 2,4 g Glukose (GIR 1,7) und 6,7 mmol Natrium je kg', () => {
+        const r = calc.calculate(baseInput({ birthWeight: 2000, currentWeight: 2000, ssw: 34, postnatalAge: 2, tfi: 48, enteralVolume: 0,
+            gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0,
+            secondarySolution: 'sterofundinVG5', secondaryRateKg: 48 })).results;
+        expect(r.effectiveGIR).toBeCloseTo(1.7, 1);          // 2,4 g/kg/d ÷ 1,44
+        expect(r.totalNaMmolKg).toBeCloseTo(6.72, 1);
+    });
+
+    it('AV3: NG-Mix 7,5 % ist als Infusionslösung wählbar: 7,5 g Glukose und 4 mmol Natrium je 100 ml, keine Aminosäuren', () => {
+        const ng = NP.parenteralSolutions.find(s => s.id === 'ngMix75');
+        expect(ng.per100ml).toMatchObject({ aminoAcids: 0, glucose: 7.5, sodium: 4.0, potassium: 0, calcium: 0.994, phosphate: 0 });
+        const r = calc.calculate(baseInput({ birthWeight: 3000, currentWeight: 3000, ssw: 39, postnatalAge: 1, tfi: 60, enteralVolume: 0,
+            lipids: 0, selectedSolution: 'ngMix75' }));
+        expect(r.results.effectiveGIR).toBeCloseTo(3.1, 1);   // 4,5 g/kg/d
+        expect(r.results.effectiveAS_GKg).toBe(0);
+        expect(r.results.effectiveNa).toBeCloseTo(2.4, 2);
+        expect(r.documentation).toMatch(/NG-Mix 7,5%/);
+    });
+
+    it('AV4: Die Eingabefelder starten leer, alle neuen Lösungen stehen in den Auswahllisten', async () => {
+        const { JSDOM } = await import('jsdom');
+        const fs = require('node:fs');
+        const html = fs.readFileSync(new URL('../index.html', import.meta.url).pathname, 'utf8');
+        const d = new JSDOM(html).window.document;
+        ['input-tfi', 'input-gir', 'input-protein', 'input-calcium', 'input-phosphate', 'input-lipids']
+            .forEach(id => expect(d.getElementById(id).value, id).toBe(''));
+        const opt = id => [...d.getElementById(id).options].map(o => o.value);
+        NP.secondarySolutions.forEach(s => expect(opt('input-secondary-solution'), s.id).toContain(s.id));
+        NP.parenteralSolutions.forEach(s => expect(opt('input-solution'), s.id).toContain(s.id));
     });
 });

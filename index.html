@@ -375,7 +375,7 @@
                             </label>
                             <div id="infusion-sum-block">
                                 <label class="block text-sm font-medium text-gray-700">Infusion gesamt <select id="input-tfi-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Infusion gesamt"><option value="kgd" selected>ml/kg/d</option><option value="d">ml/Tag</option><option value="h">ml/h</option></select></label>
-                                <input type="number" id="input-tfi" step="any" min="0" value="80" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="input-tfi" step="any" min="0" value="" placeholder="z. B. 80" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 <p class="text-[10px] text-gray-500 mt-1">Alle Infusionen zusammen (PN, Lipide, Spül- und Sekundärlösung). Die enterale Nahrung kommt dazu.</p>
                             </div>
                             <div id="infusion-rates-block" class="hidden space-y-1">
@@ -584,6 +584,10 @@
                                         <option value="nacl045">NaCl 0,45%</option>
                                         <option value="nacl09">NaCl 0,9%</option>
                                         <option value="sterofundinIso">Sterofundin ISO</option>
+                                        <option value="sterofundinVG5">Sterofundin VG-5 (Glucose 5%)</option>
+                                        <option value="halbElytG5">Halbelektrolyt-Lösung mit Glucose 5%</option>
+                                        <option value="nacl045Gluc25">NaCl 0,45% / Glucose 2,5%</option>
+                                        <option value="elyt153">Elektrolyt-Infusionslösung 153</option>
                                     </select>
                                 </div>
                                 <div>
@@ -606,6 +610,7 @@
                             <select id="input-solution" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
                                 <option value="none">— Manuelle Eingabe —</option>
                                 <option value="keinePN">Keine parenterale Ernährung</option>
+                                <option value="ngMix75">NG-Mix 7,5%</option>
                                 <option value="fgMix75">FG-Mix 7,5% (Transition)</option>
                                 <option value="basisFG">Basislösung FG (Frühgeborene)</option>
                                 <option value="basis100">Basislösung 100 ml/kg</option>
@@ -631,22 +636,22 @@
                         <div id="manual-pn-inputs">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">GIR <span class="text-gray-400 font-normal">(mg/kg/min)</span></label>
-                                <input type="number" id="input-gir" step="0.1" value="6.0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="input-gir" step="0.1" value="" placeholder="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             <div class="grid grid-cols-2 gap-4 mt-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Aminosäuren <span class="text-gray-400 font-normal">(g/kg/d)</span></label>
-                                    <input type="number" id="input-protein" step="0.1" value="2.0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="input-protein" step="0.1" value="" placeholder="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Calcium <span class="text-gray-400 font-normal">(mg/kg/d)</span></label>
-                                    <input type="number" id="input-calcium" step="1" value="40" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="input-calcium" step="1" value="" placeholder="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-4 mt-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Phosphat <span class="text-gray-400 font-normal">(mg/kg/d)</span></label>
-                                    <input type="number" id="input-phosphate" step="1" value="31" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" id="input-phosphate" step="1" value="" placeholder="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Natrium <span class="text-gray-400 font-normal">(mmol/kg/d)</span></label>
@@ -665,7 +670,7 @@
                         <div class="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Lipide <select id="input-lipids-unit" class="ml-1 border border-gray-300 rounded text-xs text-gray-600 py-0 px-1 font-normal" aria-label="Einheit Lipide"><option value="gkg" selected>g/kg/d</option><option value="mlh">ml/h</option></select></label>
-                                <input type="number" id="input-lipids" step="any" min="0" value="1.0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" id="input-lipids" step="any" min="0" value="" placeholder="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-blue-500 focus:border-blue-500">
                                 <p id="lipids-converted" class="text-[10px] text-gray-500 mt-1"></p>
                             </div>
                             <div>
@@ -1109,9 +1114,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.24"></script>
-    <script src="fenton_data.js?v=3.6.24"></script>
-    <script src="calculator.js?v=3.6.24"></script>
+    <script src="products.js?v=3.6.25"></script>
+    <script src="fenton_data.js?v=3.6.25"></script>
+    <script src="calculator.js?v=3.6.25"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1167,7 +1172,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.24';
+            const EXPECTED_CALC_VERSION = '3.6.25';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
