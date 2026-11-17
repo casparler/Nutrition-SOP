@@ -76,6 +76,9 @@
         .f-next-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#475569; }
         .f-next ol { margin:.2rem 0 0 1.1rem; padding:0; list-style:decimal; font-size:.85rem; color:#1e293b; }
         .f-ok { margin-top:.5rem; font-size:.8rem; color:#065f46; }
+        /* v3.6.23: Nach einem Eingabefehler sind die Ergebnisse nicht aktuell — sichtbar ausgegraut, nicht bedienbar */
+        .results-stale > *:not(#results-stale-note) { opacity:.3; filter:grayscale(1); pointer-events:none; }
+        #results-stale-note { border:2px solid #b91c1c; background:#fef2f2; color:#7f1d1d; border-radius:.5rem; padding:.6rem .8rem; font-size:.85rem; font-weight:600; }
         @media print { .f-fold:not([open]) > .f-fold-body { display:block; } }
 
         /* v2.0 — Copy-for-Documentation Feedback-Animation */
@@ -258,6 +261,7 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase">Patienten-ID / Name</label>
                     <input type="text" id="patient-id" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. Station A, Bett 4">
+                    <button type="button" id="btn-new-child" class="mt-1 text-xs font-bold text-blue-700 underline hover:text-blue-900">Neues Kind (alle Eingaben und den Verlauf leeren)</button>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase">Geburtsgewicht (g)</label>
@@ -268,8 +272,9 @@
                     <input type="number" id="current-weight" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="z.B. 1180">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase">Gewicht gestern (g)</label>
-                    <input type="number" id="yesterday-weight" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="optional">
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Gewicht gestern (g, optional)</label>
+                    <input type="number" id="yesterday-weight" class="w-full border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1" placeholder="nur für die Wachstumsrate">
+                    <p id="yesterday-weight-note" class="text-[11px] text-gray-500 mt-0.5"></p>
                 </div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
@@ -712,7 +717,8 @@
             </section>
 
             <!-- Results Panel -->
-            <section class="space-y-4">
+            <section id="results-panel" class="space-y-4">
+              <div id="results-stale-note" class="hidden" role="status">⚠ Keine gültige Berechnung. Die Werte darunter sind nicht aktuell. Bitte zuerst die rot gemeldete Eingabe korrigieren.</div>
 
               <!-- v3.0 — SMART DEFAULTS: Tages-basierte Startwert-Vorschläge (1-Klick bestätigen) -->
 
@@ -1103,9 +1109,9 @@
 
     <!-- App Logic -->
     <!-- ?v= umgeht den Browser-Cache; muss zu EXPECTED_CALC_VERSION und calculator.VERSION passen (Test W1) -->
-    <script src="products.js?v=3.6.22"></script>
-    <script src="fenton_data.js?v=3.6.22"></script>
-    <script src="calculator.js?v=3.6.22"></script>
+    <script src="products.js?v=3.6.23"></script>
+    <script src="fenton_data.js?v=3.6.23"></script>
+    <script src="calculator.js?v=3.6.23"></script>
     <script>
         function toggleSection(id) {
             const el = document.getElementById(id);
@@ -1161,7 +1167,7 @@
             const calculator = new NutritionCalculator();
             // Muss mit calculator.VERSION übereinstimmen. Sonst läuft die Oberfläche mit einem
             // veralteten Rechenkern und zeigt falsche oder leere Werte (v3.5.1).
-            const EXPECTED_CALC_VERSION = '3.6.22';
+            const EXPECTED_CALC_VERSION = '3.6.23';
             { const v = document.getElementById('app-version'); if (v) v.textContent = 'v' + (calculator.VERSION || '?'); }
 
             // Tippy tooltips
@@ -1626,7 +1632,9 @@
                 if (val !== null) {
                     const el = document.getElementById(id);
                     if (!el) return;
-                    if (id === 'input-invasive-ventilation') {
+                    // v3.6.23: Alle Haken werden als angehakt/nicht angehakt gespeichert. Vorher galt das nur für die Beatmung;
+                    // die Nahrungspause ging beim Neuladen verloren und die App empfahl wieder den Nahrungsaufbau.
+                    if (el.type === 'checkbox') {
                         el.checked = val === 'true';
                     } else {
                         el.value = val;
@@ -1690,8 +1698,10 @@
                 if (!el) return;
                 const eventName = selectIds.includes(id) ? 'change' : 'input';
                 el.addEventListener(eventName, () => {
-                    const storedValue = id === 'input-invasive-ventilation' ? el.checked : el.value;
+                    const storedValue = el.type === 'checkbox' ? el.checked : el.value;
                     localStorage.setItem(id, storedValue);
+                    // v3.6.23: Das Vortagsgewicht gilt nur für den Lebenstag, an dem es eingetragen wurde
+                    if (id === 'yesterday-weight') localStorage.setItem('neo-yesterday-weight-day', document.getElementById('input-day').value);
                     if (id === 'input-tfi' || id === 'input-tfi-unit') {
                         localStorage.setItem('neo-tfi-semantics', 'infusion');
                         const hinweis = document.getElementById('tfi-semantics-note');
@@ -1844,11 +1854,13 @@
                     manualInputs.classList.add('hidden');
                     const sol = NeoProducts.parenteralSolutions.find(s => s.id === solId);
                     if (sol) {
+                        // v3.6.23: Zusammensetzung je 100 ml (Stations-Verordnungstabelle) und Zufuhr beim Zielvolumen
+                        const c = sol.per100ml;
                         const p = sol.perKgAtTarget;
-                        let html = `<p class="font-bold text-blue-800">${sol.name} (Ziel: ${sol.targetVolume} ml/kg)</p>`;
-                        html += `<p>AS: ${p.aminoAcids} g/kg | Gluc: ${p.glucose} g/kg</p>`;
-                        html += `<p>Na: ${p.sodium} mmol/kg | K: ${p.potassium} mmol/kg</p>`;
-                        html += `<p>Ca: ${p.calcium} mmol/kg | P: ${p.phosphate} mmol/kg</p>`;
+                        const n = (x, d = 2) => (Math.round(x * Math.pow(10, d)) / Math.pow(10, d)).toString().replace('.', ',');
+                        let html = `<p class="font-bold text-blue-800">${sol.name}</p>`;
+                        html += `<p><span class="font-semibold">Je 100 ml:</span> Aminosäuren ${n(c.aminoAcids)} g | Glukose ${n(c.glucose)} g | Na ${n(c.sodium)} | K ${n(c.potassium)} | Ca ${n(c.calcium)} | Phosphat ${n(c.phosphate)} mmol</p>`;
+                        html += `<p><span class="font-semibold">Bei ${sol.targetVolume} ml/kg/d:</span> Aminosäuren ${n(p.aminoAcids, 1)} g/kg/d | Glukose ${n(p.glucose, 1)} g/kg/d (${n(p.glucose * 1000 / 1440, 1)} mg/kg/min) | Na ${n(p.sodium, 1)} | K ${n(p.potassium, 1)} | Ca ${n(p.calcium, 1)} | Phosphat ${n(p.phosphate, 1)} mmol/kg/d</p>`;
                         if (sol.micronutrients) {
                             const m = sol.micronutrients;
                             html += `<p class="mt-1 text-purple-700">Mikro: Soluvit ${m.soluvit}ml, Peditrace ${m.peditrace}ml, Zn ${m.zinc_umol}µmol, Cu ${m.copper_umol}µmol, Se ${m.selenium_nmol}nmol, Mn ${m.manganese_nmol}nmol, I ${m.iodine_umol}µmol</p>`;
@@ -1864,6 +1876,37 @@
                 updateSolutionUI();
                 updateCalculations();
             });
+
+            // v3.6.23: Nach einem Eingabefehler bleiben die alten Ergebnisse zwar stehen, werden aber ausgegraut und
+            // beschriftet; der Doku-Text ist geleert, damit nichts Veraltetes in die Akte kopiert wird.
+            function markResultsStale(stale) {
+                const panel = document.getElementById('results-panel');
+                const note = document.getElementById('results-stale-note');
+                if (panel) panel.classList.toggle('results-stale', stale);
+                if (note) note.classList.toggle('hidden', !stale);
+                if (stale) {
+                    lastDocumentationString = '';
+                    ['qv-weight-velocity', 'qv-kcal', 'qv-safety'].forEach(id => { const e = document.getElementById(id); if (e) e.innerText = '–'; });
+                    const sub = document.getElementById('qv-safety-sub'); if (sub) sub.innerText = 'keine gültige Berechnung';
+                    const totSub = document.getElementById('tfi-total-sub'); if (totSub) totSub.textContent = 'keine gültige Berechnung';
+                }
+            }
+            window.markResultsStale = markResultsStale;
+
+            // v3.6.23: Der Verlauf gehört zu einem Kind. Jeder berechnete Tag trägt das Geburtsgewicht als Kennung (_bw);
+            // Tage mit anderer Kennung (anderes Kind am selben Gerät) werden für Vortagsgewicht, Energiedefizit,
+            // Natrium-Trend und Verlaufskurven nicht verwendet. Tage ohne Kennung (ältere Speicherstände) zählen mit.
+            function childKey() { return String(document.getElementById('birth-weight').value || '').trim(); }
+            function childHistory() {
+                const key = childKey();
+                const out = {};
+                Object.keys(history).forEach(d => {
+                    const h = history[d];
+                    if (h && (h._bw === undefined || h._bw === key)) out[d] = h;
+                });
+                return out;
+            }
+            window.childHistory = childHistory;
 
             window.updateCalculations = function updateCalculations() {
                 // --- Versions-Wächter: nie mit einem veralteten Rechenkern rechnen ---
@@ -1882,9 +1925,29 @@
                 // Leere Felder gehen unverändert an calculate(), das dann abbricht.
                 const currentWeight = document.getElementById('current-weight').value;
 
-                const prevDayData = history[String(day - 1)];
-                const yesterdayWeightRaw = document.getElementById('yesterday-weight').value;
-                const previousWeight = yesterdayWeightRaw ? parseFloat(yesterdayWeightRaw) : (prevDayData ? parseFloat(prevDayData['current-weight']) : null);
+                // v3.6.23: Das Vortagsgewicht ist optional. Es kommt aus dem Feld „Gewicht gestern“ oder aus dem Verlauf
+                // desselben Kindes; fehlt beides, wird keine Wachstumsrate berechnet. Vorher brach die App mit
+                // „previousWeight: NaN“ ab, wenn am Vortag kein Gewicht neu eingetippt worden war.
+                const ywEl = document.getElementById('yesterday-weight');
+                const ywDay = localStorage.getItem('neo-yesterday-weight-day');
+                if (ywEl.value !== '' && ywDay !== null && ywDay !== String(day)) {
+                    // gestern eingetragener Wert: gehört zu einem anderen Lebenstag
+                    ywEl.value = '';
+                    localStorage.removeItem('yesterday-weight');
+                    localStorage.removeItem('neo-yesterday-weight-day');
+                }
+                const kindVerlauf = childHistory();
+                const prevDayData = kindVerlauf[String(day - 1)];
+                const posNum = v => { const x = parseFloat(v); return isFinite(x) && x > 0 ? x : null; };
+                const ywManual = posNum(ywEl.value);
+                const ywHistory = prevDayData ? posNum(prevDayData['current-weight']) : null;
+                const previousWeight = ywManual !== null ? ywManual : ywHistory;
+                const ywNote = document.getElementById('yesterday-weight-note');
+                if (ywNote) {
+                    ywNote.textContent = ywManual !== null ? ''
+                        : (ywHistory !== null ? `aus dem Verlauf: ${ywHistory} g (Tag ${day - 1})`
+                            : (day > 1 ? 'kein Gewicht von gestern bekannt: keine Wachstumsrate' : ''));
+                }
 
                 const rawUrea = document.getElementById('input-urea').value;
                 const rawTg = document.getElementById('input-triglycerides').value;
@@ -2004,7 +2067,7 @@
                     microVolume: document.getElementById('input-micro-vol-hidden').value || 0,
                     // v3.0 — Verlaufsdaten (anonym, nur Tag-Keys) für Predictive Analytics
                     // (Energy-Gap, Sodium-Trend) + Smart-Default-Kontext.
-                    history: history
+                    history: kindVerlauf
                 };
 
                 // --- Safety-Layer: ValidationError aus calculator.js sauber abfangen ---
@@ -2030,8 +2093,9 @@
                         }
                         const totErr = document.getElementById('tfi-total-value');
                         if (totErr) totErr.textContent = '–';
+                        markResultsStale(true);
                         console.warn('[ValidationError]', err.field, err.message);
-                        return; // displayResults überspringen — alte Werte bleiben unverändert
+                        return; // displayResults überspringen; die alten Werte sind als veraltet gekennzeichnet
                     }
                     // Andere Fehler: ebenfalls anzeigen, App nicht abstürzen lassen
                     if (errMsg) errMsg.textContent = `Unerwarteter Fehler: ${err && err.message ? err.message : err}`;
@@ -2040,12 +2104,14 @@
                         errBanner.classList.remove('hidden');
                         errBanner.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
+                    markResultsStale(true);
                     console.error('[Calculator Error]', err);
                     return;
                 }
 
                 // Erfolgreiche Berechnung → Banner ausblenden
                 if (errBanner) errBanner.classList.add('hidden');
+                markResultsStale(false);
                 displayResults(res, data);
             }
 
@@ -2202,7 +2268,7 @@
                         phEl.className = `text-[10px] font-bold px-2 py-0.5 rounded text-white ${ph.cls}`;
                     }
                     const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.innerText = txt; };
-                    setTxt('res-enteral-current', `${r.enteralVolKg} ml/kg/d`);
+                    setTxt('res-enteral-current', `${Math.round(r.enteralVolKg * 10) / 10} ml/kg/d`);
                     setTxt('res-enteral-goal', `${r.enteralTarget.min}–${r.enteralTarget.max} ml/kg/d`);
                     setTxt('res-enteral-expected', `~${r.enteralExpectedToday} ml/kg/d`);
                     const advEl = document.getElementById('res-enteral-advice');
@@ -2363,10 +2429,11 @@
                 // Safety Modal
                 const checklist = document.getElementById('safety-checklist');
                 const checks = [
-                    { name: 'Flüssigkeitsziel (TFI)', status: res.comparisons.tfi.status, val: `${data.tfi} ml/kg` },
+                    { name: 'Flüssigkeitsziel (TFI)', status: res.comparisons.tfi.status, val: `${Math.round(Number(data.tfi) * 10) / 10} ml/kg` },
                     { name: 'GIR', status: res.safetyChecks.gir ? 'green' : 'red', val: `${r.effectiveGIR} mg/kg/min` },
                     { name: 'Eiweiß-Zufuhr', status: res.comparisons.protein.status, val: `${r.proteinTotalGPerKg} g/kg` },
-                    { name: 'Lipid-Zufuhr', status: res.comparisons.lipids.status, val: `${r.lipidsPNKg} g/kg` },
+                    { name: 'Lipid-Zufuhr i. v.', status: res.comparisons.lipids.status === 'neutral' ? 'green' : res.comparisons.lipids.status,
+                      val: res.comparisons.lipids.status === 'neutral' ? 'keine Infusion, nicht bewertet' : `${r.lipidsPNKg} g/kg` },
                     { name: 'Gesamt-Energie', status: res.comparisons.energy.status, val: `${r.kcalPerKg} kcal/kg` },
                     { name: 'Osmolarität (PN)', status: res.safetyChecks.osm ? 'green' : 'red', val: `${r.osmolarity} mOsm/l` }
                 ];
@@ -2444,6 +2511,7 @@
                 try {
                     const curDay = parseInt(document.getElementById('input-day').value) || 1;
                     if (!history[String(curDay)]) history[String(curDay)] = {};
+                    history[String(curDay)]._bw = childKey();
                     if (typeof r.kcalPerKg === 'number' && isFinite(r.kcalPerKg)) {
                         history[String(curDay)]['_kcal-kg'] = r.kcalPerKg;
                     }
@@ -2459,7 +2527,7 @@
                 renderTrendCard();
 
                 // v3.0 — Energy-Gap-Index + Smart Defaults rendern (frische History).
-                renderEGI(history);
+                renderEGI(childHistory());
             }
 
             // B1: Liest aus dem history-Objekt die letzten ≤7 Tage für ein bestimmtes
@@ -2470,8 +2538,9 @@
                 const start = Math.max(1, curDay - (maxDays - 1));
                 const values = [];
                 const days = [];
+                const verlauf = childHistory();
                 for (let d = start; d <= curDay; d++) {
-                    const dd = history[String(d)];
+                    const dd = verlauf[String(d)];
                     if (!dd) continue;
                     const raw = dd[field];
                     if (raw === undefined || raw === null || raw === '') continue;
@@ -2562,13 +2631,15 @@
                 doc.save(`Nutrition_${pId.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
             });
 
-            // Reset
-            document.getElementById('btn-reset').addEventListener('click', () => {
-                if (confirm('Alle Eingaben löschen?')) {
+            // Reset / Neues Kind (v3.6.23: zweiter Knopf oben bei den Patientendaten)
+            const resetAll = () => {
+                if (confirm('Alle Eingaben und den gespeicherten Verlauf löschen?')) {
                     localStorage.clear();
                     location.reload();
                 }
-            });
+            };
+            document.getElementById('btn-reset').addEventListener('click', resetAll);
+            document.getElementById('btn-new-child').addEventListener('click', resetAll);
 
             // Initial
             updateSolutionUI();

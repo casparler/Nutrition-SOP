@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.22';
+        this.VERSION = '3.6.23';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -117,7 +117,11 @@ class NutritionCalculator {
         this.WEIGHT_COURSE = {
             minLossPercentByDay3: 2,
             maxLossPercent: 15,
-            regainByDay: 14
+            regainByDay: 14,
+            // v3.6.23: Mehr als 15 % Unterschied zwischen dem Gewicht von gestern und heute ist an einem Tag
+            // nicht möglich (physiologisch rund 3 % pro Tag). Dann stammt das Vortagsgewicht von einem anderen
+            // Kind oder ist ein Tippfehler; die Wachstumsrate wird nicht berechnet (REGELWERK 13.9).
+            maxDailyChangePercent: 15
         };
         this.LIPID_TARGETS = {
             1: { min: 1.0, max: 2.0 },
@@ -532,7 +536,7 @@ class NutritionCalculator {
                 ? `Kritische Befunde (${criticals.length}) — sofortige Re-Evaluation`
                 : 'Sicherheits-Limit überschritten — Plan anpassen';
         } else if (attentions.length > 0 ||
-                   ['protein', 'energy', 'lipids', 'tfi'].some(k => c[k] && c[k].status !== 'green')) {
+                   ['protein', 'energy', 'lipids', 'tfi'].some(k => c[k] && c[k].status !== 'green' && c[k].status !== 'neutral')) {
             status = 'attention';
             headline = 'Aufmerksamkeit erforderlich — gezielte Anpassungen empfohlen';
         } else {
@@ -550,7 +554,7 @@ class NutritionCalculator {
         // 2) Target-Bewertungen (Energie, Protein, Lipide, TFI)
         const targetBullet = (key, label, unit) => {
             const cm = c[key];
-            if (!cm || !cm.target) return;
+            if (!cm || !cm.target || cm.status === 'neutral') return;
             const v = cm.value;
             const t = cm.target;
             if (cm.status === 'green') {
@@ -617,8 +621,16 @@ class NutritionCalculator {
         if (status === 'critical') {
             summary = `${phase.label}: ${criticals.length} kritische(r) Befund(e). Plan vor nächster Infusionsbestellung überarbeiten.`;
         } else if (status === 'attention') {
-            const drift = bullets.filter(b => b.kind === 'warning').length;
-            summary = `${phase.label}: ${drift} Optimierungspunkt${drift === 1 ? '' : 'e'} identifiziert — siehe Befunde.`;
+            // v3.6.23: Die Abweichungen werden beim Namen genannt. Vorher stand hier „2 Optimierungspunkte — siehe Befunde“,
+            // während die Befundliste leer sein konnte (die Aufzählung dazu wird in der Oberfläche nicht mehr gezeigt).
+            const NAMEN = { protein: 'Eiweiß', energy: 'Energie', lipids: 'Lipide i. v.', tfi: 'Gesamtflüssigkeit' };
+            const abweichungen = ['tfi', 'protein', 'energy', 'lipids']
+                .filter(k => c[k] && c[k].target && c[k].status !== 'green' && c[k].status !== 'neutral')
+                .map(k => `${NAMEN[k]} ${c[k].value < c[k].target.min ? 'unter' : 'über'} Ziel (${c[k].value}, Ziel ${c[k].target.min}–${c[k].target.max})`);
+            const teile = [];
+            if (abweichungen.length) teile.push(abweichungen.join('; '));
+            if (attentions.length) teile.push(`${attentions.length} Meldung${attentions.length === 1 ? '' : 'en'} in den Befunden`);
+            summary = `${phase.label}: ${teile.join(' · ')}.`;
         } else {
             summary = `${phase.label}: Stabile Zufuhr, Plan kann fortgeführt werden.`;
         }
@@ -666,8 +678,11 @@ class NutritionCalculator {
         const fm85 = parseFloat(input.fm85Percent) || 0;
         const ep = input.selectedEnteralProduct || 'ebm';
         const enteralName = { ebm: 'EBM', bebaFG1: 'Beba FG 1', bebaFG2: 'Beba FG 2',
-                              aptamilPre: 'Aptamil Pre', hippPre: 'Hipp Pre' }[ep] || ep;
-        const enteralLabel = fm85 > 0 ? `${enteralName} + FM85 ${fm85}%` : enteralName;
+                              aptamilPre: 'Aptamil Pre', hippPre: 'Hipp Pre', neocate: 'Neocate' }[ep] || ep;
+        // v3.6.23: FM85 nur nennen, wenn es auch gerechnet wurde (bei Formelnahrung wird es ignoriert)
+        const prep = r.preparation || {};
+        const fm85Wirksam = Number(prep.fm85Percent) > 0 ? Number(prep.fm85Percent) : 0;
+        const enteralLabel = fm85Wirksam > 0 ? `${enteralName} + FM85 ${fm85Wirksam}%` : enteralName;
 
         const lipidProd = input.selectedLipidProduct === 'smoflipid20' ? 'SMOFlipid 20%' : 'Standard 20%';
         const sol = input.selectedSolution && input.selectedSolution !== 'none'
@@ -681,7 +696,7 @@ class NutritionCalculator {
 
         const lines = [];
         lines.push(`Ernährung Tag ${day} (${cw} g, korr. ${corrGA} SSW, ${phase.label}):`);
-        lines.push(`- TFI ${num(input.tfi, 0)} ml/kg/d (Ziel ${res.targets.tfi.min}–${res.targets.tfi.max})`);
+        lines.push(`- TFI ${num(input.tfi, 0)} ml/kg/d (Gesamtflüssigkeit inkl. enteral, Ziel ${res.targets.tfi.min}–${res.targets.tfi.max})`);
 
         if (r.enteralDaily > 0 || parseFloat(input.enteralVolume) > 0) {
             const portion = r.singlePortion ? `, ${input.mealFrequency || 8}× ${num(r.singlePortion)} ml` : '';
@@ -691,6 +706,15 @@ class NutritionCalculator {
         if (r.feedingPaused) {
             lines.push(`- Enteral: Nahrungspause (${r.feedingPauseReason})`);
         }
+        // v3.6.23: Anreicherung mit Menge je Mahlzeit dokumentieren (fehlte bisher ganz)
+        const anr = [];
+        if (fm85Wirksam > 0) {
+            anr.push(`FM85 ${num(fm85Wirksam, 1)} % (${num(prep.fm85GramsPerMeal, 2)} g Pulver je Mahlzeit)`);
+        }
+        if (Number(prep.proteinAddPer100ml) > 0) {
+            anr.push(`Eiweiß-Zusatz ${num(prep.proteinAddPer100ml, 2)} g/100 ml (${num(prep.proteinAddGramsPerMeal, 2)} g Eiweiß je Mahlzeit)`);
+        }
+        if (anr.length) lines.push(`- Anreicherung: ${anr.join(', ')}`);
         // v3.1: Enterale Supplemente separat dokumentieren
         const supp = [];
         if (parseFloat(input.liquigenMlKg) > 0) {
@@ -701,10 +725,22 @@ class NutritionCalculator {
         }
         if (supp.length) lines.push(`- Supplemente: ${supp.join(', ')}`);
 
+        // v3.6.23: „AS“ nennt die Aminosäuren aus der Infusion (vorher stand hier das Gesamteiweiß inkl. enteral).
+        // Läuft Volumen ohne eingetragenen Inhalt (keine Glukose, keine Aminosäuren), wird das so benannt statt „PN … GIR 0,0“.
         if (r.pnDaily > 0) {
-            lines.push(`- PN ${num(r.pnDaily, 0)} ml/d (${sol}, ${access}) → GIR ${num(r.effectiveGIR)} mg/kg/min, AS ${num(r.proteinTotalGPerKg, 2)} g/kg/d`);
-            lines.push(`- Lipide ${num(r.lipidsPNKg, 1)} g/kg/d (${lipidProd}, ${num(r.lipidVolDaily, 1)} ml/d)`);
+            const pnHatInhalt = Number(r.effectiveAS_GKg) > 0 || Number(r.glucoseConc) > 0;
+            if (pnHatInhalt) {
+                lines.push(`- PN ${num(r.pnDaily, 0)} ml/d (${sol}, ${access}) → GIR ${num(r.effectiveGIR)} mg/kg/min, AS ${num(r.effectiveAS_GKg, 2)} g/kg/d`);
+            } else {
+                lines.push(`- Infusion ${num(r.pnDaily, 0)} ml/d ohne eingetragenen Inhalt (keine Glukose, keine Aminosäuren)`);
+            }
         }
+        if (r.lipidsPNKg > 0) {
+            lines.push(`- Lipide i. v. ${num(r.lipidsPNKg, 1)} g/kg/d (${lipidProd}, ${num(r.lipidVolDaily, 1)} ml/d)`);
+        }
+        // v3.6.23: Eiweiß immer ausweisen, getrennt nach Infusion und enteral (fehlte bei voll enteral ernährten Kindern)
+        const eiweissEnteral = Math.max(0, Number(r.proteinTotalGPerKg) - Number(r.effectiveAS_GKg || 0));
+        lines.push(`- Eiweiß gesamt ${num(r.proteinTotalGPerKg, 2)} g/kg/d (Infusion ${num(r.effectiveAS_GKg, 2)} / enteral ${num(eiweissEnteral, 2)}; Ziel ${res.targets.protein.min}–${res.targets.protein.max})`);
 
         const caP = r.caPRatio > 0 ? `Ca:P ${num(r.caPRatio, 2)}:1` : 'Ca:P –';
         const paa = r.paaRatio > 0 ? `P:AA ${num(r.paaRatio, 2)} mmol/g` : 'P:AA –';
@@ -771,7 +807,10 @@ class NutritionCalculator {
         // Elektrolyte, auch wenn der Titel „TFI < 100“ lautet). Sonst entscheidet der
         // Titel; erst dann der Volltext. Ohne diese Reihenfolge landete „TFI 220 ist
         // sehr hoch“ wegen des Wortes „Serum-Natrium“ im Detail bei den Elektrolyten.
-        const STRONG = [{ id: 'electrolytes', re: /Hypernatri|Hyperkali|Hypokali/ }];
+        // v3.6.23: Lipid- und Triglyzerid-Meldungen gehören zu „Eiweiß & Energie“. Vorher landete der Triglyzerid-Hinweis
+        // wegen „Geburtsgewicht bis 1000 g“ bei Wachstum und der Lipid-Anteil wegen „(parenteral + enteral)“ bei Enteral.
+        const STRONG = [{ id: 'electrolytes', re: /Hypernatri|Hyperkali|Hypokali/ },
+                        { id: 'macro', re: /Triglyz|Lipid-Anteil|Lipide i\. v\./ }];
         const domainOf = (text, title) => {
             const strong = STRONG.find(x => x.re.test(text));
             if (strong) return DOMAINS.find(d => d.id === strong.id);
@@ -1178,10 +1217,16 @@ class NutritionCalculator {
         // --- Step 0b: Growth Velocity ---
         let weightVelocity = 'Initial';
         const previousWeight = input.previousWeight != null ? parseFloat(input.previousWeight) : null;
+        let previousWeightImplausible = null;
         if (previousWeight && previousWeight > 0) {
-            const gv = this.calculateGrowthVelocity(currentWeightG.toNumber(), previousWeight);
-            if (gv !== null) {
-                weightVelocity = gv;
+            const tagesAenderungPct = Math.abs(currentWeightG.toNumber() - previousWeight) / previousWeight * 100;
+            if (currentWeightG.gt(0) && tagesAenderungPct > this.WEIGHT_COURSE.maxDailyChangePercent) {
+                previousWeightImplausible = { previous: previousWeight, current: currentWeightG.toNumber(), percent: Math.round(tagesAenderungPct) };
+            } else {
+                const gv = this.calculateGrowthVelocity(currentWeightG.toNumber(), previousWeight);
+                if (gv !== null) {
+                    weightVelocity = gv;
+                }
             }
         } else if (input.weightVelocity !== undefined && input.weightVelocity !== 'Initial') {
             weightVelocity = input.weightVelocity;
@@ -1748,14 +1793,18 @@ class NutritionCalculator {
             // Zielkonzentration beim aktuellen Volumen noch möglich wäre. Über
             // die Eingabe als g/100 ml ist die Grenze sonst leicht zu übersehen.
             if (enteralVolKg.gt(0) && (fm85Percent > 0 || n.proteinAddPer100ml > 0)) {
-                const maxGesamtPer100 = D(this.LIMITS.PROTEIN.max).times(100).div(enteralVolKg);
+                // v3.6.23: Für die enterale Zufuhr bleibt nur, was die Infusion übrig lässt. Vorher wurde mit der vollen
+                // Obergrenze gerechnet („FM85 höchstens 17,5 % möglich“ bei laufender Aminosäuren-Infusion).
+                const enteralErlaubt = Decimal.max(0, D(this.LIMITS.PROTEIN.max).minus(n.effectiveAS));
+                const maxGesamtPer100 = enteralErlaubt.times(100).div(enteralVolKg);
+                const infusionsAnteil = n.effectiveAS > 0 ? ` Die Infusion liefert ${n.effectiveAS} g/kg/d Aminosäuren, das ist abgezogen.` : '';
                 const basisPer100 = D(n.proteinPer100mlFinal).minus(n.proteinAddPer100ml);
                 const moeglicherZusatz = Decimal.max(0, maxGesamtPer100.minus(basisPer100)).toDecimalPlaces(2);
                 warnings.push(
                     `Hinweis: Treiber ist die Anreicherung — ${n.proteinPer100mlFinal} g Eiweiß/100 ml ` +
-                    `bei ${n.enteralVolKg} ml/kg/d. Ohne Überschreitung wären bei diesem Volumen höchstens ` +
+                    `bei ${this._round(n.enteralVolKg, 1)} ml/kg/d. Ohne Überschreitung wären bei diesem Volumen höchstens ` +
                     `${moeglicherZusatz.toNumber()} g/100 ml Zusatz möglich (aktuell ${n.proteinAddPer100ml}). ` +
-                    `Alternativ das enterale Volumen oder die FM85-Stufe senken.`
+                    `Alternativ das enterale Volumen oder die FM85-Stufe senken.${infusionsAnteil}`
                 );
                 // v3.5: Ist FM85 der Treiber, nennt der Zusatz allein (0 g/100 ml) keinen
                 // Ausweg. Hier die noch mögliche FM85-Stufe beim aktuellen Volumen.
@@ -1764,7 +1813,7 @@ class NutritionCalculator {
                     const maxFm85 = Decimal.max(0, maxGesamtPer100.minus(ohneFm85).div(this.FM85_PER_PERCENT.protein));
                     const maxFm85Step = maxFm85.div('0.5').floor().times('0.5').toNumber();
                     warnings.push(
-                        `Hinweis: Bei ${n.enteralVolKg} ml/kg/d und aktuellem Eiweißzusatz wäre FM85 höchstens ` +
+                        `Hinweis: Bei ${this._round(n.enteralVolKg, 1)} ml/kg/d und aktuellem Eiweißzusatz wäre FM85 höchstens ` +
                         `${maxFm85Step} % möglich (aktuell ${fm85Percent} %).`
                     );
                 }
@@ -1850,7 +1899,7 @@ class NutritionCalculator {
 
         // BLIND-7: Enteral volume exceeds TFI
         if (enteralVolKg.gt(tfi) && tfi.gt(0)) {
-            warnings.push(`Warnung: Enterale Zufuhr (${n.enteralVolKg} ml/kg/d) übersteigt TFI (${tfi.toNumber()} ml/kg/d) – Volumen prüfen.`);
+            warnings.push(`Warnung: Enterale Zufuhr (${this._round(n.enteralVolKg, 1)} ml/kg/d) übersteigt TFI (${this._round(tfi.toNumber(), 1)} ml/kg/d) – Volumen prüfen.`);
         }
 
         // --- v3.1: Gestufte TFI-Signalisierung statt hartem Stopp bei 200 ---
@@ -1878,7 +1927,9 @@ class NutritionCalculator {
         // das Behandlungsteam anhand der Toleranz.
         const et = targets.enteralTarget;
         const er = targets.enteralRamp;
+        // v3.6.23: in Meldungen auf eine Nachkommastelle gerundet (vorher „8.333 ml/kg/d“ bei Eingabe je Mahlzeit)
         const entNum = n.enteralVolKg;
+        const entTxt = this._round(n.enteralVolKg, 1);
         let enteralPhase;
         if (feedingPaused) enteralPhase = 'paused';
         else if (entNum <= 0) enteralPhase = 'none';
@@ -1898,7 +1949,7 @@ class NutritionCalculator {
             if (gap >= 10) {
                 const stepNow = Math.min(er.step, gap);
                 warnings.push(
-                    `Hinweis: Enteral ${entNum} ml/kg/d liegt ${gap} ml/kg/d unter dem Aufbau-Korridor ` +
+                    `Hinweis: Enteral ${entTxt} ml/kg/d liegt ${gap} ml/kg/d unter dem Aufbau-Korridor ` +
                     `für Lebenstag ${postnatalAge} (~${er.expected} ml/kg/d, Ziel ${et.min}–${et.max} ml/kg/d). ` +
                     `Steigerung um ${stepNow} ml/kg/d erwägen — nur bei guter Toleranz ` +
                     `(weiches Abdomen, unauffällige Reste, kein NEC-Verdacht, stabile Kreislaufsituation).`
@@ -1908,7 +1959,7 @@ class NutritionCalculator {
         if (enteralPhase === 'full') {
             if (n.pnDaily > 0) {
                 reminders.push(
-                    `💡 Enterales Ziel erreicht (${entNum} ml/kg/d ≥ ${et.min}) — Beendigung der parenteralen Ernährung prüfen.`
+                    `💡 Enterales Ziel erreicht (${entTxt} ml/kg/d ≥ ${et.min}) — Beendigung der parenteralen Ernährung prüfen.`
                 );
             }
             if (entNum > et.max) {
@@ -1917,7 +1968,7 @@ class NutritionCalculator {
                     ? `Die Energie liegt bereits an der Obergrenze (${n.kcalPerKg} kcal/kg/d, Ziel ${targets.energy.min}–${targets.energy.max}) — keine weitere Anreicherung.`
                     : 'Bei unzureichendem Wachstum vertretbar — vorrangig Anreicherung statt Volumen steigern.';
                 warnings.push(
-                    `Hinweis: Enteral ${entNum} ml/kg/d oberhalb des Zielkorridors (${et.min}–${et.max} ml/kg/d, ${et.label}). ` + empfehlung
+                    `Hinweis: Enteral ${entTxt} ml/kg/d oberhalb des Zielkorridors (${et.min}–${et.max} ml/kg/d, ${et.label}). ` + empfehlung
                 );
             }
         }
@@ -2079,6 +2130,13 @@ class NutritionCalculator {
         const hatAktuellesGewicht = input.currentWeight !== undefined
             && input.currentWeight !== null && input.currentWeight !== ''
             && currentWeightG.gt(0) && birthWeightG.gt(0);
+        if (previousWeightImplausible) {
+            warnings.push(
+                `Warnung: Gewicht gestern (${previousWeightImplausible.previous} g) passt nicht zum aktuellen Gewicht ` +
+                `(${previousWeightImplausible.current} g): ${previousWeightImplausible.percent} % Unterschied an einem Tag. ` +
+                `Die Wachstumsrate wird nicht berechnet. Vortagsgewicht prüfen; bei einem anderen Kind zuerst „Neues Kind“ wählen.`
+            );
+        }
         let weightChangePercent = null;
         if (hatAktuellesGewicht) {
             weightChangePercent = currentWeightG.minus(birthWeightG)
@@ -2154,7 +2212,11 @@ class NutritionCalculator {
         const comparisons = {
             tfi: { value: tfi.toNumber(), target: targets.tfi, status: checkStatus(tfi.toNumber(), targets.tfi) },
             protein: { value: n.proteinTotalGKg, target: targets.protein, status: checkStatus(n.proteinTotalGKg, targets.protein) },
-            lipids: { value: n.lipidsPNKg, target: targets.lipidTarget, status: checkStatus(n.lipidsPNKg, targets.lipidTarget) },
+            // v3.6.23: Das Lipidziel gilt für Lipide über die Vene. Läuft keine Infusion (kein PN-Volumen, keine Lipide),
+            // wird es nicht bewertet (vorher: „Lipide-Target unterschritten: 0 g/kg/d“ bei voll enteral ernährten Kindern).
+            lipids: (!hasPNVolume && n.lipidsPNKg === 0)
+                ? { value: 0, target: targets.lipidTarget, status: 'neutral', notApplicable: true }
+                : { value: n.lipidsPNKg, target: targets.lipidTarget, status: checkStatus(n.lipidsPNKg, targets.lipidTarget) },
             energy: { value: n.kcalPerKg, target: targets.energy, status: checkStatus(n.kcalPerKg, targets.energy) },
             // v3.2: Das enterale Volumen wird gegen den Korridor des AKTUELLEN
             // Lebenstags bewertet, nicht gegen das Endziel — sonst leuchtet die

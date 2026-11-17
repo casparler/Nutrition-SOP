@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 01.11.2026, Version v3.6.22, 322 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 17.11.2026, Version v3.6.23, 341 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -130,6 +130,7 @@ darüber nur in Studien (ESPGHAN 2018).
 | 7.4 | Lipidanteil an Nicht-Protein-Energie unter 25 % oder über 50 % → Warnung | Leitlinie | `calculate` | – |
 | 7.5 | Lipid unter Tagesziel bei laufender PN → Erinnerung | Haus | `calculate` | – |
 | 7.6 | Lipidvolumen größer als PN-Volumen → CRITICAL | Technisch | `calculate` | – |
+| 7.7 | **Das Lipidziel (7.1) gilt für Lipide über die Vene und wird nur bei laufender Infusion bewertet.** Ohne PN-Volumen und ohne Lipide i. v. ist die Ampel neutral, es gibt keine Aussage „Lipide-Target unterschritten“ und der Status wird dadurch nicht „Aufmerksamkeit“. Bei laufender PN wie bisher | Fehlerkorrektur 17.11.2026 (aus der kritischen Prüfung; passt zu 7.5) | `calculate` (comparisons), `generateClinicalAssessment` | AT13, AT14 |
 
 ## 8. Glukose und Osmolarität
 
@@ -140,6 +141,31 @@ darüber nur in Studien (ESPGHAN 2018).
 | 8.3 | **GIR unter 3 bei laufendem PN-Volumen → CRITICAL**, gilt auch für GIR = 0. Bewertet wird die Gesamt-Glukose inklusive enteraler Kohlenhydrate | Entscheidung 02.10.2026 | `calculate` Step 12 | S2, S3, T1 |
 | 8.4 | Peripherer Zugang: Glukosekonzentration > 12,5 % → CRITICAL; Osmolarität > 900 mOsm/l → CRITICAL | Haus | `calculate` | – |
 | 8.5 | Plausibilitäts-Flag bei GIR < 1 oder > 18 | Technisch | `calculate` | – |
+
+## 8a. Hauslösungen (v3.6.23)
+
+Quelle: Stations-Verordnungstabelle „IntensivVerordnung KITS PZ September 2023“, Blatt „Eingabemaske“
+(Zellen V4:AD10 und W22:AK58), übermittelt vom Neonatologen am 17.11.2026. Die Tabelle rechnet
+Zufuhr = Gehalt × Menge der Basislösung in ml/kg/d; so rechnet auch die App (PN-Volumen × Gehalt).
+
+| Lösung | Aminosäuren g/100 ml | Glukose g/100 ml | Na | K | Ca | Mg | Phosphat | Cl (mmol/100 ml) | Elektrolyt-Konzentrat |
+|---|---|---|---|---|---|---|---|---|---|
+| FG-Mix 7,5 % | 2,5 | 7,5 | 0 | 0 | 0,994 | 0 | 0 | 0 | – |
+| Basislösung FG | 2,0 | 4,0 | 4,44 | 3,004 | 1,545 | 0,203 | 1,432 | 4,56 | 40 ml/100 ml |
+| Basislösung 100 | 3,5 | 15,0 | 4,44 | 3,004 | 1,545 | 0,203 | 1,432 | 4,56 | 40 ml/100 ml |
+| Basislösung 120 | 2,92 | 12,5 | 3,70 | 2,503 | 1,288 | 0,169 | 1,193 | 3,80 | 33,33 ml/100 ml |
+| Basislösung 150 | 2,33 | 10,0 | 2,96 | 2,003 | 1,030 | 0,135 | 0,955 | 3,04 | 26,67 ml/100 ml |
+| Basis peripher | 1,75 | 7,5 | 2,22 | 1,502 | 0,773 | 0,101 | 0,716 | 2,28 | 20 ml/100 ml |
+
+Elektrolyt-Konzentrat je 100 ml: Na 11,1, K 7,51, Ca 3,863, Mg 0,507, Phosphat 3,58, Cl 11,4 mmol.
+
+| ID | Regel | Status | Code | Test |
+|---|---|---|---|---|
+| 8a.1 | **Zusammensetzung je 100 ml wie in der Tabelle oben.** Die Zufuhr je kg ergibt sich aus PN-Volumen × Gehalt; `perKgAtTarget` wird aus `per100ml` × Zielvolumen berechnet (keine zweite, von Hand übertragene Zahl mehr) | Stations-Tabelle 09/2023, übernommen 17.11.2026 | `products.js` | AT1–AT4 |
+| 8a.2 | **Fehlerkorrektur:** Bis v3.6.22 standen in `products.js` die Werte, die die Stations-Tabelle bei einer Einstellung von 70 ml/kg/d anzeigt (Basislösung 100: 2,45 statt 3,5 g Aminosäuren, 10,5 statt 15 g Glukose, 3,11 statt 4,44 mmol Natrium). Alle Nährstoffe aus Hauslösungen wurden 30 % zu niedrig gerechnet; bei Basislösung 120 und 150 kam die Teilung durch das Zielvolumen dazu (42 % und 53 % zu niedrig, z. B. Basis 150 bei 150 ml/kg/d: 1,63 statt 3,5 g Aminosäuren, GIR 4,9 statt 10,4) | Fehlerkorrektur 17.11.2026 | `products.js` | AT3, AT4, F1 |
+| 8a.3 | Basislösung 100, 120 und 150 liefern bei 100, 120 bzw. 150 ml/kg/d dieselbe Tagesdosis: 3,5 g Aminosäuren, 15 g Glukose (GIR 10,4), Na 4,44, K 3,0, Ca 1,55, Phosphat 1,43 mmol je kg | folgt aus 8a.1 | `products.js` | AT3, AT4 |
+| 8a.4 | Die Oberfläche zeigt bei Auswahl einer Hauslösung den Gehalt je 100 ml und die Zufuhr beim Zielvolumen | Technisch | `updateSolutionUI` | AT19 |
+| 8a.5 | Magnesium und Chlorid der Hauslösungen sind hinterlegt, werden aber **noch nicht** in die Bilanz gerechnet (Chlorid: siehe offener Punkt 17.24) | **Offen** | `products.js` | – |
 
 ## 9. Elektrolyte
 
@@ -250,6 +276,7 @@ Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 
 | 11.14 | Zielkonzentration wird eingegeben (g Eiweiß/100 ml, FM85 in 0,5-%-Schritten); Aptamil Eiweiß+: 82,1 g Protein je 100 g Pulver, 338 kcal; Zielkonzentration hat Vorrang | Entscheidung (v3.4) | `calculate` | Q15–Q19 |
 | 11.14a | **Eiweißlösung der Station: 1 g Eiweiß = 1 ml.** Die Zubereitung nennt das Zusatz-Eiweiß in g und das Volumen der Lösung je Mahlzeit und pro Tag. Die Zeile „Nahrung: … ml je Mahlzeit“ meint die Milchmenge, nicht das Eiweiß. Das Pulver bleibt als zweite Zeile | Entscheidung 20.10.2026 | `PROTEIN_SOLUTION`, `results.preparation` | U1–U3 |
 | 11.14b | **Eiweiß-Zusatz in zwei Einheiten** über eine Auswahl am Eingabefeld: **g/100 ml** (Hauptform, die Station steigert in der Regel bis 2 g/100 ml) oder **g Eiweiß/kg/d**. Vorrang: g/100 ml, dann g/kg/d, dann direkte Pulvereingabe. Grenzen: g/100 ml 0–3, g/kg/d 0–5. Zusatz ohne enterale Nahrung → Hinweis | Entscheidung 20.10.2026 | `proteinAddGKg`, `proteinAddPer100ml` | V1–V5, Q16–Q19 |
+| 11.14c | **Der Hinweis zur noch möglichen FM85-Stufe bzw. zum möglichen Eiweiß-Zusatz zieht die Aminosäuren der Infusion ab** (enteral erlaubt = 4,5 − Aminosäuren i. v.). Vorher wurde mit der vollen Obergrenze gerechnet („FM85 höchstens 17,5 % möglich“) | Fehlerkorrektur 17.11.2026 | `calculate` Step 12 | AT16 |
 | 11.15 | Liquigen: 4,5 kcal/ml, 0,5 g Fett/ml. Supplement-Volumen erhöht die Gesamtflüssigkeit **nicht** | Haus | `calculate` Step 7b | N15–N20 |
 | 11.16 | Harnstoff < 3 mmol/l bei enteral ≥ 100 → Hinweis (Eiweißmangel); > 8 mmol/l → Hinweis (Eiweiß prüfen) | Haus, **Offen** (17.4) | `calculate` | – |
 | 11.17 | Wachstumsrate = (Gewicht − Vortag) / Gewicht × 1000 g/kg/d; ab Tag 28 unter 15 → Hinweis (Bezeichnung „Wachstumsrate“) | Leitlinie | `calculateGrowthVelocity` | E1 |
@@ -277,6 +304,9 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 | 13.5 | **Gewichtsperzentile** nach Fenton gegen das **korrigierte** Gestationsalter (SSW + Lebenswochen) | Entscheidung 01.10.2026 | `calculate` Step 0 | S6 |
 | 13.6 | Fenton-Tabelle **männlich** für alle (kein Geschlechtsfeld); die weibliche Tabelle liegt rund 5 % niedriger | Haus, **Offen** (17.7) | `calculate` | – |
 | 13.7 | **SGA**: Geburtsgewicht unter der **10. Perzentile** beim Gestationsalter bei Geburt → Hinweis; unter der **3.** → „schwer“. Der Hinweis nennt Hypoglykämie-, Phosphat- und Kaliumrisiko; kein Eingriff in Zielwerte | Entscheidung 02.10.2026 | `SGA` | T11, T12 |
+| 13.8 | **Vortagsgewicht ist optional.** Es kommt aus dem Feld „Gewicht gestern“ (hat Vorrang, gilt nur für den Lebenstag der Eingabe) oder aus dem Verlauf desselben Kindes. Fehlt es, wird keine Wachstumsrate berechnet; die App bricht nicht mehr mit „previousWeight: NaN“ ab | Fehlerkorrektur 17.11.2026, Wunsch des Neonatologen | `updateCalculations` | AT6, AT7 |
+| 13.9 | **Plausibilität des Vortagsgewichts:** Weicht es um mehr als **15 %** vom aktuellen Gewicht ab, wird keine Wachstumsrate berechnet und eine Warnung ausgegeben (anderes Kind oder Tippfehler). 15 % an einem Tag sind nicht möglich (physiologisch rund 3 %/Tag, Regel 13.1) | Technisch, Vorschlag aus der Prüfung 17.11.2026 | `WEIGHT_COURSE.maxDailyChangePercent`, `calculate` Step 0b | AT11 |
+| 13.10 | **Der Verlauf gehört zu einem Kind.** Jeder berechnete Tag trägt das Geburtsgewicht als Kennung; Tage mit anderer Kennung werden für Vortagsgewicht, Energiedefizit, Natrium-Trend und Verlaufskurven nicht verwendet. Der Knopf „Neues Kind“ bei den Patientendaten leert Eingaben und Verlauf | Fehlerkorrektur 17.11.2026 | `childHistory`, `btn-new-child` | AT10, AT18 |
 
 ## 14. Beurteilung, Ampeln, Fazit
 
@@ -287,6 +317,10 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 | 14.3 | Höchstens 5 Aussagen, kritische zuerst (zwei) | Haus | `generateClinicalAssessment` |
 | 14.4 | **Fazit enthält alle CRITICAL-Befunde** (GIR, Osmolarität, Triglyzeride, Hypoglykämie, Kristallgefahr, SID). „Keine Korrekturen erforderlich“ steht nur bei leerer Befundliste. Bei Hypertriglyzeridämie keine Zeile „Energie steigern“ | Entscheidung 01.10.2026 | `calculate` Step 16 (S4, S5) |
 | 14.5 | Plausibilitäts-Flags: TFI < 30 oder > 300; Protein > 6; Lipide > 5; Gewicht < 200 oder > 6000 g | Technisch | `calculate` |
+| 14.6 | **Die Zusammenfassung nennt die Abweichungen beim Namen** (z. B. „Eiweiß unter Ziel (1,7, Ziel 2,5–3)“) und die Zahl der Meldungen. Vorher „2 Optimierungspunkte — siehe Befunde“, auch wenn die Befundliste leer war | Fehlerkorrektur 17.11.2026 | `generateClinicalAssessment` |
+| 14.7 | **Nach einem Eingabefehler sind die Ergebnisse als nicht aktuell gekennzeichnet:** ausgegraut, nicht bedienbar, mit Hinweiszeile; Quick-View zeigt „–“, der Doku-Text ist leer (Tests AT9) | Fehlerkorrektur 17.11.2026 | `markResultsStale` |
+| 14.8 | **Doku-Text:** „AS“ nennt die Aminosäuren der Infusion; „Eiweiß gesamt“ steht immer, getrennt nach Infusion und enteral; FM85 und Eiweiß-Zusatz mit Menge je Mahlzeit; Lipide i. v. nur, wenn sie laufen; Volumen ohne Glukose und Aminosäuren heißt „Infusion … ohne eingetragenen Inhalt“ (Tests AT12, AT13) | Fehlerkorrektur 17.11.2026 | `generateDocumentationString` |
+| 14.9 | Haken werden als angehakt/nicht angehakt gespeichert; die **Nahrungspause bleibt nach dem Neuladen** gesetzt (Test AT8) | Fehlerkorrektur 17.11.2026 | `index.html` (Speichern/Laden) |
 
 ## 15. Vorhersagehinweise (nur Hinweis, nie Sperre)
 
@@ -320,6 +354,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 16a.10 | Entfallen sind die getrennten Listen (Warnliste, Erinnerungsbox, Empfehlungsbox, Fazit-Karte) und die Bullets der Beurteilung. Alles steht in einem Bereich der Beurteilungskarte | Entscheidung 20.10.2026 | `index.html` | Z5 |
 | 16a.11 | „Im Ziel“-Zeile ersetzt die einzelnen grünen Positiv-Meldungen | Entscheidung 20.10.2026 | `renderFindings` | – |
 | 16a.12 | Nur in der Oberfläche berechnet: Wachstumsrate > 30 g/kg/d → kritisch (Ödem, Plausibilität). Beeinflusst `isSafe` nicht | Haus | `renderFindings` | – |
+| 16a.13 | Lipid- und Triglyzerid-Meldungen gehören zum Bereich „Eiweiß & Energie“ (vorher wegen einzelner Wörter bei „Wachstum“ bzw. „Enteral“); Mengen in Meldungen sind auf eine Nachkommastelle gerundet | Fehlerkorrektur 17.11.2026 | `_buildAlerts`, `calculate` | AT15, AT17 |
 
 ## 17. Offene Punkte (brauchen eine Entscheidung)
 
@@ -347,6 +382,11 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.20 | **Produkte nur im Excel (Werte je 100 ml, aus dem Excel, nicht an der Packung geprüft):** Aptamil HA Pre 66 kcal, 1,5 g Eiweiß, 3,4 g Fett, 7,2 g KH; Aptamil AR Komplettnahrung 66 kcal, 1,6 g, 3,5 g, 6,8 g (Ca 77, P 43 mg); Neocate 67 kcal, 1,8 g, 3,4 g, 7,2 g; „Primergen, Aptamil“ 62 kcal, **0,7 g Eiweiß** (wirkt zu niedrig, vermutlich Tippfehler), 3,6 g, 6,4 g; Frühkarotten je 100 ml 39 kcal, 0,8 g Eiweiß, 1,0 g Fett, 5,5 g KH. Soll das in die App? Frühkarotten und Liquigen als Volumen zusätzlich oder in der Mahlzeit enthalten? | zu entscheiden |
 | 17.21 | **Mögliche Datenverwechslung in `products.js`:** Beba FG 1 hat dort 116 mg Phosphor, im Excel stehen 116 für Calcium und 77 für Phosphat; Beba FG 2 hat 77 mg Phosphor. Bitte an der Packung prüfen | zu prüfen |
 | 17.22 | **Eingabe Aptamil Eiweiß+ wie im Excel** (g Pulver je 100 ml Milch): 1 entspricht 0,82 g Eiweiß/100 ml der App. Als zusätzliche Einheit denkbar | Vorschlag |
+| 17.23 | **Basislösung FG und Regel 12.2:** Die Lösung enthält laut Stations-Tabelle nur 4 g Glukose je 100 ml (GIR 2,8 bei 100 ml/kg/d) und löst allein den Hypoglykämie-Alarm aus. Regel 12.2 empfiehlt ab Tag 3 den Wechsel von FG-Mix (7,5 % Glukose) auf diese Lösung. Wofür wird die Basislösung FG eingesetzt (Hyperglykämie, zusammen mit einer Glukose-Infusion)? Soll die Erinnerung 12.2 bleiben, auf „Basislösung“ allgemein lauten oder entfallen? | offen |
+| 17.24 | **Chlorid der Hauslösungen:** Jetzt bekannt (Basislösung 100: Cl 4,56 bei Na 4,44 und K 3,0 mmol/100 ml), aber noch nicht in der Bilanz. Wird es mitgerechnet, liegt Na:Cl bei 0,97 und die Warnung „Chlorid-Überhang“ (Na:Cl < 1) erschiene bei jeder Basislösung. Vorschlag: Chlorid mitrechnen und nur noch über Na + K − Cl bewerten | offen, Vorschlag |
+| 17.25 | **Weitere Lösungen der Stations-Tabelle, die in der App fehlen:** NG-Mix 7,5 % (Glukose 75 g/l, Na 40 mmol/l, Ca 0,994 mmol/100 ml), Sterofundin VG-5 (Glukose 5 %, Na 140, K 4, Ca 2,5, Mg 1, Cl 141 mmol/l), fertige Halbelektrolyt-Lösung G5 % (Na 77 mmol/l), NaCl 0,45 %/Glukose 2,5 %, Elektrolyt-Infusionslösung 153 (Na 140, K 5, Ca 2,5, Mg 1,5, Cl 103 mmol/l). Aufnehmen? | offen |
+| 17.26 | **Stand der Stations-Tabelle:** Dateiname „September 2023 … AUF FEHLER ACHTEN“. Bitte bestätigen, dass die Rezepturen (8a) dem aktuellen Stand der Apotheke entsprechen | zu bestätigen |
+| 17.27 | **Reihenfolge Tag/Gewicht:** Wird das neue Gewicht eingetippt, bevor der Lebenstag weitergestellt ist, landet es im Verlauf beim alten Tag (Wachstumsrate fehlt dann). Mit eingetragenem Geburtsdatum tritt das nicht auf | bekannt, Lösung offen |
 
 ---
 
@@ -401,3 +441,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 02.11.2026 | Eingabe „Infusion gesamt“, die Gesamtflüssigkeit wird aus Infusion + enteral berechnet (Regel 4.8, Version 3.6.20). Tests AK6, AL/AM-Fixtures, AO2, AO3, AP7 mit Begründung angepasst |
 | 02.11.2026 | Eingabeart „Laufraten einzeln“ für die Infusion neben der Summe (Regel 4.9, Version 3.6.21) |
 | 02.11.2026 | Lipide wahlweise als Laufrate in ml/h, Gesamtflüssigkeit groß angezeigt, Startwerte und Simulationspatienten aus der Oberfläche entfernt (Regeln 4.10, 4.11, Version 3.6.22). Tests M2, M3, M5, AF5, AK10, AL11, AO6, AQ7, AQ8, AR7, AR8 auf den neuen Zustand umgestellt |
+| 17.11.2026 | Kritische Prüfung mit Szenarien. **Hauslösungen nach der Stations-Verordnungstabelle 09/2023 korrigiert** (Abschnitt 8a; vorher 30–53 % zu niedrig). Vortagsgewicht optional und auf Plausibilität geprüft, Verlauf je Kind, Knopf „Neues Kind“, Nahrungspause bleibt nach dem Neuladen, Ergebnisse nach Eingabefehler als nicht aktuell gekennzeichnet, Doku-Text korrigiert, Lipidziel i. v. nur bei laufender Infusion, Zusammenfassung nennt die Abweichungen, FM85-Hinweis zieht Aminosäuren i. v. ab (Regeln 7.7, 8a, 11.14c, 13.8–13.10, 14.6–14.9, 16a.13, Version 3.6.23). Tests F1, M4, M5 mit Begründung angepasst, neu AT1–AT19. Neue offene Punkte 17.23–17.27 |
