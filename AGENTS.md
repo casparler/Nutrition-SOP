@@ -581,6 +581,8 @@ git push -u origin feature/{name}-v{X.Y}
 
 | v3.6.28 | `claude/zen-babbage-vjgke2` | Bereich „Anthropometrie & Labor“ entfernt (Länge, Kopfumfang, Triglyzeride, Z-Scores); Natrium-Trend-Hinweis entfällt, im Verlauf nur noch Gewichte; Triglyzerid-Kontrollhinweis ohne Feldbezug; tote Funktionen der entfallenen Karten entfernt. → Tests AY1–AY3. **357 Tests total** | in Arbeit |
 
+| v3.6.29 | `claude/zen-babbage-vjgke2` | Triglyzerid-Kontrollhinweis gestrichen (Entscheidung 18.11.2026; Triglyzeride selten bestimmt, Kinder überwiegend dystroph). Die CRITICAL-Prüfung bei Wert > 250 mg/dl bleibt im Rechenkern. → AI1, AI3, AT15, AY3 mit Begründung angepasst. **357 Tests total** | in Arbeit |
+
 ### Git-Konfiguration im Clone
 ```
 user.email = caspar@local

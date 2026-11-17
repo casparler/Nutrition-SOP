@@ -2616,15 +2616,16 @@ describe('AH) Lipid-Anteil an NPC: Gesamtenergie, Regel nur bei vollständiger P
  * SECTION AI — Triglyzerid-Kontrollhinweis (v3.6.11)
  * Triglyzeride werden auf der Station kaum bestimmt; der Hinweis regt die Kontrolle an, wenn kein Wert vorliegt.
  * ────────────────────────────────────────────────────────────────*/
-describe('AI) Triglyzerid-Kontrollhinweis (v3.6.11)', () => {
+// v3.6.29 — Entscheidung des Neonatologen 18.11.2026: Der Triglyzerid-Kontrollhinweis entfällt (Triglyzeride werden selten
+// bestimmt, kein Eingabefeld mehr, bei überwiegend dystrophen Kindern nicht die vordringliche Sorge). AI1 und AI3 prüfen
+// jetzt das Gegenteil an denselben Fällen; AI2, AI4 und AI5 gelten unverändert.
+describe('AI) Triglyzerid-Kontrollhinweis (v3.6.11, entfallen v3.6.29)', () => {
     const mk = o => calc.calculate(baseInput({ birthWeight: 1200, currentWeight: 1200, tfi: 150, enteralVolume: 0, gir: 8, protein: 3, lipids: 2, triglycerides: null, ...o }));
     const tgHint = r => r.warnings.filter(w => /^Hinweis: Lipide i\. v\..*Triglyzeride kontrollieren/.test(w));
 
-    it('AI1: Lipide über 3 g/kg/d ohne Triglyzerid-Wert → Hinweis', () => {
-        const h = tgHint(mk({ lipids: 3.5 }));
-        expect(h).toHaveLength(1);
-        expect(h[0]).toMatch(/über 3 g\/kg\/d/);
-        expect(h[0]).toMatch(/Zufallswert genügt/);
+    it('AI1: Lipide über 3 g/kg/d ohne Triglyzerid-Wert → kein Hinweis mehr', () => {
+        expect(tgHint(mk({ lipids: 3.5 }))).toEqual([]);
+        expect(mk({ lipids: 3.5 }).warnings.some(w => /Triglyz/.test(w))).toBe(false);
     });
 
     it('AI2: Lipide bis einschließlich 3 g/kg/d bei Geburtsgewicht über 1000 g → kein Hinweis', () => {
@@ -2632,9 +2633,9 @@ describe('AI) Triglyzerid-Kontrollhinweis (v3.6.11)', () => {
         expect(tgHint(mk({ lipids: 2 }))).toEqual([]);
     });
 
-    it('AI3: ELBW ab 2 g/kg/d → Hinweis, 1000 g gehört dazu (inklusive Grenze), 1001 g nicht', () => {
-        expect(tgHint(mk({ birthWeight: 800, currentWeight: 800, lipids: 2 }))).toHaveLength(1);
-        expect(tgHint(mk({ birthWeight: 1000, currentWeight: 1000, lipids: 2 }))).toHaveLength(1);
+    it('AI3: Auch bei ELBW ab 2 g/kg/d (800 g, 1000 g) kein Hinweis mehr', () => {
+        expect(tgHint(mk({ birthWeight: 800, currentWeight: 800, lipids: 2 }))).toEqual([]);
+        expect(tgHint(mk({ birthWeight: 1000, currentWeight: 1000, lipids: 2 }))).toEqual([]);
         expect(tgHint(mk({ birthWeight: 1001, currentWeight: 1001, lipids: 2 }))).toEqual([]);
         expect(tgHint(mk({ birthWeight: 800, currentWeight: 800, lipids: 1.5 }))).toEqual([]);
     });
@@ -3808,10 +3809,12 @@ describe('AT) Korrekturen aus der kritischen Prüfung (v3.6.23)', () => {
     });
 
     it('AT15: Lipid- und Triglyzerid-Meldungen tragen das Etikett „Eiweiß & Energie“ (vorher „Wachstum“ bzw. „Enteral“)', () => {
+        // v3.6.29: Der Triglyzerid-Kontrollhinweis ist entfallen; geprüft wird das Etikett der kritischen Triglyzerid-Meldung
+        // (Wert > 250 mg/dl, Rechenkern) bei einem Kind mit Geburtsgewicht bis 1000 g.
         const r = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
-            tfi: 150, enteralVolume: 0, lipids: 3, gir: 9, protein: 3.5 }));
+            tfi: 150, enteralVolume: 0, lipids: 3, gir: 9, protein: 3.5, triglycerides: 300 }));
         const tg = r.alerts.items.find(i => /Triglyzerid/.test(i.text));
-        expect(tg.text).toMatch(/Geburtsgewicht bis 1000 g/);
+        expect(tg.level).toBe('critical');
         expect(tg.domain).toBe('macro');
         const arm = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
             tfi: 150, enteralVolume: 0, lipids: 0.5, gir: 10, protein: 3.5 }));
@@ -4123,10 +4126,10 @@ describe('AY) Kein Bereich Anthropometrie & Labor, kein Natrium-Trend (v3.6.28)'
         expect(typeof calc._analyzeSodiumTrend).toBe('function');
     });
 
-    it('AY3: Der Triglyzerid-Kontrollhinweis kommt ohne „kein Triglyzerid-Wert eingetragen“ aus', () => {
+    // v3.6.29 — Entscheidung des Neonatologen 18.11.2026: Der Triglyzerid-Kontrollhinweis entfällt ganz.
+    it('AY3: Kein Triglyzerid-Kontrollhinweis, auch nicht bei 3 g/kg/d Lipiden und Geburtsgewicht unter 1000 g', () => {
         const r = calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
             tfi: 150, enteralVolume: 0, lipids: 3, gir: 9, protein: 3.5 }));
-        const h = r.warnings.find(w => /Triglyzeride kontrollieren/.test(w));
-        expect(h).toBe('Hinweis: Lipide i. v. 3 g/kg/d (bei Geburtsgewicht bis 1000 g ab 2 g/kg/d) – Triglyzeride kontrollieren (Zufallswert genügt).');
+        expect([...r.warnings, ...r.reminders].some(w => /Triglyz/.test(w))).toBe(false);
     });
 });

@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.28';
+        this.VERSION = '3.6.29';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -1838,16 +1838,9 @@ class NutritionCalculator {
         if (triglycerides !== null && triglycerides > 250) {
             warnings.push('CRITICAL: Triglyzeride > 250 mg/dl – Hypertriglyceridämie! Lipidzufuhr auf 0,5–1,0 g/kg/d reduzieren (ESPGHAN).');
         }
-        // v3.6.11: Kein Triglyzerid-Wert eingetragen, aber Lipid-Dosis mit erhöhtem Risiko → Kontrolle anregen (nie ein Stopp).
-        if (triglycerides === null && n.lipidsPNKg > 0
-            && (n.lipidsPNKg > this.LIPID_TG_HINT.dose
-                || (birthWeightG.lte(1000) && n.lipidsPNKg >= this.LIPID_TG_HINT.doseElbw))) {
-            const grund = n.lipidsPNKg > this.LIPID_TG_HINT.dose
-                ? `über ${this.LIPID_TG_HINT.dose} g/kg/d`
-                : `bei Geburtsgewicht bis 1000 g ab ${this.LIPID_TG_HINT.doseElbw} g/kg/d`;
-            // v3.6.28: Die Oberfläche hat kein Triglyzerid-Feld mehr, daher ohne „kein Triglyzerid-Wert eingetragen“
-            warnings.push(`Hinweis: Lipide i. v. ${n.lipidsPNKg} g/kg/d (${grund}) – Triglyzeride kontrollieren (Zufallswert genügt).`);
-        }
+        // v3.6.29 (Entscheidung des Neonatologen 18.11.2026): Der Triglyzerid-Kontrollhinweis (v3.6.11) entfällt. Triglyzeride
+        // werden selten bestimmt, die Oberfläche hat kein Feld mehr, und bei überwiegend dystrophen Kindern ist das nicht die
+        // vordringliche Sorge. Die CRITICAL-Prüfung bei eingetragenem Wert > 250 mg/dl oben bleibt im Rechenkern.
 
         // C-01: Glucose concentration > 12.5% at peripheral access
         if (access === 'peripheral' && n.glucoseConc > 12.5) {

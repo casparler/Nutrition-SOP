@@ -98,7 +98,7 @@ Für diese Werte gibt es keine Literaturzahl; sie bleiben als begründete Hausen
 | 8.4 | Peripherer Zugang: Glukose > 12,5 %, Osmolarität > 900 mOsm/l |
 | 9.3, 15.2 | Natrium-Zufuhr-Anstieg > 5 mmol/kg/d in 48 h |
 | 10.4 | Ausfällung Ca + P > 72 bzw. > 55 mmol/l |
-| 10.6 | Triglyzerid-Hinweis ab 3 g/kg/d bzw. 2 g/kg/d bei ≤ 1000 g (auf Grundlage von Frost 2023, Suh 2025, Bader 2021) |
+| 10.6 | ~~Triglyzerid-Hinweis ab 3 g/kg/d bzw. 2 g/kg/d bei ≤ 1000 g~~ entfallen 18.11.2026 |
 | 12.1–12.3, 14.1–14.3, 16 | Erinnerungen, Ampeln, Phasen |
 | 13.2, 13.3 | Gewichtsverlust < 2 % bzw. > 15 %, Geburtsgewicht nach Tag 14 |
 | 15.1 | Energiedefizit-Schwelle 150 kcal/kg (Konzept: Embleton 2001) |
