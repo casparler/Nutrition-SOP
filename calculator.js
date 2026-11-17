@@ -24,7 +24,7 @@ class NutritionCalculator {
         // „undefined“ in der Zubereitung, neue Eingabefelder ohne Wirkung).
         // Bei JEDER Änderung an calculator.js oder index.html hochzählen — an drei
         // Stellen: hier, `EXPECTED_CALC_VERSION` und die ?v= der Skript-Tags in index.html.
-        this.VERSION = '3.6.23';
+        this.VERSION = '3.6.24';
         this.LIMITS = {
             // TFI: Gestufte Grenzen (v3.1).
             //   hint  180 → gelber Hinweis (hohe Zufuhr, Bilanz beachten)
@@ -740,7 +740,7 @@ class NutritionCalculator {
         }
         // v3.6.23: Eiweiß immer ausweisen, getrennt nach Infusion und enteral (fehlte bei voll enteral ernährten Kindern)
         const eiweissEnteral = Math.max(0, Number(r.proteinTotalGPerKg) - Number(r.effectiveAS_GKg || 0));
-        lines.push(`- Eiweiß gesamt ${num(r.proteinTotalGPerKg, 2)} g/kg/d (Infusion ${num(r.effectiveAS_GKg, 2)} / enteral ${num(eiweissEnteral, 2)}; Ziel ${res.targets.protein.min}–${res.targets.protein.max})`);
+        lines.push(`- Eiweiß gesamt ${num(r.proteinTotalGPerKg, 2)} g/kg/d (Infusion ${num(r.effectiveAS_GKg, 2)} / enteral ${num(eiweissEnteral, 2)}${ssw >= 37 ? '' : `; Ziel ${res.targets.protein.min}–${res.targets.protein.max}`})`);
 
         const caP = r.caPRatio > 0 ? `Ca:P ${num(r.caPRatio, 2)}:1` : 'Ca:P –';
         const paa = r.paaRatio > 0 ? `P:AA ${num(r.paaRatio, 2)} mmol/g` : 'P:AA –';
@@ -1101,6 +1101,9 @@ class NutritionCalculator {
         const currentWeightG = D(sp(input.currentWeight, 'currentWeight', { defaultValue: birthWeightG.toNumber() }));
         const postnatalAge = Math.max(1, sp(input.postnatalAge, 'postnatalAge', { defaultValue: 1, integer: true }));
         const ssw = sp(input.ssw, 'ssw', { defaultValue: 28, integer: true });
+        // v3.6.24 (Entscheidung des Neonatologen 17.11.2026): Bei Reifgeborenen (ab 37+0 SSW) werden Eiweiß- und
+        // Energieziel nicht bewertet. Die Sicherheitsgrenzen (CRITICAL) gelten unverändert.
+        const reifgeboren = Number(ssw) >= 37;
         const tfi = D(sp(input.tfi, 'tfi', { defaultValue: 0 }));
         const enteralVolKg = D(sp(input.enteralVolume, 'enteralVolume', { defaultValue: 0 }));
         // v3.4: nicht mehr ganzzahlig — Anreicherung in 0,5-%-Schritten moeglich
@@ -1741,8 +1744,10 @@ class NutritionCalculator {
         if (n.singlePortion >= 3) {
             reminders.push('💡 Vitamin D (500 IE) und Proprems (Probiotika) ab jetzt indiziert');
         }
+        // v3.6.24: FG-Mix ist für die ersten 2 Lebenstage gedacht. Danach Wechsel-Erinnerung (ohne Festlegung auf
+        // „Basislösung FG“, siehe REGELWERK 17.23) und unten ein Phosphat-/Kalium-Hinweis.
         if (postnatalAge >= 3 && selectedSolution === 'fgMix75') {
-            reminders.push('💡 Tag ≥ 3: Wechsel von FG-Mix 7,5% auf Basislösung FG empfohlen');
+            reminders.push(`💡 Lebenstag ${postnatalAge}: FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf eine Basislösung empfohlen`);
         }
         if (fm85Percent > 0 && n.enteralVolKg < 100) {
             reminders.push('💡 FM85 aktiv bei < 100 ml/kg/d – Verträglichkeit engmaschig kontrollieren');
@@ -1760,9 +1765,8 @@ class NutritionCalculator {
         }
         // v3.6.16: keine Anreicherungs-Empfehlungen, wenn die Energie schon an der Obergrenze liegt
         const energieAmLimit = this._energyAtLimit(n.kcalPerKg, targets, postnatalAge, n.kcalParenteralKg);
-        if (fortifierIndiziert && !energieAmLimit && n.enteralVolKg >= 50 && n.enteralVolKg < 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
-            reminders.push('💡 Fortifizierung (FM85) empfohlen ab enteralem Volumen von 50 ml/kg/d (ESPGHAN).');
-        }
+        // v3.6.24 (Entscheidung des Neonatologen 17.11.2026): FM85 frühestens ab 100 ml/kg/d. Die frühere Erinnerung
+        // „empfohlen ab 50 ml/kg/d“ entfällt (sie widersprach dem Hinweis „Start erst ab 100“).
         if (fortifierIndiziert && !energieAmLimit && n.enteralVolKg >= 100 && fm85Percent === 0 && selectedEnteralProduct === 'ebm') {
             reminders.push('💡 FM85 Start-Kriterium erfüllt (≥ 100 ml/kg/d enteral)');
         }
@@ -1997,18 +2001,23 @@ class NutritionCalculator {
             warnings.push('Hinweis: FM85 Start i.d.R. erst ab 100 ml/kg/d enteralem Volumen empfohlen.');
         }
 
+        // v3.6.24: FG-Mix über Tag 2 hinaus — Aminosäuren ohne Phosphat und Kalium
+        if (postnatalAge >= 3 && selectedSolution === 'fgMix75' && hasPNVolume) {
+            warnings.push(`Hinweis: FG-Mix 7,5 % an Lebenstag ${postnatalAge} – die Lösung enthält Aminosäuren, aber kein Phosphat und kein Kalium. Serum-Phosphat und Kalium kontrollieren (Hypophosphatämie-Risiko), Wechsel auf eine Basislösung.`);
+        }
+
         // C-02: Protein deficiency below target at day 4+ for ELBW
-        if (postnatalAge >= 4 && n.proteinTotalGKg < targets.protein.min) {
+        if (!reifgeboren && postnatalAge >= 4 && n.proteinTotalGKg < targets.protein.min) {
             warnings.push(`Hinweis: Protein ${n.proteinTotalGKg} g/kg/d unter Zielbereich (${targets.protein.min}–${targets.protein.max}) – Steigerung prüfen.`);
         }
 
         // C-03: Energy deficiency below target at day 4+
-        if (postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
+        if (!reifgeboren && postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
             warnings.push(`Hinweis: Energie ${n.kcalPerKg} kcal/kg/d unter Zielbereich (${targets.energy.min}–${targets.energy.max}) – Zufuhr steigern.`);
         }
 
         // Energy excess above target
-        if (postnatalAge >= 4 && n.kcalPerKg > targets.energy.max) {
+        if (!reifgeboren && postnatalAge >= 4 && n.kcalPerKg > targets.energy.max) {
             warnings.push(`Hinweis: Energie ${n.kcalPerKg} kcal/kg/d über Zielbereich (${targets.energy.min}–${targets.energy.max}) – Überernährung prüfen.`);
         }
 
@@ -2211,13 +2220,17 @@ class NutritionCalculator {
 
         const comparisons = {
             tfi: { value: tfi.toNumber(), target: targets.tfi, status: checkStatus(tfi.toNumber(), targets.tfi) },
-            protein: { value: n.proteinTotalGKg, target: targets.protein, status: checkStatus(n.proteinTotalGKg, targets.protein) },
+            protein: reifgeboren
+                ? { value: n.proteinTotalGKg, target: targets.protein, status: 'neutral', notApplicable: true }
+                : { value: n.proteinTotalGKg, target: targets.protein, status: checkStatus(n.proteinTotalGKg, targets.protein) },
             // v3.6.23: Das Lipidziel gilt für Lipide über die Vene. Läuft keine Infusion (kein PN-Volumen, keine Lipide),
             // wird es nicht bewertet (vorher: „Lipide-Target unterschritten: 0 g/kg/d“ bei voll enteral ernährten Kindern).
             lipids: (!hasPNVolume && n.lipidsPNKg === 0)
                 ? { value: 0, target: targets.lipidTarget, status: 'neutral', notApplicable: true }
                 : { value: n.lipidsPNKg, target: targets.lipidTarget, status: checkStatus(n.lipidsPNKg, targets.lipidTarget) },
-            energy: { value: n.kcalPerKg, target: targets.energy, status: checkStatus(n.kcalPerKg, targets.energy) },
+            energy: reifgeboren
+                ? { value: n.kcalPerKg, target: targets.energy, status: 'neutral', notApplicable: true }
+                : { value: n.kcalPerKg, target: targets.energy, status: checkStatus(n.kcalPerKg, targets.energy) },
             // v3.2: Das enterale Volumen wird gegen den Korridor des AKTUELLEN
             // Lebenstags bewertet, nicht gegen das Endziel — sonst leuchtet die
             // Kachel bei jedem Kind in der ersten Lebenswoche rot (Alarm-Fatigue).
@@ -2296,10 +2309,10 @@ class NutritionCalculator {
         // Bei Hypertriglyceridämie ist „Energie steigern“ über Lipide gegenläufig zur
         // kritischen Empfehlung oben — dann keine zusätzliche Energie-Zeile.
         const tgKritisch = triglycerides !== null && triglycerides > 250;
-        if (fazit.length < 3 && !tgKritisch && postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
+        if (fazit.length < 3 && !reifgeboren && !tgKritisch && postnatalAge >= 4 && n.kcalPerKg < targets.energy.min) {
             fazit.push(`Energiezufuhr um ${this._round(targets.energy.min - n.kcalPerKg, 0)} kcal/kg/d steigern (Ziel ${targets.energy.min}–${targets.energy.max}).`);
         }
-        if (fazit.length < 3 && postnatalAge >= 4 && n.proteinTotalGKg < targets.protein.min && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
+        if (fazit.length < 3 && !reifgeboren && postnatalAge >= 4 && n.proteinTotalGKg < targets.protein.min && n.proteinTotalGKg <= this.LIMITS.PROTEIN.max) {
             fazit.push(`Proteinzufuhr um ${this._round(targets.protein.min - n.proteinTotalGKg, 1)} g/kg/d steigern (Ziel ${targets.protein.min}–${targets.protein.max}).`);
         }
         if (fazit.length < 3 && n.npcPerProtein > 0 && n.npcPerProtein < 20) {

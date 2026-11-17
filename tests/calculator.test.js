@@ -3799,11 +3799,13 @@ describe('AT) Korrekturen aus der kritischen Prüfung (v3.6.23)', () => {
     });
 
     it('AT14: Die Zusammenfassung nennt die Abweichungen beim Namen statt „Optimierungspunkte — siehe Befunde“', () => {
-        const r = calc.calculate(baseInput({ birthWeight: 3400, currentWeight: 3300, ssw: 40, postnatalAge: 6,
+        // v3.6.24: Beispiel auf ein spätes Frühgeborenes (34 SSW) umgestellt, weil Eiweiß und Energie bei Reifgeborenen
+        // nach Entscheidung des Neonatologen vom 17.11.2026 nicht mehr bewertet werden (Tests AU1, AU2). Prüfziel unverändert.
+        const r = calc.calculate(baseInput({ birthWeight: 2100, currentWeight: 2050, ssw: 34, postnatalAge: 6,
             tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0 }));
         expect(r.assessment.status).toBe('attention');
         expect(r.assessment.summary).not.toMatch(/Optimierungspunkt/);
-        expect(r.assessment.summary).toMatch(/Eiweiß unter Ziel \(1\.7, Ziel 2\.5–3\)/);
+        expect(r.assessment.summary).toMatch(/Eiweiß unter Ziel \(1\.7, Ziel 3–3\.5\)/);
         expect(r.assessment.summary).toMatch(/Energie unter Ziel/);
         expect(r.assessment.summary).not.toMatch(/Lipide/);
     });
@@ -3856,5 +3858,66 @@ describe('AT) Korrekturen aus der kritischen Prüfung (v3.6.23)', () => {
         const txt = $(w, 'sol-info').textContent;
         expect(txt).toMatch(/Je 100 ml: Aminosäuren 2,92 g \| Glukose 12,5 g \| Na 3,7 \| K 2,5/);
         expect(txt).toMatch(/Bei 120 ml\/kg\/d: Aminosäuren 3,5 g\/kg\/d \| Glukose 15 g\/kg\/d \(10,4 mg\/kg\/min\)/);
+    });
+});
+
+/* ────────────────────────────────────────────────────────────────
+ * SECTION AU — Entscheidungen des Neonatologen vom 17.11.2026 (v3.6.24)
+ * (1) Bei Reifgeborenen werden Eiweiß- und Energieziel nicht bewertet. (2) FM85 frühestens ab 100 ml/kg/d, die Erinnerung
+ * „empfohlen ab 50 ml/kg/d“ entfällt. (3) FG-Mix über Lebenstag 2 hinaus: Wechsel-Erinnerung und Phosphat-/Kalium-Hinweis.
+ * ────────────────────────────────────────────────────────────────*/
+describe('AU) Reifgeborene, FM85-Start, FG-Mix nach Tag 2 (v3.6.24)', () => {
+    const enteral = o => calc.calculate(baseInput({ birthWeight: 3400, currentWeight: 3300, ssw: 40, postnatalAge: 6,
+        tfi: 150, enteralVolume: 150, gir: 0, protein: 0, lipids: 0, calcium: 0, phosphate: 0, sodium: 0, potassium: 0, ...o }));
+
+    it('AU1: Reifgeborenes mit 150 ml/kg/d Muttermilch — Eiweiß und Energie werden nicht bewertet, die Beurteilung ist stabil', () => {
+        const r = enteral({});
+        expect(r.comparisons.protein.status).toBe('neutral');
+        expect(r.comparisons.energy.status).toBe('neutral');
+        expect(r.warnings.some(w => /unter Zielbereich|über Zielbereich/.test(w) && /Protein|Energie/.test(w))).toBe(false);
+        expect(r.fazit.some(f => /Proteinzufuhr|Energiezufuhr/.test(f))).toBe(false);
+        expect(r.assessment.status).toBe('stable');
+        expect(r.assessment.bullets.some(b => /Protein|Energie/.test(b.text))).toBe(false);
+        expect(r.documentation).toMatch(/Eiweiß gesamt 1\.70 g\/kg\/d \(Infusion 0\.00 \/ enteral 1\.70\)/);   // ohne Zielangabe
+        // Die Werte selbst bleiben berechnet und sichtbar
+        expect(r.results.proteinTotalGPerKg).toBeCloseTo(1.7, 1);
+        expect(r.results.kcalPerKg).toBeCloseTo(106.5, 1);
+    });
+
+    it('AU2: Die Grenze liegt bei 37+0 SSW; Sicherheitsgrenzen gelten auch bei Reifgeborenen', () => {
+        const fg = enteral({ ssw: 36, birthWeight: 2600, currentWeight: 2550 });
+        expect(fg.comparisons.protein.status).not.toBe('neutral');
+        expect(fg.warnings.some(w => /Protein .* unter Zielbereich/.test(w))).toBe(true);
+        expect(enteral({ ssw: 37 }).comparisons.energy.status).toBe('neutral');
+        // Eiweiß über 4,5 g/kg/d bleibt kritisch
+        const zuviel = enteral({ selectedEnteralProduct: 'bebaFG1', enteralVolume: 160, tfi: 160 });
+        expect(zuviel.results.proteinTotalGPerKg).toBeGreaterThan(4.5);
+        expect(zuviel.warnings.some(w => /^CRITICAL: Protein gesamt/.test(w))).toBe(true);
+        expect(zuviel.assessment.status).toBe('critical');
+    });
+
+    const fg = o => calc.calculate(baseInput({ birthWeight: 900, currentWeight: 900, ssw: 27, postnatalAge: 6, access: 'central',
+        tfi: 150, gir: 8, protein: 3, lipids: 2, ...o }));
+
+    it('AU3: FM85 frühestens ab 100 ml/kg/d — bei 60 ml/kg/d gibt es keine Empfehlung mehr, ab 100 das Start-Kriterium', () => {
+        const bei60 = fg({ enteralVolume: 60 });
+        expect([...bei60.reminders, ...bei60.warnings].some(t => /FM85|Fortifizierung/.test(t))).toBe(false);
+        const bei100 = fg({ enteralVolume: 100, protein: 1, gir: 3, lipids: 0 });
+        expect(bei100.reminders.some(t => /FM85 Start-Kriterium erfüllt \(≥ 100 ml\/kg\/d enteral\)/.test(t))).toBe(true);
+        // Wird FM85 vorher eingetragen, bleibt der Hinweis auf 100 ml/kg/d
+        expect(fg({ enteralVolume: 60, fm85Percent: 2 }).warnings.some(w => /erst ab 100 ml\/kg\/d/.test(w))).toBe(true);
+    });
+
+    it('AU4: FG-Mix an Lebenstag 3 — Wechsel-Erinnerung und Hinweis auf Phosphat und Kalium; an Tag 2 keines von beiden', () => {
+        const mix = tag => calc.calculate(baseInput({ birthWeight: 800, currentWeight: 780, ssw: 26, postnatalAge: tag, access: 'central',
+            tfi: 100, enteralVolume: 0, lipids: 1, selectedSolution: 'fgMix75' }));
+        const t3 = mix(3);
+        expect(t3.reminders.some(t => /FG-Mix 7,5 % ist für die ersten 2 Lebenstage gedacht – Wechsel auf eine Basislösung empfohlen/.test(t))).toBe(true);
+        const h = t3.warnings.find(w => /^Hinweis: FG-Mix/.test(w));
+        expect(h).toMatch(/kein Phosphat und kein Kalium/);
+        expect(h).toMatch(/Serum-Phosphat und Kalium kontrollieren/);
+        expect(t3.alerts.items.find(i => /FG-Mix/.test(i.text)).domain).toBe('electrolytes');
+        const t2 = mix(2);
+        expect([...t2.reminders, ...t2.warnings].some(t => /FG-Mix/.test(t))).toBe(false);
     });
 });

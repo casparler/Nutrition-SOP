@@ -1,6 +1,6 @@
 # NeoNutri — Regelwerk (Manuskript)
 
-Stand: 17.11.2026, Version v3.6.23, 341 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
+Stand: 17.11.2026, Version v3.6.24, 345 Tests. Quellen: [QUELLEN.md](./QUELLEN.md).
 
 Dieses Dokument beschreibt **jede Regel, nach der der Rechner arbeitet**: Wert, Herkunft,
 Entscheidungsdatum, Stelle im Code und Absicherung durch Tests. Es dient dazu, Regeln später
@@ -101,6 +101,7 @@ Zielspannen in ml/kg/d (`TFI_TARGETS`). ELBW und VLBW liegen **bewusst 10 ml unt
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
 | 5.1 | Ziel kcal/kg/d: Tag 1 **45–60**, Tag 2 **60–80**, Tag 3 **80–100**, ab Tag 4 **110–140** (bis v3.6.16: 110–135; Entscheidung 01.11.2026, ESPGHAN 2022: 115–140) | Haus | `getTargets` | O2, AN1–AN6 |
+| 5.1a | **Bei Reifgeborenen (ab 37+0 SSW) wird das Energieziel nicht bewertet:** keine Meldung „unter/über Zielbereich“, keine Zeile in den nächsten Schritten, Ampel neutral, kein Energiedefizit im Verlauf. Der Wert wird weiter berechnet und angezeigt | Entscheidung 17.11.2026 | `calculate` (`reifgeboren`) | AU1, AU2 |
 | 5.2 | Ab Tag 4: unter Ziel → Hinweis; über Ziel → Hinweis „Überernährung prüfen“ | Haus | `calculate` Step 12 | – |
 | 5.3 | Brennwerte: Glukose 4, Protein 4, Lipide 9 (Standard) bzw. 10 kcal/g (SMOFlipid) | Technisch | `CALORIES` | – |
 | 5.4 | Plausibilitäts-Flag bei > 180 kcal/kg/d | Technisch | `calculate` | – |
@@ -110,6 +111,7 @@ Zielspannen in ml/kg/d (`TFI_TARGETS`). ELBW und VLBW liegen **bewusst 10 ml unt
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
 | 6.1 | Ziel g/kg/d: ELBW ≤ 1000 g **3,5–4,0**; ≤ 1500 g **3,0–3,5**; ≥ 37 SSW und > 1500 g **2,5–3,0**; sonst 3,0–3,5 | Haus (Leitlinie ELBW) | `getTargets` | C1, C2, Q7 |
+| 6.1a | **Bei Reifgeborenen (ab 37+0 SSW) wird das Eiweißziel nicht bewertet** (wie 5.1a). Die Obergrenze 4,5 g/kg/d bleibt CRITICAL | Entscheidung 17.11.2026 | `calculate` (`reifgeboren`) | AU1, AU2 |
 | 6.2 | Obergrenze gesamt (PN + enteral) **4,5 g/kg/d** → CRITICAL, `isSafe = false` | Haus + Leitlinie | `LIMITS.PROTEIN` | – |
 | 6.3 | Ab Tag 4: unter Zielminimum → Hinweis | Haus | `calculate` | – |
 | 6.4 | Ampel (grün/gelb/rot) vergleicht an **jedem** Lebenstag gegen das Ziel, auch an Tag 1–3 | Haus, **Offen** (17.5) | `comparisons` | – |
@@ -271,7 +273,7 @@ Sterofundin ISO je 1000 ml: Na 145, K 4, Ca 2,5, Mg 1, Cl 127, Acetat 24, Malat 
 | 11.9 | **FM85 wirkt nur auf Muttermilch, Zusammensetzung nach Packung** (je 100 g Pulver: 435 kcal, 35,5 g Eiweiß, 18,1 g Fett, 32,4 g Kohlenhydrate, 918 mg Natrium, 1890 mg Calcium, 1095 mg Phosphor). Je 1 % (= 1 g auf 100 ml; 4 % = 1 g auf 25 ml): +0,355 g Eiweiß, +4,35 kcal, +0,181 g Fett, +0,324 g Kohlenhydrate, +9,18 mg Na, +18,9 mg Ca, +10,95 mg P je 100 ml. Vorher 0,4675 g Eiweiß und 3,5 kcal je 1 %, was das Eiweiß um rund 30 % zu hoch und die Energie zu niedrig rechnete | Entscheidung 20.10.2026 (Packungsangabe) | `FM85_PER_PERCENT`, `products.js` | AB1–AB4, Q14–Q21 |
 | 11.10 | Basis EBM je 100 ml: 71 kcal, 1,13 g Protein, 4,03 g Fett, 7,0 g KH, 7 mg Na, 28 mg Ca, 32 mg P | Haus | `calculate`, `products.js` | – |
 | 11.11 | **Bei Formelnahrung wird ein stehendes FM85-Feld ignoriert**, die Zubereitung zeigt 0 g, ein Hinweis erscheint | Entscheidung 01.10.2026 | `fm85Ignoriert` | S7, S7b |
-| 11.12 | **FM85-Empfehlungen** (Erinnerung ab 50 ml/kg/d, Start-Kriterium ab 100 ml/kg/d, Titrationsplan auf 4 %, Fazit-Zeile, Hinweis ab Tag 28) nur bei **Geburtsgewicht < 1800 g** | Entscheidung 02.10.2026, Geltungsbereich ESPGHAN 2022 | `FORTIFIER.maxBirthWeight` | T7, T8 |
+| 11.12 | **FM85 frühestens ab 100 ml/kg/d enteral.** FM85-Empfehlungen (Start-Kriterium ab 100 ml/kg/d, Titrationsplan auf 4 %, Fazit-Zeile, Hinweis ab Tag 28) nur bei **Geburtsgewicht < 1800 g**. Die frühere Erinnerung „empfohlen ab 50 ml/kg/d“ ist entfallen | Entscheidung 02.10.2026 (Geltungsbereich ESPGHAN 2022) und 17.11.2026 (Start ab 100) | `FORTIFIER.maxBirthWeight`, `calculate` | T7, T8, AU3 |
 | 11.13 | FM85 bei enteral < 100 ml/kg/d → Hinweis; Voraussetzungs-Erinnerung (stabiles Abdomen, > 5–7 Tage toleriert) | Haus | `calculate` | – |
 | 11.14 | Zielkonzentration wird eingegeben (g Eiweiß/100 ml, FM85 in 0,5-%-Schritten); Aptamil Eiweiß+: 82,1 g Protein je 100 g Pulver, 338 kcal; Zielkonzentration hat Vorrang | Entscheidung (v3.4) | `calculate` | Q15–Q19 |
 | 11.14a | **Eiweißlösung der Station: 1 g Eiweiß = 1 ml.** Die Zubereitung nennt das Zusatz-Eiweiß in g und das Volumen der Lösung je Mahlzeit und pro Tag. Die Zeile „Nahrung: … ml je Mahlzeit“ meint die Milchmenge, nicht das Eiweiß. Das Pulver bleibt als zweite Zeile | Entscheidung 20.10.2026 | `PROTEIN_SOLUTION`, `results.preparation` | U1–U3 |
@@ -290,7 +292,7 @@ Volumen- oder Nierenproblem: Eiweißzufuhr senken erwägen.
 | ID | Regel | Status | Code | Test |
 |---|---|---|---|---|
 | 12.1 | **Vitamin D und Proprems**, sobald die Einzelmahlzeit **≥ 3 ml** beträgt. Die absolute Grenze bleibt bewusst so | Entscheidung 02.10.2026 | `calculate` Step 11 | – |
-| 12.2 | Ab Tag 3 auf FG-Mix 7,5 %: Wechsel auf Basislösung FG empfohlen | Haus | `calculate` | – |
+| 12.2 | **FG-Mix 7,5 % über Lebenstag 2 hinaus** (ab Tag 3): Erinnerung „Wechsel auf eine Basislösung“ und Hinweis „kein Phosphat, kein Kalium: Serum-Phosphat und Kalium kontrollieren“ (Hypophosphatämie-Risiko bei Aminosäuren ohne Phosphat). Der Mix wird auf Station kaum länger als 2 Tage gegeben | Entscheidung 17.11.2026 | `calculate` | F6, AU4 |
 | 12.3 | Triglyzeride 200–250: Lipid-Reduktion erwägen | Haus | `calculate` | – |
 
 ## 13. Gewicht, Perzentilen, SGA
@@ -367,8 +369,8 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.5 | **Protein-Ziel und Aufbau (6.4)**: Soll die Protein-Ampel erst gelten, wenn enteral aufgebaut wird? Die Regel „Protein erst beim enteralen Aufbau“ ist in den Projektdokumenten nicht auffindbar | Passage aus dem Protokoll nötig |
 | 17.6 | **Kalium-Schwere (9.5, 9.6)**: aktuell Warnung. Soll es CRITICAL sein? Soll enterales Kalium mitgerechnet werden? | offen |
 | 17.7 | **Geschlecht (13.6)** für Perzentile und SGA | zurückgestellt |
-| 17.8 | **Protein-Obergrenze 4,5 g/kg/d für Reife** (6.2): in ESPGHAN 2022 nicht geregelt (nur < 1800 g) | Quelle fehlt |
-| 17.9 | **Energie- und Protein-Ziele für Reife** (5.1, 6.1): Leitlinienwerte für Reife nicht belegt | Quelle fehlt |
+| 17.8 | **Protein-Obergrenze 4,5 g/kg/d für Reife** (6.2): in ESPGHAN 2022 nicht geregelt (nur < 1800 g). Bleibt als Sicherheitsgrenze; das Ziel wird bei Reifen nicht mehr bewertet (6.1a) | Quelle fehlt |
+| 17.9 | ~~Energie- und Protein-Ziele für Reife~~ **entschieden 17.11.2026:** werden bei Reifgeborenen nicht bewertet (5.1a, 6.1a) | erledigt |
 | 17.10 | ~~FM85-Zusammensetzung~~ | **entschieden 20.10.2026:** Packungswerte übernommen (siehe 11.9). Folge: Der Standardverlauf EBM + FM85 4 % ist nicht mehr dauerhaft kritisch; die Energie begrenzt das Volumen bei 4 % auf 150 ml/kg/d |
 | 17.11 | **Sterofundin ISO (9a)**: Zusammensetzung aus meinem Wissen eingetragen, **nicht an der Packung geprüft**. Bitte mit dem Etikett abgleichen. Ist eine andere Sterofundin-Variante im Einsatz (z. B. mit Glucose oder Halbelektrolyt), fehlt sie noch | Packungswerte nötig |
 | 17.12 | ~~Osmolarität bei Sekundärinfusion~~ **erledigt 23.10.2026** (Regeln 9a.6–9a.9). Die stehengebliebenen PN-Felder leert die App jetzt selbst über die Auswahl „Keine parenterale Ernährung“ | erledigt |
@@ -382,7 +384,7 @@ bleiben im vollen Wortlaut erhalten; es wird nur gestaffelt, nie unterdrückt.
 | 17.20 | **Produkte nur im Excel (Werte je 100 ml, aus dem Excel, nicht an der Packung geprüft):** Aptamil HA Pre 66 kcal, 1,5 g Eiweiß, 3,4 g Fett, 7,2 g KH; Aptamil AR Komplettnahrung 66 kcal, 1,6 g, 3,5 g, 6,8 g (Ca 77, P 43 mg); Neocate 67 kcal, 1,8 g, 3,4 g, 7,2 g; „Primergen, Aptamil“ 62 kcal, **0,7 g Eiweiß** (wirkt zu niedrig, vermutlich Tippfehler), 3,6 g, 6,4 g; Frühkarotten je 100 ml 39 kcal, 0,8 g Eiweiß, 1,0 g Fett, 5,5 g KH. Soll das in die App? Frühkarotten und Liquigen als Volumen zusätzlich oder in der Mahlzeit enthalten? | zu entscheiden |
 | 17.21 | **Mögliche Datenverwechslung in `products.js`:** Beba FG 1 hat dort 116 mg Phosphor, im Excel stehen 116 für Calcium und 77 für Phosphat; Beba FG 2 hat 77 mg Phosphor. Bitte an der Packung prüfen | zu prüfen |
 | 17.22 | **Eingabe Aptamil Eiweiß+ wie im Excel** (g Pulver je 100 ml Milch): 1 entspricht 0,82 g Eiweiß/100 ml der App. Als zusätzliche Einheit denkbar | Vorschlag |
-| 17.23 | **Basislösung FG und Regel 12.2:** Die Lösung enthält laut Stations-Tabelle nur 4 g Glukose je 100 ml (GIR 2,8 bei 100 ml/kg/d) und löst allein den Hypoglykämie-Alarm aus. Regel 12.2 empfiehlt ab Tag 3 den Wechsel von FG-Mix (7,5 % Glukose) auf diese Lösung. Wofür wird die Basislösung FG eingesetzt (Hyperglykämie, zusammen mit einer Glukose-Infusion)? Soll die Erinnerung 12.2 bleiben, auf „Basislösung“ allgemein lauten oder entfallen? | offen |
+| 17.23 | **Basislösung FG und Regel 12.2:** Die Lösung enthält laut Stations-Tabelle nur 4 g Glukose je 100 ml (GIR 2,8 bei 100 ml/kg/d) und löst allein den Hypoglykämie-Alarm aus. Regel 12.2 empfiehlt ab Tag 3 den Wechsel von FG-Mix (7,5 % Glukose) auf diese Lösung. Wofür wird die Basislösung FG eingesetzt (Hyperglykämie, zusammen mit einer Glukose-Infusion)? Soll die Erinnerung 12.2 bleiben, auf „Basislösung“ allgemein lauten oder entfallen? | teilweise erledigt 17.11.2026: Regel 12.2 nennt jetzt „eine Basislösung“; die Frage zur Verwendung der Basislösung FG ist offen |
 | 17.24 | **Chlorid der Hauslösungen:** Jetzt bekannt (Basislösung 100: Cl 4,56 bei Na 4,44 und K 3,0 mmol/100 ml), aber noch nicht in der Bilanz. Wird es mitgerechnet, liegt Na:Cl bei 0,97 und die Warnung „Chlorid-Überhang“ (Na:Cl < 1) erschiene bei jeder Basislösung. Vorschlag: Chlorid mitrechnen und nur noch über Na + K − Cl bewerten | offen, Vorschlag |
 | 17.25 | **Weitere Lösungen der Stations-Tabelle, die in der App fehlen:** NG-Mix 7,5 % (Glukose 75 g/l, Na 40 mmol/l, Ca 0,994 mmol/100 ml), Sterofundin VG-5 (Glukose 5 %, Na 140, K 4, Ca 2,5, Mg 1, Cl 141 mmol/l), fertige Halbelektrolyt-Lösung G5 % (Na 77 mmol/l), NaCl 0,45 %/Glukose 2,5 %, Elektrolyt-Infusionslösung 153 (Na 140, K 5, Ca 2,5, Mg 1,5, Cl 103 mmol/l). Aufnehmen? | offen |
 | 17.26 | **Stand der Stations-Tabelle:** Dateiname „September 2023 … AUF FEHLER ACHTEN“. Bitte bestätigen, dass die Rezepturen (8a) dem aktuellen Stand der Apotheke entsprechen | zu bestätigen |
@@ -442,3 +444,4 @@ Zusammenfassungen und Auszügen und sollten einmal gegen die Originale geprüft 
 | 02.11.2026 | Eingabeart „Laufraten einzeln“ für die Infusion neben der Summe (Regel 4.9, Version 3.6.21) |
 | 02.11.2026 | Lipide wahlweise als Laufrate in ml/h, Gesamtflüssigkeit groß angezeigt, Startwerte und Simulationspatienten aus der Oberfläche entfernt (Regeln 4.10, 4.11, Version 3.6.22). Tests M2, M3, M5, AF5, AK10, AL11, AO6, AQ7, AQ8, AR7, AR8 auf den neuen Zustand umgestellt |
 | 17.11.2026 | Kritische Prüfung mit Szenarien. **Hauslösungen nach der Stations-Verordnungstabelle 09/2023 korrigiert** (Abschnitt 8a; vorher 30–53 % zu niedrig). Vortagsgewicht optional und auf Plausibilität geprüft, Verlauf je Kind, Knopf „Neues Kind“, Nahrungspause bleibt nach dem Neuladen, Ergebnisse nach Eingabefehler als nicht aktuell gekennzeichnet, Doku-Text korrigiert, Lipidziel i. v. nur bei laufender Infusion, Zusammenfassung nennt die Abweichungen, FM85-Hinweis zieht Aminosäuren i. v. ab (Regeln 7.7, 8a, 11.14c, 13.8–13.10, 14.6–14.9, 16a.13, Version 3.6.23). Tests F1, M4, M5 mit Begründung angepasst, neu AT1–AT19. Neue offene Punkte 17.23–17.27 |
+| 17.11.2026 | Entscheidungen des Neonatologen: Eiweiß- und Energieziel bei Reifgeborenen nicht bewerten (5.1a, 6.1a), FM85 frühestens ab 100 ml/kg/d, Erinnerung „ab 50“ entfällt (11.12), FG-Mix ab Tag 3 mit Wechsel-Erinnerung und Phosphat-/Kalium-Hinweis (12.2). Version 3.6.24, Tests AU1–AU4, AT14 auf ein Frühgeborenes umgestellt |
